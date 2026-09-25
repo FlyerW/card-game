@@ -7,13 +7,17 @@
   ],
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc -p packages/engine",
-    "cards": "tsx packages/engine/scripts/cards-md.ts"
+    "typecheck": "tsc -p packages/engine && tsc -p packages/sim && tsc -p packages/web",
+    "cards": "tsx packages/engine/scripts/cards-md.ts",
+    "sim": "tsx packages/sim/src/run.ts",
+    "dev": "npm run dev -w @card-game/web",
+    "build:web": "npm run build -w @card-game/web"
   },
   "devDependencies": {
     "@types/node": "^22.20.4",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
+    "vite": "^7.3.6",
     "vitest": "^5.0.2"
   }
 }
