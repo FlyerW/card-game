@@ -1,0 +1,264 @@
+// ─── 卡牌資料 ────────────────────────────────────────────────────────────────
+//
+// 卡牌全部是資料，不寫死在程式裡。技能由「目標類型 + 效果積木」組成，
+// 新增卡片或調整平衡只要改資料。對應設計文件「線上遊戲架構」一節。
+
+/** 五個顏色，參考魔法風雲會。無色卡的 colors 是空陣列。 */
+export type Color = 'white' | 'blue' | 'black' | 'red' | 'green';
+
+export type PlayerId = 0 | 1;
+
+/** 突襲：召喚當回合就能發動技能。 */
+export type Keyword = 'haste';
+
+/**
+ * 稀有度，由低到高。N 是單純的數值卡，可以只有一個技能；R 開始有特殊機制。
+ * 每次進化稀有度升一級，最多兩次：N → R → SR，較強的進化鏈是 R → SR → UR。
+ */
+export type Rarity = 'N' | 'R' | 'SR' | 'UR';
+export const RARITIES: readonly Rarity[] = ['N', 'R', 'SR', 'UR'];
+
+/** 技能、天生技、法術選目標的方式。 */
+export type TargetSpec =
+  /** 不選目標：抽牌、範圍傷害、作用在自己身上的效果。 */
+  | { kind: 'none' }
+  /** 對手的單位。any = 任意目標、creature = 只打生物、hero = 只打英雄。 */
+  | { kind: 'enemy'; allow: 'any' | 'creature' | 'hero' }
+  /** 位置技能，只能用在生物技能上。目標格全空時打到對手英雄。 */
+  | { kind: 'lane'; lane: 'opposite' | 'diagonal' }
+  /** 我方的單位，用於回復與增益。 */
+  | { kind: 'ally'; allow: 'any' | 'creature' }
+  /** 對手身上掛著道具的生物。 */
+  | { kind: 'enemyItem' }
+  /** 對手身上掛著道具的生物，或場上的場地卡。 */
+  | { kind: 'enemyItemOrField' };
+
+export type Effect =
+  /** 對目標造成傷害。生物技能的傷害會加上攻擊指示物與道具加成。 */
+  | { type: 'damage'; amount: number }
+  /** 對對手每隻生物各造成傷害。 */
+  | { type: 'damageEnemyCreatures'; amount: number }
+  | { type: 'draw'; count: number }
+  | { type: 'opponentDiscardRandom'; count: number }
+  /** 回復目標的 HP，不超過上限。 */
+  | { type: 'heal'; amount: number }
+  /** 目標剩餘 HP 減半、無條件捨去。算失去 HP 不算傷害：減傷擋不住，也不受挑釁限制。 */
+  | { type: 'halveHp' }
+  /** 發動者挑釁，直到對手下回合結束。 */
+  | { type: 'taunt' }
+  /**
+   * 放增益指示物。attack 讓之後的技能傷害增加，hp 讓 HP 上限增加。
+   * 「增益 N」就是 attack 與 hp 各 N。
+   */
+  | { type: 'buff'; attack: number; hp: number; on: 'self' | 'target' }
+  /** 加速型：能量上限 +N，不超過最高上限，當回合不補能量。 */
+  | { type: 'gainMaxEnergy'; amount: number }
+  /** 突破型：最高上限永久 +N。 */
+  | { type: 'raiseCeiling'; amount: number }
+  /** 破壞目標生物身上的道具，或目標場地卡。 */
+  | { type: 'destroy' };
+
+/** 生物技能、英雄天生技，以及法術的效果部分，都是 Ability。 */
+export interface Ability {
+  name: string;
+  cost: number;
+  target: TargetSpec;
+  effects: Effect[];
+}
+
+interface CardBase {
+  id: string;
+  name: string;
+  colors: Color[];
+  rarity: Rarity;
+}
+
+export interface CreatureDef extends CardBase {
+  kind: 'creature';
+  /** 0 = 基礎，1 = 一階，2 = 二階。 */
+  stage: 0 | 1 | 2;
+  /** 基礎生物是召喚費用，進化生物是進化費用。 */
+  cost: number;
+  /** 進化生物才有：從哪張卡進化而來。 */
+  evolvesFrom?: string;
+  hp: number;
+  skills: Ability[];
+  keywords?: Keyword[];
+}
+
+export interface SpellDef extends CardBase {
+  kind: 'spell';
+  cost: number;
+  target: TargetSpec;
+  effects: Effect[];
+}
+
+export interface ItemDef extends CardBase {
+  kind: 'item';
+  cost: number;
+  /** 這隻生物的技能傷害加成。 */
+  attack?: number;
+  /** 這隻生物受到的傷害減少。 */
+  damageReduction?: number;
+  /** 這隻生物的 HP 上限加成。 */
+  hp?: number;
+}
+
+export interface FieldDef extends CardBase {
+  kind: 'field';
+  cost: number;
+  /** 在場時，雙方的最高上限加成。 */
+  ceilingBonus?: number;
+}
+
+export type DeckCardDef = CreatureDef | SpellDef | ItemDef | FieldDef;
+
+export interface HeroDef {
+  kind: 'hero';
+  id: string;
+  name: string;
+  colors: Color[];
+  hp: number;
+  power?: Ability;
+  passive?: { name: string; ceilingBonus?: number };
+}
+
+export interface CardDb {
+  cards: ReadonlyMap<string, DeckCardDef>;
+  heroes: ReadonlyMap<string, HeroDef>;
+}
+
+// ─── 規則參數 ────────────────────────────────────────────────────────────────
+
+export interface Rules {
+  deckSize: number;
+  maxCopies: number;
+  startingHand: number;
+  zones: number;
+  /** 雙方第一個回合的能量上限：[先攻, 後攻]。 */
+  startingMaxEnergy: [number, number];
+  /** 之後每個回合，能量上限增加多少。 */
+  energyGrowth: number;
+  baseCeiling: number;
+  /** 後攻玩家第一個回合額外給的一次性能量。舊制用；新制由 startingMaxEnergy 補償，設為 0。 */
+  secondPlayerBonusEnergy: number;
+}
+
+// ─── 遊戲狀態 ────────────────────────────────────────────────────────────────
+//
+// 狀態是純資料，可以直接 structuredClone、序列化、存檔。
+// 「這回合做過了沒」一律記成回合編號而不是布林值，換回合時就不用逐一重設。
+
+/** 一張實體卡。uid 在整局中唯一，cardId 指向卡牌資料。 */
+export interface CardRef {
+  uid: number;
+  cardId: string;
+}
+
+export interface Creature {
+  /** 沿用基礎卡的 uid，進化後不變。 */
+  uid: number;
+  /** 進化堆疊：[0] 是基礎形態，最後一張是目前形態。 */
+  cards: CardRef[];
+  /**
+   * 受到的傷害，不是剩餘 HP。
+   * 這樣進化、增益提高 HP 上限時，剩餘 HP 會跟著上升，已受的傷害保留。
+   */
+  damage: number;
+  attackCounters: number;
+  hpCounters: number;
+  item: CardRef | null;
+  summonedTurn: number;
+  evolvedTurn: number | null;
+  skillUsedTurn: number | null;
+  /** 挑釁持續到這個回合結束（含）。 */
+  tauntUntilTurn: number | null;
+}
+
+export interface PlayerState {
+  heroId: string;
+  heroDamage: number;
+  heroPowerUsedTurn: number | null;
+  zones: (Creature | null)[];
+  hand: CardRef[];
+  /** [0] 是牌庫頂。 */
+  deck: CardRef[];
+  discard: CardRef[];
+  energy: number;
+  maxEnergy: number;
+  /** 突破型卡牌永久提高的最高上限。 */
+  ceilingBonus: number;
+  fieldPlayedTurn: number | null;
+  mulliganDone: boolean;
+}
+
+export type GameOverReason = 'heroDefeated' | 'deckOut' | 'concede';
+
+export interface GameResult {
+  winner: PlayerId | 'draw';
+  reason: GameOverReason;
+}
+
+export interface GameState {
+  rules: Rules;
+  /** 亂數產生器的內部狀態。同樣的種子加同樣的動作，一定得到同樣的結果。 */
+  rng: number;
+  /** 0 表示還在重抽階段；先攻玩家的第一回合是 1。 */
+  turn: number;
+  firstPlayer: PlayerId;
+  activePlayer: PlayerId;
+  phase: 'mulligan' | 'main' | 'over';
+  players: [PlayerState, PlayerState];
+  /** 場地卡區雙方共用。 */
+  field: { card: CardRef; owner: PlayerId } | null;
+  result: GameResult | null;
+  nextUid: number;
+}
+
+// ─── 玩家動作 ────────────────────────────────────────────────────────────────
+
+/** 目標一律用絕對的玩家編號，伺服器與紀錄檔才不會有「你、我」的歧義。 */
+export type Target =
+  | { kind: 'hero'; player: PlayerId }
+  | { kind: 'creature'; player: PlayerId; zone: number }
+  | { kind: 'field' };
+
+/** 卡牌以手牌中的 uid 指定。target 只有一個合法目標時可以省略。 */
+export type Action =
+  | { type: 'mulligan'; player: PlayerId; cards: number[] }
+  | { type: 'summon'; player: PlayerId; card: number; zone: number }
+  | { type: 'evolve'; player: PlayerId; card: number; zone: number }
+  | { type: 'useSkill'; player: PlayerId; zone: number; skill: number; target?: Target }
+  | { type: 'heroPower'; player: PlayerId; target?: Target }
+  | { type: 'castSpell'; player: PlayerId; card: number; target?: Target }
+  | { type: 'attachItem'; player: PlayerId; card: number; zone: number }
+  | { type: 'playField'; player: PlayerId; card: number }
+  | { type: 'endTurn'; player: PlayerId }
+  | { type: 'concede'; player: PlayerId };
+
+// ─── 事件 ────────────────────────────────────────────────────────────────────
+//
+// 每個動作回傳的事件清單，給畫面播動畫、給文字介面印訊息用。
+// 注意：事件含有抽到的卡等隱藏資訊，伺服器轉給對手前必須先過濾。
+
+export type GameEvent =
+  | { type: 'turnStarted'; player: PlayerId; turn: number }
+  | { type: 'drew'; player: PlayerId; cards: CardRef[] }
+  | { type: 'mulliganed'; player: PlayerId; count: number }
+  | { type: 'summoned'; player: PlayerId; zone: number; cardId: string }
+  | { type: 'evolved'; player: PlayerId; zone: number; from: string; to: string }
+  | { type: 'abilityUsed'; player: PlayerId; source: 'creature' | 'hero' | 'spell'; cardId: string; ability: string }
+  | { type: 'itemAttached'; player: PlayerId; zone: number; cardId: string }
+  | { type: 'fieldPlayed'; player: PlayerId; cardId: string }
+  | { type: 'damaged'; target: Target; amount: number }
+  | { type: 'hpLost'; target: Target; amount: number }
+  | { type: 'healed'; target: Target; amount: number }
+  | { type: 'buffed'; player: PlayerId; zone: number; attack: number; hp: number }
+  | { type: 'taunting'; player: PlayerId; zone: number }
+  | { type: 'discarded'; player: PlayerId; cardId: string }
+  | { type: 'creatureDestroyed'; player: PlayerId; zone: number; cardId: string }
+  | { type: 'itemDestroyed'; player: PlayerId; zone: number; cardId: string }
+  | { type: 'fieldDestroyed'; owner: PlayerId; cardId: string }
+  | { type: 'maxEnergyGained'; player: PlayerId; amount: number }
+  | { type: 'ceilingRaised'; player: PlayerId; amount: number }
+  | { type: 'gameOver'; result: GameResult };
