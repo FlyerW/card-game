@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./bot": "./src/bot.ts"
+    "./bot": "./src/bot.ts",
+    "./deck": "./src/deck.ts"
   },
   "dependencies": {
     "@card-game/engine": "*"

@@ -10,6 +10,7 @@ import {
   type Rules,
 } from '@card-game/engine';
 import { STYLES, type BotStyle } from './bot';
+import { buildDeck } from './deck';
 
 // ─── 模擬環境 ────────────────────────────────────────────────────────────────
 //
@@ -63,23 +64,8 @@ export const EXPERIMENTS: Experiment[] = [
   })),
 ];
 
-/** 用 mulberry32 從範例卡池隨機組 40 張（每種最多 3 張）。同一個 seed 一定組出同一副。 */
-export function mirrorDeck(seed: number): string[] {
-  const pool = SAMPLE_CARDS.flatMap((card) => [card.id, card.id, card.id]);
-  let t = seed >>> 0;
-  const random = () => {
-    t = (t + 0x6d2b79f5) >>> 0;
-    let x = t;
-    x = Math.imul(x ^ (x >>> 15), x | 1);
-    x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
-    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
-  };
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j]!, pool[i]!];
-  }
-  return pool.slice(0, 40);
-}
+/** 模擬用的牌組：進化線照 3/2/1 帶，其餘隨機；模擬英雄沒有英雄進化卡。同一個 seed 一定組出同一副。 */
+export const mirrorDeck = (seed: number): string[] => buildDeck(seed, null);
 
 /**
  * 第 i 局在每個實驗裡都用同一個種子、同一副牌（共同隨機數），

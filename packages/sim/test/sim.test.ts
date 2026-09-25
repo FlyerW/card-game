@@ -1,9 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { evaluate, STYLES } from '../src/bot';
+import { SAMPLE_CARDS } from '@card-game/engine';
+import { evolutionLines } from '../src/deck';
 import { EXPERIMENTS, engine, gameConfig, mirrorDeck } from '../src/experiments';
 import { playMatch } from '../src/match';
 
 describe('模擬環境', () => {
+  it('進化線照 3/2/1 帶：一階不會比基礎多、二階不會比一階多', () => {
+    for (let seed = 0; seed < 50; seed++) {
+      const deck = mirrorDeck(seed);
+      const count = (id: string) => deck.filter((card) => card === id).length;
+      for (const line of evolutionLines(SAMPLE_CARDS)) {
+        const counts = line.map((card) => count(card.id));
+        for (let i = 1; i < counts.length; i++) expect(counts[i]!).toBeLessThanOrEqual(counts[i - 1]!);
+      }
+    }
+  });
+
   it('同一個種子組出同一副牌，而且每種卡最多 3 張', () => {
     const deck = mirrorDeck(123);
     expect(mirrorDeck(123)).toEqual(deck);
