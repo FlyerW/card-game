@@ -52,7 +52,7 @@ export const SAMPLE_HEROES: HeroDef[] = [
     name: '潮影雙生',
     colors: ['blue', 'black'],
     hp: 32,
-    power: { name: '低語', cost: 2, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
+    power: { name: '低語', cost: 4, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
     passive: { name: '暗流', creatures: { attack: 1 } },
   },
   {
