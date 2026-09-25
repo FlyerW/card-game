@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { evaluate, STYLES } from '../src/bot';
-import { SAMPLE_CARDS } from '@card-game/engine';
-import { evolutionLines } from '../src/deck';
+import { chooseAction, evaluate, STYLES } from '../src/bot';
+import { DEFAULT_RULES, deckPool, SAMPLE_CARDS, SAMPLE_HEROES, validateDeck, type Creature, type GameState, type PlayerId } from '@card-game/engine';
+import { buildDeck, evolutionLines } from '../src/deck';
 import { EXPERIMENTS, engine, gameConfig, mirrorDeck } from '../src/experiments';
 import { playMatch } from '../src/match';
 
@@ -13,6 +13,15 @@ describe('模擬環境', () => {
       for (const line of evolutionLines(SAMPLE_CARDS)) {
         const counts = line.map((card) => count(card.id));
         for (let i = 1; i < counts.length; i++) expect(counts[i]!).toBeLessThanOrEqual(counts[i - 1]!);
+      }
+    }
+  });
+
+  it('用英雄自己的卡池組牌，組出來的都是正式規則下合法的牌組', () => {
+    for (const hero of SAMPLE_HEROES) {
+      for (const seed of [1, 2, 3]) {
+        const deck = buildDeck(seed, hero.id, deckPool(engine.db, hero.id));
+        expect(validateDeck(engine.db, DEFAULT_RULES, hero.id, deck), hero.name).toEqual([]);
       }
     }
   });
@@ -38,7 +47,46 @@ describe('模擬環境', () => {
   });
 });
 
+/** 開一局、雙方保留起手，停在先攻玩家的第 1 回合。 */
+function opening(): GameState {
+  const created = engine.createGame(gameConfig(EXPERIMENTS[3]!, 3));
+  if (!created.ok) throw new Error(created.error.message);
+  let state = created.state;
+  for (const player of [0, 1] as const) {
+    const kept = engine.apply(state, { type: 'mulligan', player, cards: [] });
+    if (!kept.ok) throw new Error(kept.error.message);
+    state = kept.state;
+  }
+  return state;
+}
+
+function put(state: GameState, player: PlayerId, zone: number, cardId: string, damage = 0): void {
+  const uid = state.nextUid++;
+  const creature: Creature = {
+    uid, owner: player, cards: [{ uid, cardId }], damage, attackCounters: 0, hpCounters: 0, item: null,
+    summonedTurn: 0, evolvedTurn: null, skillUsedTurn: null, tauntUntilTurn: null,
+    poison: 0, burn: 0, paralyzedUntilTurn: null, asleepUntilTurn: null,
+  };
+  state.players[player].zones[zone] = creature;
+}
+
 describe('機器人', () => {
+  it('等待回應時會用瞬發牌：先把攻擊者打倒，攻擊就不會打出來', () => {
+    const state = opening();
+    const a = state.activePlayer;
+    const b: PlayerId = a === 0 ? 1 : 0;
+    put(state, a, 0, 'wandering-mercenary', 4); // HP 8，剩 4
+    state.players[a].energy = 5;
+    state.players[b].energy = 2;
+    state.players[b].hand.push({ uid: state.nextUid++, cardId: 'ice-shard' });
+    const attacked = engine.apply(state, { type: 'useSkill', player: a, zone: 0, skill: 0, target: { kind: 'hero', player: b } });
+    if (!attacked.ok) throw new Error(attacked.error.message);
+    expect(attacked.state.window).toBe(b);
+    const pick = chooseAction(engine, attacked.state, b, STYLES.balanced);
+    expect(pick.action).toMatchObject({ type: 'castSpell', target: { kind: 'creature', player: a, zone: 0 } });
+
+  });
+
   it('分出勝負時評分是極值', () => {
     const { outcome, state } = (() => {
       const created = engine.createGame(gameConfig(EXPERIMENTS[0]!, 0));

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { sampleDb } from '../src/cards/sample';
+import { SAMPLE_HEROES, sampleDb } from '../src/cards/sample';
 import { buildCardDb, CardDataError } from '../src/db';
-import { validateDeck } from '../src/deck';
+import { deckPool, validateDeck } from '../src/deck';
 import { describeCard } from '../src/describe';
 import { DEFAULT_RULES } from '../src/rules';
 import type { Ability, DeckCardDef, HeroDef } from '../src/types';
@@ -47,6 +47,37 @@ describe('範例卡牌', () => {
     const rarities = (ids: string[]) => ids.map((id) => sample.cards.get(id)?.rarity);
     expect(rarities(['ember-fox', 'ember-fox-king', 'nine-tailed-fox'])).toEqual(['N', 'R', 'SR']);
     expect(rarities(['grove-bear', 'grove-bear-king', 'ancient-bear-god'])).toEqual(['R', 'SR', 'UR']);
+  });
+});
+
+describe('範例卡池', () => {
+  const sample = sampleDb();
+  const colors = ['white', 'blue', 'black', 'red', 'green'] as const;
+
+  it('每個顏色 10 張、無色 6 張（英雄進化卡另計）', () => {
+    const regular = [...sample.cards.values()].filter((card) => card.kind !== 'heroEvolution');
+    for (const color of colors) {
+      expect(regular.filter((card) => card.colors.length === 1 && card.colors[0] === color), color).toHaveLength(10);
+    }
+    expect(regular.filter((card) => card.colors.length === 0)).toHaveLength(6);
+  });
+
+  it('每個英雄能用的卡都夠組 40 張', () => {
+    for (const hero of SAMPLE_HEROES) {
+      expect(deckPool(sample, hero.id).length * DEFAULT_RULES.maxCopies, hero.name).toBeGreaterThanOrEqual(DEFAULT_RULES.deckSize);
+    }
+  });
+
+  it('每個顏色都有一條進化線，也都有瞬發牌', () => {
+    const cards = [...sample.cards.values()];
+    for (const color of colors) {
+      const own = cards.filter((card) => card.colors.includes(color));
+      expect(own.some((card) => card.kind === 'creature' && card.stage > 0), `${color} 進化線`).toBe(true);
+      const instant = own.some(
+        (card) => (card.kind === 'spell' && card.instant) || (card.kind === 'creature' && card.skills.some((skill) => skill.instant)),
+      );
+      expect(instant, `${color} 瞬發`).toBe(true);
+    }
   });
 });
 
@@ -156,6 +187,16 @@ describe('牌組驗證', () => {
     expect(validateDeck(db, rules, 'red-green', ['pinger-plus', 'wolf', 'wolf', 'hitter'])).toContain(
       'pinger-plus 是pinger的進化卡，不能放進red-green的牌組',
     );
+  });
+
+  it('卡池：英雄顏色內的卡加上無色卡；英雄進化卡只給對應的英雄', () => {
+    const ids = (heroId: string) => deckPool(db, heroId).map((card) => card.id);
+    expect(ids('warden')).not.toContain('red-imp');
+    expect(ids('pinger')).toContain('red-imp');
+    expect(ids('pinger')).not.toContain('gold-griffin');
+    expect(ids('pinger')).toContain('pinger-plus');
+    expect(ids('blank')).not.toContain('pinger-plus');
+    expect(deckPool(db, 'nope')).toEqual([]);
   });
 
   it('英雄不能放進牌組，也不能放不存在的卡', () => {

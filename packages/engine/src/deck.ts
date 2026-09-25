@@ -1,5 +1,19 @@
 import { COLOR_NAMES } from './describe';
-import type { CardDb, Rules } from './types';
+import type { CardDb, DeckCardDef, Rules } from './types';
+
+/**
+ * 英雄能放進牌組的卡，順序跟卡牌資料一樣：顏色都在英雄的顏色內（或無色），
+ * 英雄進化卡只有對應的英雄能放。
+ */
+export function deckPool(db: CardDb, heroId: string): DeckCardDef[] {
+  const hero = db.heroes.get(heroId);
+  if (hero === undefined) return [];
+  return [...db.cards.values()].filter(
+    (card) =>
+      card.colors.every((color) => hero.colors.includes(color)) &&
+      (card.kind !== 'heroEvolution' || card.evolvesFrom === heroId),
+  );
+}
 
 /** 檢查牌組是否合法，回傳所有問題；空陣列表示合法。 */
 export function validateDeck(db: CardDb, rules: Rules, heroId: string, deck: readonly string[]): string[] {
