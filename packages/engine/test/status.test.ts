@@ -127,6 +127,18 @@ describe('沉睡', () => {
   });
 });
 
+describe('對手每隻生物', () => {
+  it('不用選目標，對手每隻生物都中；自己的生物不受影響', () => {
+    let { state, a, b } = start();
+    place(state, a, 0, 'hitter');
+    place(state, b, 0, 'hitter');
+    place(state, b, 3, 'wolf');
+    state = act(state, { type: 'castSpell', player: a, card: give(state, a, 'miasma') });
+    for (const zone of [0, 3]) expect(at(state, b, zone)).toMatchObject({ poison: 1, paralyzedUntilTurn: 2 });
+    expect(at(state, a, 0)).toMatchObject({ poison: 0, paralyzedUntilTurn: null });
+  });
+});
+
 describe('進化', () => {
   it('解除全部異常狀態，已受的傷害保留', () => {
     let { state, a } = start();

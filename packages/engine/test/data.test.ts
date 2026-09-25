@@ -54,12 +54,12 @@ describe('範例卡池', () => {
   const sample = sampleDb();
   const colors = ['white', 'blue', 'black', 'red', 'green'] as const;
 
-  it('每個顏色 10 張、無色 6 張（英雄進化卡另計）', () => {
+  it('每個顏色至少 10 張、無色至少 6 張（英雄進化卡另計）', () => {
     const regular = [...sample.cards.values()].filter((card) => card.kind !== 'heroEvolution');
     for (const color of colors) {
-      expect(regular.filter((card) => card.colors.length === 1 && card.colors[0] === color), color).toHaveLength(10);
+      expect(regular.filter((card) => card.colors.length === 1 && card.colors[0] === color).length, color).toBeGreaterThanOrEqual(10);
     }
-    expect(regular.filter((card) => card.colors.length === 0)).toHaveLength(6);
+    expect(regular.filter((card) => card.colors.length === 0).length).toBeGreaterThanOrEqual(6);
   });
 
   it('每個英雄能用的卡都夠組 40 張', () => {

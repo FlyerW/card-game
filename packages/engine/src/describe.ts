@@ -59,13 +59,13 @@ export function describeEffect(effect: Effect): string {
     case 'evolveFromDeck':
       return '用牌庫裡自己的進化卡直接進化';
     case 'poison':
-      return `中毒 ${effect.amount}（牠的回合開始時失去 ${effect.amount} HP）`;
+      return `${effect.all ? '對手每隻生物' : ''}中毒 ${effect.amount}（牠的回合開始時失去 ${effect.amount} HP）`;
     case 'burn':
-      return `灼燒 ${effect.amount}（牠的回合結束時受到 ${effect.amount} 傷害）`;
+      return `${effect.all ? '對手每隻生物' : ''}灼燒 ${effect.amount}（牠的回合結束時受到 ${effect.amount} 傷害）`;
     case 'paralyze':
-      return '麻痺（到牠的下個回合結束前不能發動技能）';
+      return `${effect.all ? '對手每隻生物' : ''}麻痺（到牠的下個回合結束前不能發動技能）`;
     case 'sleep':
-      return '沉睡（不能發動技能，受到傷害就醒；最多 2 個回合）';
+      return `${effect.all ? '對手每隻生物' : ''}沉睡（不能發動技能，受到傷害就醒；最多 2 個回合）`;
   }
 }
 

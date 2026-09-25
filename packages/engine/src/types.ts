@@ -72,14 +72,15 @@ export type Effect =
   /** 用牌庫裡發動者的進化卡直接進化，不另付進化費用；一回合仍只能進化一次。只能用在生物技能上。 */
   | { type: 'evolveFromDeck' }
   // 異常狀態：只作用在生物身上，打到英雄沒有效果；進化會解除全部。
+  // all 為 true 時不選目標，對手每隻生物都中。
   /** 中毒 N：牠的擁有者回合開始時失去 N HP（不算傷害）。再中一次數字相加。 */
-  | { type: 'poison'; amount: number }
+  | { type: 'poison'; amount: number; all?: boolean }
   /** 灼燒 N：牠的擁有者回合結束時受到 N 傷害（算傷害，減傷擋得住）。再中一次取大的。 */
-  | { type: 'burn'; amount: number }
+  | { type: 'burn'; amount: number; all?: boolean }
   /** 麻痺：不能發動技能，直到擁有者的下一個回合結束。 */
-  | { type: 'paralyze' }
+  | { type: 'paralyze'; all?: boolean }
   /** 沉睡：不能發動技能；受到傷害就醒來，最多持續擁有者的 2 個回合。 */
-  | { type: 'sleep' };
+  | { type: 'sleep'; all?: boolean };
 
 /** 異常狀態的種類。 */
 export type StatusKind = 'poison' | 'burn' | 'paralysis' | 'sleep';

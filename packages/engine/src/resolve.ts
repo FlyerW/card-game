@@ -331,6 +331,13 @@ function applyEffect(
     case 'burn':
     case 'paralyze':
     case 'sleep':
+      if (effect.all) {
+        const enemy = other(me);
+        state.players[enemy].zones.forEach((each, zone) => {
+          if (each !== null) inflict(ctx, each, enemy, zone, effect);
+        });
+        return;
+      }
       // 只作用在生物身上：目標是英雄，或生物已經不在了，就沒有效果。
       if (creature !== null && target?.kind === 'creature') inflict(ctx, creature, target.player, target.zone, effect);
       return;

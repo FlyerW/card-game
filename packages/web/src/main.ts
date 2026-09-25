@@ -72,6 +72,8 @@ interface App extends Saved {
   /** 選了「這回合都不回應」的回合編號。 */
   skipResponsesTurn: number | null;
   builder: Builder;
+  /** 卡牌大小：true 縮小、false 放大；null 表示照視窗高度自動決定。 */
+  compactPref: boolean | null;
 }
 
 const app: App = {
@@ -86,7 +88,32 @@ const app: App = {
   busy: false,
   toast: null,
   skipResponsesTurn: null,
+  compactPref: loadDensity(),
 };
+
+// ─── 卡牌大小：整個牌桌要放得進一個畫面 ────────────────────────────────────────
+
+const DENSITY_KEY = 'card-game.density';
+/** 視窗比這個矮就自動用小卡牌。 */
+const COMPACT_BELOW = 820;
+
+function loadDensity(): boolean | null {
+  try {
+    const saved = localStorage.getItem('card-game.density');
+    return saved === 'compact' ? true : saved === 'large' ? false : null;
+  } catch {
+    return null;
+  }
+}
+
+const compact = () => app.compactPref ?? window.innerHeight < COMPACT_BELOW;
+const applyDensity = () => document.documentElement.classList.toggle('compact', compact());
+applyDensity();
+window.addEventListener('resize', applyDensity);
+document.addEventListener('fullscreenchange', () => {
+  applyDensity();
+  render();
+});
 
 interface Float {
   key: string;
@@ -602,7 +629,11 @@ function playScreen(): string {
     <aside class="panel">
       <div class="detail">${chainBox(view)}${detail(view)}</div>
       <div class="log-wrap"><p class="log-title">對戰紀錄</p><ol class="log">${log}</ol></div>
-      <button class="ghost small" data-do="concede" ${view.phase === 'main' ? '' : 'disabled'}>投降</button>
+      <div class="panel-tools">
+        <button class="ghost small" data-do="concede" ${view.phase === 'main' ? '' : 'disabled'}>投降</button>
+        <button class="ghost small" data-do="density" aria-pressed="${compact()}">${compact() ? '放大卡牌' : '縮小卡牌'}</button>
+        ${document.fullscreenEnabled ? `<button class="ghost small" data-do="fullscreen">${document.fullscreenElement ? '離開全螢幕' : '全螢幕'}</button>` : ''}
+      </div>
     </aside>
   </div>${overlay(view)}`;
 }
@@ -806,6 +837,21 @@ root.addEventListener('click', (event) => {
   } else if (command === 'skip-turn' && app.state) {
     app.skipResponsesTurn = app.state.turn;
     perform({ type: 'pass', player: YOU });
+  } else if (command === 'density') {
+    app.compactPref = !compact();
+    try {
+      localStorage.setItem(DENSITY_KEY, app.compactPref ? 'compact' : 'large');
+    } catch {
+      // 存不了就只在這次開著的頁面有效。
+    }
+    applyDensity();
+    render();
+  } else if (command === 'fullscreen') {
+    const request = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+    request.catch(() => {
+      app.toast = '這個畫面不能切換全螢幕，可以改用瀏覽器的全螢幕（F11）。';
+      render();
+    });
   } else if (command === 'concede') {
     perform({ type: 'concede', player: YOU });
   } else if (command === 'power') {

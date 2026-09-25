@@ -115,6 +115,11 @@ export const TEST_CARDS: DeckCardDef[] = [
     target: ANY, effects: [{ type: 'damage', amount: 1 }, { type: 'poison', amount: 2 }],
   },
 
+  {
+    kind: 'spell', id: 'miasma', name: 'miasma', rarity: 'R', colors: [], cost: 1,
+    target: NONE, effects: [{ type: 'poison', amount: 1, all: true }, { type: 'paralyze', all: true }],
+  },
+
   // 即時回應
   { kind: 'spell', id: 'snap', name: 'snap', rarity: 'N', colors: [], cost: 1, instant: true, target: ANY, effects: [{ type: 'damage', amount: 3 }] },
   {

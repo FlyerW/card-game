@@ -258,15 +258,16 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   },
 
   // ── 道具與場地 ──
-  { kind: 'item', id: 'iron-armor', name: '鐵甲', rarity: 'N', colors: ['white'], cost: 2, damageReduction: 2 },
-  { kind: 'item', id: 'claws', name: '利爪', rarity: 'N', colors: ['red'], cost: 1, attack: 2 },
+  // 道具的預算：1 費 ≈ HP 上限 +4 ≈ 攻擊 +2 ≈ 減傷 1。道具會被破壞、生物倒下就一起沒了，所以給得比增益大方。
+  { kind: 'item', id: 'iron-armor', name: '鐵甲', rarity: 'N', colors: ['white'], cost: 2, damageReduction: 2, hp: 3 },
+  { kind: 'item', id: 'claws', name: '利爪', rarity: 'N', colors: ['red'], cost: 1, attack: 2, hp: 1 },
   // ── 無色 ──
   {
     kind: 'creature', id: 'gargoyle', name: '石像鬼', rarity: 'N', colors: [],
     stage: 0, cost: 4, hp: 10,
     skills: [hit('俯擊', 3, ANY, 7)],
   },
-  { kind: 'item', id: 'travel-cloak', name: '旅人斗篷', rarity: 'N', colors: [], cost: 1, hp: 2 },
+  { kind: 'item', id: 'travel-cloak', name: '旅人斗篷', rarity: 'N', colors: [], cost: 1, hp: 4 },
 
   // ── 白：守護、秩序。挑釁、回復、減傷，異常狀態是沉睡 ──
   {
@@ -440,6 +441,72 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     kind: 'spell', id: 'giant-growth', name: '巨化術', rarity: 'R', colors: ['green'], cost: 3, instant: true,
     target: ALLY_CREATURE, effects: [{ type: 'buff', attack: 2, hp: 3, on: 'target' }],
   },
+
+  // ── 異常狀態的新卡：進場施加狀態、對手每隻生物都中的法術、瞬發 ──
+  // 進場效果照數值基準從本體扣（每 1 能量約少 2 HP）；對手每隻生物都中的狀態約是單體的 1.5 倍能量。
+  {
+    kind: 'creature', id: 'plague-rat', name: '瘟疫鼠', rarity: 'R', colors: ['black'],
+    stage: 0, cost: 2, hp: 4,
+    entry: { name: '病菌', target: CREATURE, effects: [{ type: 'poison', amount: 1 }] },
+    skills: [
+      hit('啃咬', 1, CREATURE, 3),
+      { name: '散播', cost: 3, target: NONE, effects: [{ type: 'poison', amount: 1, all: true }] },
+    ],
+  },
+  {
+    kind: 'spell', id: 'toxic-fog', name: '毒霧', rarity: 'R', colors: ['black'], cost: 3,
+    target: NONE, effects: [{ type: 'poison', amount: 2, all: true }],
+  },
+  {
+    kind: 'spell', id: 'venom-dart', name: '腐毒箭', rarity: 'N', colors: ['black'], cost: 2, instant: true,
+    target: CREATURE, effects: [{ type: 'damage', amount: 1 }, { type: 'poison', amount: 1 }],
+  },
+  { kind: 'item', id: 'bone-armor', name: '骨甲', rarity: 'N', colors: ['black'], cost: 1, attack: 1, hp: 2 },
+  {
+    kind: 'creature', id: 'blast-mage', name: '炎爆術士', rarity: 'R', colors: ['red'],
+    stage: 0, cost: 2, hp: 4,
+    entry: { name: '引燃', target: CREATURE, effects: [{ type: 'burn', amount: 1 }] },
+    skills: [hit('火苗', 1, ANY, 2), hit('爆燃', 2, CREATURE, 6)],
+  },
+  {
+    kind: 'spell', id: 'wildfire', name: '焚野', rarity: 'R', colors: ['red'], cost: 3,
+    target: NONE, effects: [{ type: 'burn', amount: 2, all: true }],
+  },
+  {
+    kind: 'creature', id: 'shock-eel', name: '電鰻', rarity: 'R', colors: ['blue'],
+    stage: 0, cost: 3, hp: 4,
+    entry: { name: '電擊', target: CREATURE, effects: [{ type: 'paralyze' }] },
+    skills: [hit('放電', 2, ANY, 5), hit('纏繞', 1, CREATURE, 3)],
+  },
+  {
+    kind: 'spell', id: 'thunderstorm', name: '雷暴', rarity: 'SR', colors: ['blue'], cost: 5,
+    target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }, { type: 'paralyze', all: true }],
+  },
+  {
+    kind: 'spell', id: 'counter-current', name: '反制電流', rarity: 'R', colors: ['blue'], cost: 3, instant: true,
+    target: CREATURE, effects: [{ type: 'damage', amount: 2 }, { type: 'paralyze' }],
+  },
+  {
+    kind: 'creature', id: 'dream-herald', name: '夢境使者', rarity: 'R', colors: ['white'],
+    stage: 0, cost: 3, hp: 4,
+    entry: { name: '入夢', target: CREATURE, effects: [{ type: 'sleep' }] },
+    skills: [hit('夢擊', 2, ANY, 4), { name: '催眠', cost: 3, target: CREATURE, effects: [{ type: 'sleep' }] }],
+  },
+  {
+    kind: 'spell', id: 'lullaby-light', name: '催眠之光', rarity: 'R', colors: ['white'], cost: 3,
+    target: NONE, effects: [{ type: 'sleep', all: true }],
+  },
+  {
+    // 綠色的高 HP：比基準多 2；進場增益約 1 能量，少 2。
+    kind: 'creature', id: 'sapling-guard', name: '樹苗守衛', rarity: 'R', colors: ['green'],
+    stage: 0, cost: 2, hp: 6,
+    entry: { name: '萌芽', target: ALLY_CREATURE, effects: [{ type: 'buff', attack: 1, hp: 1, on: 'target' }] },
+    skills: [
+      hit('藤鞭', 2, ANY, 4),
+      { name: '扎根', cost: 2, target: NONE, effects: [{ type: 'buff', attack: 0, hp: 3, on: 'self' }] },
+    ],
+  },
+  { kind: 'item', id: 'bark-armor', name: '樹皮護甲', rarity: 'N', colors: ['green'], cost: 2, hp: 6, damageReduction: 1 },
 
   // ── 英雄進化：每局限一次，費用約 5–7 ──
   // 像爐石的英雄卡：打出時有進場效果（戰吼），天生技變強或多一個被動。

@@ -333,6 +333,32 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .dl-minus { height: 24px; }
 .b-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 
+/* ─── 一個畫面放得下整個牌桌 ─── */
+.panel-tools { display: flex; flex-wrap: wrap; gap: 6px; }
+/* 寬螢幕：生物格的高度跟著視窗高度走，--chrome 是牌桌上生物格以外的高度總和。 */
+@media (min-width: 901px) {
+  :root { --chrome: 550px; }
+  :root.compact { --chrome: 410px; }
+  .board .zone { aspect-ratio: auto; height: clamp(58px, calc((100dvh - var(--chrome)) / 2), 190px); }
+}
+.compact body { padding-block: 8px; }
+.compact .board { gap: 5px; padding: 8px 10px; }
+.compact .hero { padding: 2px 14px; min-width: 170px; }
+.compact .h-name { font-size: 14px; }
+.compact .h-hp b { font-size: 21px; } .compact .h-hp small { font-size: 12px; }
+.compact .power { padding: 2px 10px 2px 3px; font-size: 12px; }
+.compact .energy { padding: 2px 10px; }
+.compact .crystal { width: 10px; height: 10px; }
+.compact .midline { padding-block: 2px; margin-block: 0; }
+.compact .end-turn { padding: 5px 16px; }
+.compact .z-name { font-size: 12.5px; }
+.compact .z-hp b { font-size: 19px; }
+.compact .hand { padding-top: 6px; margin-top: 0; }
+.compact .card { width: 82px; min-height: 96px; padding: 6px 6px 4px; }
+.compact .card .c-name { font-size: 12.5px; margin-top: 2px; }
+.compact .card .c-hp { font-size: 12.5px; }
+.compact .panel { top: 8px; max-height: calc(100vh - 16px); }
+
 @media (max-width: 900px) {
   .b-body { grid-template-columns: 1fr; }
   .b-side { position: static; }

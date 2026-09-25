@@ -26,6 +26,7 @@ function targetProblem(effect: Effect, spec: TargetSpec): string | null {
     case 'burn':
     case 'paralyze':
     case 'sleep':
+      if (effect.all) return null;
       return (spec.kind === 'enemy' && spec.allow !== 'hero') || spec.kind === 'lane'
         ? null
         : '異常狀態只能指定對手的生物（任意目標、只打生物或位置）';
@@ -36,6 +37,7 @@ function targetProblem(effect: Effect, spec: TargetSpec): string | null {
 
 function usesTarget(effect: Effect): boolean {
   if (effect.type === 'buff') return effect.on === 'target';
+  if ((effect.type === 'poison' || effect.type === 'burn' || effect.type === 'paralyze' || effect.type === 'sleep') && effect.all) return false;
   return ['damage', 'heal', 'halveHp', 'destroy', 'poison', 'burn', 'paralyze', 'sleep'].includes(effect.type);
 }
 
