@@ -10,6 +10,7 @@ import type {
   HeroEvolutionDef,
   HeroPassive,
   ItemDef,
+  Keyword,
   PlayerId,
 } from './types';
 
@@ -71,11 +72,12 @@ export function aura(db: CardDb, state: GameState, player: PlayerId): Required<C
     const def = cardDef(db, field.cardId);
     if (def.kind === 'field') sources.push(def.creatures);
   }
-  const total = { attack: 0, hp: 0, damageReduction: 0 };
+  const total = { attack: 0, hp: 0, damageReduction: 0, regenerate: 0 };
   for (const modifier of sources) {
     total.attack += modifier?.attack ?? 0;
     total.hp += modifier?.hp ?? 0;
     total.damageReduction += modifier?.damageReduction ?? 0;
+    total.regenerate += modifier?.regenerate ?? 0;
   }
   return total;
 }
@@ -95,6 +97,13 @@ export const attackBonus = (db: CardDb, state: GameState, creature: Creature): n
 
 export const damageReduction = (db: CardDb, state: GameState, creature: Creature): number =>
   (itemDef(db, creature)?.damageReduction ?? 0) + aura(db, state, creature.owner).damageReduction;
+
+/** 再生：卡上的再生，加上英雄被動與場地卡給的。 */
+export const regeneration = (db: CardDb, state: GameState, creature: Creature): number =>
+  (creatureDef(db, creature).regenerate ?? 0) + aura(db, state, creature.owner).regenerate;
+
+export const hasKeyword = (db: CardDb, creature: Creature, keyword: Keyword): boolean =>
+  creatureDef(db, creature).keywords?.includes(keyword) ?? false;
 
 export const heroMaxHp = (db: CardDb, state: GameState, player: PlayerId): number =>
   heroDef(db, state, player).hp + (heroEvolution(db, state, player)?.hpBonus ?? 0);

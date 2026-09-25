@@ -18,8 +18,7 @@ function section(title: string, cards: DeckCardDef[]): string[] {
     '',
     ...sorted.flatMap((card) => {
       const [head, ...body] = describeCard(card, nameOf);
-      // 這份文件把召喚費用寫成「能量 N」，一看就知道要花多少能量；遊戲裡的卡面不變。
-      return [`**${head!.replace('｜召喚 ', '｜能量 ')}**`, ...body.map((line) => `- ${line}`), ''];
+      return [`**${head}**`, ...body.map((line) => `- ${line}`), ''];
     }),
   ];
 }

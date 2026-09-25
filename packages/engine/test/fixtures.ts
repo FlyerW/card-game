@@ -136,6 +136,17 @@ export const TEST_CARDS: DeckCardDef[] = [
     entry: { name: 'flare', target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'damage', amount: 4 }] },
   },
 
+  // 吸血、再生、全體回復、消滅
+  creature('leech', [hit('drain4', ANY, 4), { name: 'drainAll', cost: 1, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }], {
+    keywords: ['lifesteal'],
+  }),
+  creature('moss', [hit('x', ANY, 1), hit('y', ANY, 1)], { regenerate: 2 }),
+  { kind: 'spell', id: 'bloom', name: 'bloom', rarity: 'N', colors: [], cost: 1, target: NONE, effects: [{ type: 'healAll', amount: 4 }] },
+  {
+    kind: 'spell', id: 'doom', name: 'doom', rarity: 'R', colors: [], cost: 1,
+    target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'destroyCreature' }],
+  },
+
   // 顏色測試
   creature('red-imp', [hit('x', ANY, 1), hit('y', ANY, 1)], { colors: ['red'] }),
   creature('gold-griffin', [hit('x', ANY, 1), hit('y', ANY, 1)], { colors: ['red', 'green'] }),
@@ -150,6 +161,7 @@ export const TEST_HEROES: HeroDef[] = [
     kind: 'hero', id: 'warden', name: 'warden', colors: ['white'], hp: 48,
     passive: { name: 'guard', creatures: { damageReduction: 1 } },
   },
+  { kind: 'hero', id: 'mender', name: 'mender', colors: ['green'], hp: 47, passive: { name: 'growth', creatures: { regenerate: 1 } } },
 ];
 
 export const testDb = () => buildCardDb(TEST_CARDS, TEST_HEROES);

@@ -8,8 +8,11 @@ export type Color = 'white' | 'blue' | 'black' | 'red' | 'green';
 
 export type PlayerId = 0 | 1;
 
-/** 速攻：召喚當回合就能發動技能。 */
-export type Keyword = 'haste';
+/**
+ * 速攻：召喚當回合就能發動技能。
+ * 吸血：這隻生物的技能與進場效果造成傷害時，自己的英雄回復等量的 HP。
+ */
+export type Keyword = 'haste' | 'lifesteal';
 
 /**
  * 稀有度，由低到高。N 是單純的數值卡，可以只有一個技能；R 開始有特殊機制。
@@ -26,6 +29,8 @@ export interface CreatureModifier {
   hp?: number;
   /** 受到的傷害減少。 */
   damageReduction?: number;
+  /** 再生：擁有者的回合開始時回復這麼多 HP。 */
+  regenerate?: number;
 }
 
 /** 技能、天生技、法術選目標的方式。 */
@@ -52,6 +57,10 @@ export type Effect =
   | { type: 'opponentDiscardRandom'; count: number }
   /** 回復目標的 HP，不超過上限。 */
   | { type: 'heal'; amount: number }
+  /** 自己的英雄與每隻生物各回復 N，不選目標。 */
+  | { type: 'healAll'; amount: number }
+  /** 消滅目標生物：直接送進棄牌區，不算傷害，減傷擋不住。 */
+  | { type: 'destroyCreature' }
   /**
    * 目標剩餘 HP 減半、無條件捨去。算失去 HP 不算傷害：減傷擋不住，也不受挑釁限制。
    * all 為 true 時不選目標，對手每隻生物都減半。
@@ -114,6 +123,8 @@ export interface CreatureDef extends CardBase {
   hp: number;
   skills: Ability[];
   keywords?: Keyword[];
+  /** 再生 N：擁有者的回合開始時，這隻生物回復 N HP。 */
+  regenerate?: number;
   /**
    * 進場效果：這張卡進場時（召喚，或進化成這張）發動。
    * 不另外花能量，價值算在費用裡，所以有進場效果的生物本體數值要低一點。

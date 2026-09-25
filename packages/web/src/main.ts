@@ -3,6 +3,8 @@ import {
   describeAbility,
   describeCard,
   describeColors,
+  describeEffects,
+  describeEntry,
   describeHero,
   other,
   sampleDb,
@@ -481,7 +483,7 @@ function detail(view: PlayerView): string {
         const acts = actsForSkill(sel.zone, index);
         const reason = myTurn && acts.length === 0 ? skillReason(cv, skill.cost, view.you.energy) : '';
         body += `<button class="skill" data-skill="${sel.zone}:${index}" ${acts.length === 0 ? 'disabled' : ''}>
-          <span class="skill-cost">${skill.cost}</span><span class="skill-text">${esc(describeAbility(skill))}</span>
+          <span class="skill-cost">${skill.cost}</span><span class="skill-text">${esc(`${skill.name}：${describeEffects(skill)}`)}</span>
           ${reason ? `<span class="skill-why">${esc(reason)}</span>` : ''}</button>`;
       });
       body += '</div>';
@@ -505,7 +507,7 @@ function detail(view: PlayerView): string {
     return (
       toast +
       `<p class="d-head">選擇進場效果的目標</p><p class="d-line">${esc(def!.name)} 放在 ${ZONE[sel.zone]}</p>
-       <p class="d-line">${esc(describeAbility({ ...entry, cost: 0 }).replace('（0）', ''))}</p><p class="hint">發光的就是可以選的目標。</p>` +
+       <p class="d-line">${esc(describeEntry(entry))}</p><p class="hint">發光的就是可以選的目標。</p>` +
       cancel
     );
   }

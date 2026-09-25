@@ -20,6 +20,8 @@ function targetProblem(effect: Effect, spec: TargetSpec): string | null {
       return spec.kind === 'enemyItem' || spec.kind === 'enemyItemOrField'
         ? null
         : '破壞只能指定道具或場地卡';
+    case 'destroyCreature':
+      return spec.kind === 'enemy' && spec.allow === 'creature' ? null : '消滅只能指定對手的生物';
     case 'buff':
       if (effect.on === 'self') return null;
       return spec.kind === 'ally' && spec.allow === 'creature' ? null : '對目標增益只能指定我方生物';
@@ -39,7 +41,7 @@ function targetProblem(effect: Effect, spec: TargetSpec): string | null {
 function usesTarget(effect: Effect): boolean {
   if (effect.type === 'buff') return effect.on === 'target';
   if ((effect.type === 'halveHp' || effect.type === 'poison' || effect.type === 'burn' || effect.type === 'paralyze' || effect.type === 'sleep') && effect.all) return false;
-  return ['damage', 'heal', 'halveHp', 'destroy', 'poison', 'burn', 'paralyze', 'sleep'].includes(effect.type);
+  return ['damage', 'heal', 'halveHp', 'destroy', 'destroyCreature', 'poison', 'burn', 'paralyze', 'sleep'].includes(effect.type);
 }
 
 function checkAbility(ability: Ability, where: string, isCreatureSkill: boolean): string[] {
@@ -93,6 +95,9 @@ function checkCard(
   switch (card.kind) {
     case 'creature': {
       if (!Number.isInteger(card.hp) || card.hp <= 0) problems.push(`${where}：HP 必須是正整數`);
+      if (card.regenerate !== undefined && (!Number.isInteger(card.regenerate) || card.regenerate <= 0)) {
+        problems.push(`${where}：再生必須是正整數`);
+      }
       // N 卡是單純的數值卡，可以只有一個技能；其他稀有度至少兩個。
       const minSkills = card.rarity === 'N' ? 1 : 2;
       if (card.skills.length < minSkills) problems.push(`${where}：${card.rarity} 生物至少要有 ${minSkills} 個技能`);

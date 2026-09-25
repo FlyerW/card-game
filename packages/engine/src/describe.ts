@@ -1,4 +1,4 @@
-import type { Ability, Color, CreatureModifier, DeckCardDef, Effect, HeroDef, HeroPassive, TargetSpec } from './types';
+import type { Ability, Color, CreatureDef, CreatureModifier, DeckCardDef, Effect, HeroDef, HeroPassive, TargetSpec } from './types';
 
 // 卡面文字由資料產生，不另外手寫，資料和說明才不會對不上。
 
@@ -36,6 +36,10 @@ export function describeEffect(effect: Effect): string {
       return `對手隨機棄 ${effect.count} 張手牌`;
     case 'heal':
       return `回復 ${effect.amount} HP`;
+    case 'healAll':
+      return `我方英雄與每隻生物各回復 ${effect.amount} HP`;
+    case 'destroyCreature':
+      return '消滅（直接送進棄牌區，不算傷害）';
     case 'halveHp':
       return `${effect.all ? '對手每隻生物' : ''}剩餘 HP 減半`;
     case 'taunt':
@@ -69,10 +73,26 @@ export function describeEffect(effect: Effect): string {
   }
 }
 
-export function describeAbility(ability: Ability): string {
+/** 目標與效果：「〔任意目標〕造成 7 傷害」。 */
+export function describeEffects(ability: Omit<Ability, 'cost'>): string {
   const target = describeTarget(ability.target);
-  const effects = ability.effects.map(describeEffect).join('，');
-  return `${ability.name}（${ability.cost}）：${target === null ? '' : `〔${target}〕`}${effects}`;
+  return `${target === null ? '' : `〔${target}〕`}${ability.effects.map(describeEffect).join('，')}`;
+}
+
+/** 技能與天生技：「火花（能量 2）：〔斜對角〕造成 7 傷害」。 */
+export const describeAbility = (ability: Ability): string =>
+  `${ability.name}（能量 ${ability.cost}）：${describeEffects(ability)}`;
+
+/** 進場效果：「進場 火星：〔任意目標〕造成 2 傷害」。 */
+export const describeEntry = (entry: Omit<Ability, 'cost'>): string => `進場 ${entry.name}：${describeEffects(entry)}`;
+
+/** 關鍵字與再生，各自一行說明。 */
+function describeTraits(card: CreatureDef): string[] {
+  const lines: string[] = [];
+  if (card.keywords?.includes('haste')) lines.push('速攻：召喚當回合就能發動技能');
+  if (card.keywords?.includes('lifesteal')) lines.push('吸血：牠的技能與進場效果造成傷害時，你的英雄回復等量的 HP');
+  if (card.regenerate) lines.push(`再生 ${card.regenerate}：你的回合開始時，牠回復 ${card.regenerate} HP`);
+  return lines;
 }
 
 /** 「我方生物 HP 上限 +2、技能傷害 +1」這類持續加成的說明。 */
@@ -81,6 +101,7 @@ function describeModifier(modifier: CreatureModifier | undefined): string[] {
   if (modifier?.attack) parts.push(`技能傷害 +${modifier.attack}`);
   if (modifier?.hp) parts.push(`HP 上限 +${modifier.hp}`);
   if (modifier?.damageReduction) parts.push(`受到傷害 −${modifier.damageReduction}`);
+  if (modifier?.regenerate) parts.push(`再生 ${modifier.regenerate}（你的回合開始時回復 ${modifier.regenerate} HP）`);
   return parts;
 }
 
@@ -94,27 +115,26 @@ function describeOwnEffects(creatures: CreatureModifier | undefined, ceilingBonu
 
 const STAGE_NAMES = ['基礎', '一階', '二階'] as const;
 
-/** 整張卡的說明，第一行是標題，其餘是效果。 */
+/** 整張卡的說明，第一行是標題，其餘是效果。費用一律寫成「能量 N」；進化生物寫的是進化要花的能量。 */
 export function describeCard(card: DeckCardDef, names: (id: string) => string = (id) => id): string[] {
   const tag = `${card.rarity}・${describeColors(card.colors)}`;
+  const cost = `能量 ${card.cost}`;
   switch (card.kind) {
     case 'creature': {
       const stage = STAGE_NAMES[card.stage];
       const from = card.evolvesFrom === undefined ? '' : `，由${names(card.evolvesFrom)}進化`;
-      const cost = card.stage === 0 ? `召喚 ${card.cost}` : `進化 ${card.cost}`;
-      const keywords = card.keywords?.includes('haste') ? '｜速攻' : '';
-      const entry = card.entry ? [`進場 ${describeAbility({ ...card.entry, cost: 0 }).replace('（0）', '')}`] : [];
-      return [`${card.name}　${tag}・${stage}${from}｜${cost}｜HP ${card.hp}${keywords}`, ...entry, ...card.skills.map(describeAbility)];
+      const entry = card.entry ? [describeEntry(card.entry)] : [];
+      return [`${card.name}　${tag}・${stage}${from}｜${cost}｜HP ${card.hp}`, ...describeTraits(card), ...entry, ...card.skills.map(describeAbility)];
     }
     case 'spell':
-      return [`${card.name}　${tag}・法術`, describeAbility({ ...card })];
+      return [`${card.name}　${tag}・法術｜${cost}`, describeEffects(card)];
     case 'item':
-      return [`${card.name}　${tag}・道具（${card.cost}）`, `這隻生物${describeModifier(card).join('、')}`];
+      return [`${card.name}　${tag}・道具｜${cost}`, `這隻生物${describeModifier(card).join('、')}`];
     case 'field':
-      return [`${card.name}　${tag}・場地（${card.cost}）`, describeOwnEffects(card.creatures, card.ceilingBonus)];
+      return [`${card.name}　${tag}・場地｜${cost}`, describeOwnEffects(card.creatures, card.ceilingBonus)];
     case 'heroEvolution': {
-      const lines = [`${card.name}　${tag}・英雄進化（${card.cost}）｜由${names(card.evolvesFrom)}進化`];
-      if (card.entry) lines.push(`進場 ${describeAbility({ ...card.entry, cost: 0 }).replace('（0）', '')}`);
+      const lines = [`${card.name}　${tag}・英雄進化｜${cost}｜由${names(card.evolvesFrom)}進化`];
+      if (card.entry) lines.push(describeEntry(card.entry));
       lines.push(`英雄 HP 上限 +${card.hpBonus}`);
       if (card.power) lines.push(`天生技換成 ${describeAbility(card.power)}`);
       if (card.passive) lines.push(`多一個${describePassive(card.passive)}`);

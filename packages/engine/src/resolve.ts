@@ -6,10 +6,12 @@ import {
   currentCardId,
   currentHp,
   damageReduction,
+  hasKeyword,
   heroHp,
   isAsleep,
   other,
   ownersTurn,
+  regeneration,
 } from './queries';
 import type { AbilitySource } from './targeting';
 import type {
@@ -76,17 +78,23 @@ export function endGame(ctx: Ctx, result: GameResult): void {
   ctx.events.push({ type: 'gameOver', result });
 }
 
+/** 把生物連同進化堆疊與道具送進棄牌區。 */
+function removeCreature(ctx: Ctx, player: PlayerId, zone: number): void {
+  const p = ctx.state.players[player];
+  const creature = p.zones[zone];
+  if (creature == null) return;
+  p.zones[zone] = null;
+  p.discard.push(...creature.cards);
+  if (creature.item !== null) p.discard.push(creature.item);
+  ctx.events.push({ type: 'creatureDestroyed', player, zone, cardId: currentCardId(creature) });
+}
+
 /** 清掉 HP 歸零的生物，再檢查英雄。每個效果結算完都要跑一次。 */
 export function cleanup(ctx: Ctx): void {
   const { db, state } = ctx;
   for (const player of [0, 1] as const) {
-    const p = state.players[player];
-    p.zones.forEach((creature, zone) => {
-      if (creature === null || currentHp(db, state, creature) > 0) return;
-      p.zones[zone] = null;
-      p.discard.push(...creature.cards);
-      if (creature.item !== null) p.discard.push(creature.item);
-      ctx.events.push({ type: 'creatureDestroyed', player, zone, cardId: currentCardId(creature) });
+    state.players[player].zones.forEach((creature, zone) => {
+      if (creature !== null && currentHp(db, state, creature) <= 0) removeCreature(ctx, player, zone);
     });
   }
   if (state.phase === 'over') return;
@@ -106,11 +114,14 @@ function liveCreature(state: GameState, target: Target | null, uid: number | nul
   return creature !== null && creature.uid === uid ? creature : null;
 }
 
-function dealDamage(ctx: Ctx, target: Target, creature: Creature | null, amount: number): void {
+/** 造成傷害，回傳實際造成多少（扣掉減傷）。 */
+function dealDamage(ctx: Ctx, target: Target, creature: Creature | null, amount: number): number {
   if (target.kind === 'hero') {
     ctx.state.players[target.player].heroDamage += amount;
     ctx.events.push({ type: 'damaged', target, amount });
-  } else if (creature !== null) {
+    return amount;
+  }
+  if (creature !== null) {
     const dealt = Math.max(0, amount - damageReduction(ctx.db, ctx.state, creature));
     creature.damage += dealt;
     ctx.events.push({ type: 'damaged', target, amount: dealt });
@@ -119,7 +130,22 @@ function dealDamage(ctx: Ctx, target: Target, creature: Creature | null, amount:
       creature.asleepUntilTurn = null;
       ctx.events.push({ type: 'wokeUp', player: target.player, zone: target.zone });
     }
+    return dealt;
   }
+  return 0;
+}
+
+function healHero(ctx: Ctx, player: PlayerId, amount: number): void {
+  const owner = ctx.state.players[player];
+  const healed = Math.min(amount, owner.heroDamage);
+  owner.heroDamage -= healed;
+  ctx.events.push({ type: 'healed', target: { kind: 'hero', player }, amount: healed });
+}
+
+function healCreature(ctx: Ctx, creature: Creature, target: Target, amount: number): void {
+  const healed = Math.min(amount, creature.damage);
+  creature.damage -= healed;
+  ctx.events.push({ type: 'healed', target, amount: healed });
 }
 
 /** 對一隻生物施加異常狀態。 */
@@ -173,6 +199,16 @@ export function tickPoison(ctx: Ctx, player: PlayerId): void {
   cleanup(ctx);
 }
 
+/** 回合開始：這位玩家有再生的生物回復 HP。在中毒之前，所以再生抵得掉同樣多的中毒。 */
+export function tickRegenerate(ctx: Ctx, player: PlayerId): void {
+  const { db, state } = ctx;
+  state.players[player].zones.forEach((creature, zone) => {
+    if (creature === null || creature.damage === 0) return;
+    const amount = regeneration(db, state, creature);
+    if (amount > 0) healCreature(ctx, creature, { kind: 'creature', player, zone }, amount);
+  });
+}
+
 /** 回合結束：這位玩家灼燒的生物受到傷害。算傷害，減傷擋得住。 */
 export function tickBurn(ctx: Ctx, player: PlayerId): void {
   ctx.state.players[player].zones.forEach((creature, zone) => {
@@ -196,19 +232,25 @@ function applyEffect(
   const player = state.players[me];
   const bonus = sourceCreature === null ? 0 : attackBonus(db, state, sourceCreature);
   const creature = liveCreature(state, target, targetUid);
+  // 吸血：這隻生物造成多少傷害，自己的英雄就回復多少。
+  const lifesteal = (dealt: number) => {
+    if (dealt > 0 && sourceCreature !== null && hasKeyword(db, sourceCreature, 'lifesteal')) healHero(ctx, me, dealt);
+  };
 
   switch (effect.type) {
     case 'damage':
       if (target !== null && (target.kind === 'hero' || creature !== null)) {
-        dealDamage(ctx, target, creature, effect.amount + bonus);
+        lifesteal(dealDamage(ctx, target, creature, effect.amount + bonus));
       }
       return;
 
     case 'damageEnemyCreatures': {
       const enemy = other(me);
+      let dealt = 0;
       state.players[enemy].zones.forEach((each, zone) => {
-        if (each !== null) dealDamage(ctx, { kind: 'creature', player: enemy, zone }, each, effect.amount + bonus);
+        if (each !== null) dealt += dealDamage(ctx, { kind: 'creature', player: enemy, zone }, each, effect.amount + bonus);
       });
+      lifesteal(dealt);
       return;
     }
 
@@ -228,16 +270,19 @@ function applyEffect(
     }
 
     case 'heal':
-      if (target?.kind === 'hero') {
-        const owner = state.players[target.player];
-        const healed = Math.min(effect.amount, owner.heroDamage);
-        owner.heroDamage -= healed;
-        ctx.events.push({ type: 'healed', target, amount: healed });
-      } else if (creature !== null) {
-        const healed = Math.min(effect.amount, creature.damage);
-        creature.damage -= healed;
-        ctx.events.push({ type: 'healed', target: target!, amount: healed });
-      }
+      if (target?.kind === 'hero') healHero(ctx, target.player, effect.amount);
+      else if (creature !== null) healCreature(ctx, creature, target!, effect.amount);
+      return;
+
+    case 'healAll':
+      healHero(ctx, me, effect.amount);
+      player.zones.forEach((each, zone) => {
+        if (each !== null) healCreature(ctx, each, { kind: 'creature', player: me, zone }, effect.amount);
+      });
+      return;
+
+    case 'destroyCreature':
+      if (creature !== null && target?.kind === 'creature') removeCreature(ctx, target.player, target.zone);
       return;
 
     case 'halveHp': {

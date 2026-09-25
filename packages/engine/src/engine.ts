@@ -21,6 +21,7 @@ import {
   shuffle,
   tickBurn,
   tickPoison,
+  tickRegenerate,
   type Ctx,
 } from './resolve';
 import { DEFAULT_RULES } from './rules';
@@ -181,6 +182,7 @@ function startTurn(ctx: Ctx, player: PlayerId): void {
   const grown = isFirstTurn ? rules.startingMaxEnergy[isFirstPlayer ? 0 : 1] : p.maxEnergy + rules.energyGrowth;
   p.maxEnergy = Math.min(grown, ceiling(db, state, player));
   p.energy = p.maxEnergy + (isFirstTurn && !isFirstPlayer ? rules.secondPlayerBonusEnergy : 0);
+  tickRegenerate(ctx, player);
   tickPoison(ctx, player);
 }
 
