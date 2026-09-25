@@ -4,7 +4,8 @@ import type { Ability, DeckCardDef, HeroDef, TargetSpec } from '../types';
 // 設計文件「範例卡牌」一節的卡，名字與數值都是暫定。
 // 數值參照「數值基準」：HP ≈ 2 + 2 × 召喚費用；單體傷害 ≈ 任意 2.5、只打英雄 2.5 + 1、
 // 只打生物 3、位置 3.5 倍費用。稀有度預算：N 基準、R 基準加一個機制、SR +10%、UR +20%。
-// 只打生物的法術 = 同費用生物的 HP，一張就能解掉同費用的生物；範圍法術能清掉便宜 3 費以上的生物。
+// 只打生物的法術 = 同費用生物的 HP，而且至少比任意目標多 1，一張就能解掉同費用的生物；
+// 範圍法術能清掉便宜 3 費以上的生物。
 
 const ANY: TargetSpec = { kind: 'enemy', allow: 'any' };
 const CREATURE: TargetSpec = { kind: 'enemy', allow: 'creature' };
@@ -223,7 +224,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   },
   {
     kind: 'spell', id: 'annihilate', name: '湮滅', rarity: 'R', colors: ['black'], cost: 4,
-    target: CREATURE, effects: [{ type: 'damage', amount: 10 }],
+    target: CREATURE, effects: [{ type: 'damage', amount: 11 }],
   },
   {
     kind: 'spell', id: 'plague', name: '瘟疫', rarity: 'R', colors: ['black'], cost: 4,
@@ -235,7 +236,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   },
   {
     kind: 'spell', id: 'healing-light', name: '治癒之光', rarity: 'N', colors: ['white'], cost: 1,
-    target: { kind: 'ally', allow: 'any' }, effects: [{ type: 'heal', amount: 4 }],
+    target: { kind: 'ally', allow: 'any' }, effects: [{ type: 'heal', amount: 4 }, { type: 'draw', count: 1 }],
   },
   { kind: 'spell', id: 'inspiration', name: '靈感', rarity: 'R', colors: ['blue'], cost: 2, target: NONE, effects: [{ type: 'draw', count: 2 }] },
   {
