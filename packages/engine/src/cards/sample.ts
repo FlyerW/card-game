@@ -27,13 +27,14 @@ const hit = (name: string, cost: number, target: TargetSpec, amount: number): Ab
 });
 
 export const SAMPLE_HEROES: HeroDef[] = [
-  { kind: 'hero', id: 'nameless-swordsman', name: '無名劍士', colors: ['white'], hp: 50 },
+  // 英雄 HP = 35 − 3 ×（顏色數 − 1）− 效果強度。基準從 50 降到 35，一局才會在 5–10 分鐘。
+  { kind: 'hero', id: 'nameless-swordsman', name: '無名劍士', colors: ['white'], hp: 35 },
   {
     kind: 'hero',
     id: 'flame-lord',
     name: '烈焰領主',
     colors: ['red'],
-    hp: 46,
+    hp: 32,
     power: hit('燃燼', 2, ANY, 2),
   },
   {
@@ -41,7 +42,7 @@ export const SAMPLE_HEROES: HeroDef[] = [
     id: 'forest-king',
     name: '林海之王',
     colors: ['green'],
-    hp: 47,
+    hp: 33,
     passive: { name: '豐饒', creatures: { hp: 1 } },
   },
   {
@@ -49,7 +50,7 @@ export const SAMPLE_HEROES: HeroDef[] = [
     id: 'tide-shadow-twins',
     name: '潮影雙生',
     colors: ['blue', 'black'],
-    hp: 40,
+    hp: 28,
     power: { name: '低語', cost: 2, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
   },
   {
@@ -57,7 +58,7 @@ export const SAMPLE_HEROES: HeroDef[] = [
     id: 'prism-sage',
     name: '虹彩賢者',
     colors: ['white', 'blue', 'black', 'red', 'green'],
-    hp: 30,
+    hp: 23,
   },
 ];
 
@@ -406,29 +407,29 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
 
   // ── 綠：成長、巨大。大型生物、提高能量上限、高 HP ──
   {
-    // 綠色的高 HP：比基準多 2，傷害少 1。
+    // 綠色的高 HP：比基準多 2，傷害少 1。用位置打：正對面空著就撞到英雄。
     kind: 'creature', id: 'forest-stag', name: '林鹿', rarity: 'N', colors: ['green'],
     stage: 0, cost: 2, hp: 8,
-    skills: [hit('鹿角', 2, CREATURE, 5)],
+    skills: [hit('衝撞', 2, OPPOSITE, 6)],
   },
   {
     kind: 'creature', id: 'moss-lizard', name: '苔甲巨蜥', rarity: 'N', colors: ['green'],
     stage: 0, cost: 5, hp: 14,
-    skills: [hit('甩尾', 4, CREATURE, 11)],
+    skills: [hit('甩尾', 4, DIAGONAL, 13)],
   },
   {
     kind: 'creature', id: 'grove-druid', name: '林語德魯伊', rarity: 'R', colors: ['green'],
     stage: 0, cost: 3, hp: 8,
     skills: [
       { name: '催生', cost: 2, target: ALLY_CREATURE, effects: [{ type: 'buff', attack: 2, hp: 2, on: 'target' }] },
-      hit('藤鞭', 2, CREATURE, 6),
+      hit('藤鞭', 2, ANY, 5),
     ],
   },
   {
     kind: 'creature', id: 'elder-treant', name: '萬年樹人', rarity: 'SR', colors: ['green'],
     stage: 0, cost: 7, hp: 18,
     skills: [
-      hit('巨根', 4, CREATURE, 13),
+      hit('巨根', 4, OPPOSITE, 15),
       { name: '年輪', cost: 2, target: NONE, effects: [{ type: 'buff', attack: 0, hp: 4, on: 'self' }] },
     ],
   },
@@ -440,17 +441,17 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   // ── 英雄進化：每局限一次，費用約 5–7 ──
   {
     kind: 'heroEvolution', id: 'flame-sovereign', name: '烈焰君王', rarity: 'SR', colors: ['red'],
-    cost: 6, evolvesFrom: 'flame-lord', hpBonus: 8,
+    cost: 6, evolvesFrom: 'flame-lord', hpBonus: 6,
     power: hit('煉獄', 2, ANY, 3),
   },
   {
     kind: 'heroEvolution', id: 'world-tree-king', name: '萬木之王', rarity: 'SR', colors: ['green'],
-    cost: 5, evolvesFrom: 'forest-king', hpBonus: 12,
+    cost: 5, evolvesFrom: 'forest-king', hpBonus: 8,
     passive: { name: '萬木', creatures: { hp: 1 } },
   },
   {
     kind: 'heroEvolution', id: 'sword-saint', name: '無名劍聖', rarity: 'SR', colors: ['white'],
-    cost: 6, evolvesFrom: 'nameless-swordsman', hpBonus: 10,
+    cost: 6, evolvesFrom: 'nameless-swordsman', hpBonus: 7,
     power: {
       name: '劍意', cost: 2, target: { kind: 'ally', allow: 'creature' },
       effects: [{ type: 'buff', attack: 2, hp: 0, on: 'target' }],

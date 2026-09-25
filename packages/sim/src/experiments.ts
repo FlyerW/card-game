@@ -1,6 +1,7 @@
 import {
   buildCardDb,
   createEngine,
+  deckPool,
   LEGACY_ENERGY_RULES,
   SAMPLE_CARDS,
   SAMPLE_HEROES,
@@ -17,11 +18,14 @@ import { buildDeck } from './deck';
 // 鏡像對戰：兩邊同一副牌、同一個英雄、同一種打法，唯一的差別是誰先手。
 // 所以先攻勝率偏離 50% 多少，就是先後手差距有多大。
 //
-// 英雄是模擬專用的：沒有任何效果、五色都能用、HP 可調。
-// 範例卡只有 21 張，單色組不成 40 張，所以用五色；沒有效果是為了只測能量制度本身。
+// 前兩組實驗的英雄是模擬專用的：沒有任何效果、五色都能用、HP 可調。
+// 五色是為了讓每一局都從整個卡池組牌，沒有效果是為了只測規則本身。
+// 第三組用範例卡裡的英雄，牌組只從他自己能用的卡組。
 
 const ALL_COLORS: Color[] = ['white', 'blue', 'black', 'red', 'green'];
-export const HERO_HPS = [40, 50, 60, 70] as const;
+/** 英雄基準 HP。 */
+export const BASE_HP = 35;
+export const HERO_HPS = [25, 30, 35, 40, 50] as const;
 const simHero = (hp: number): HeroDef => ({ kind: 'hero', id: `sim-${hp}`, name: `模擬英雄 ${hp}`, colors: ALL_COLORS, hp });
 
 export const db = buildCardDb(SAMPLE_CARDS, [...SAMPLE_HEROES, ...HERO_HPS.map(simHero)]);
@@ -33,6 +37,8 @@ export interface Experiment {
   rules: Partial<Rules>;
   heroHp: number;
   style: BotStyle;
+  /** 用範例卡裡的英雄與他自己的卡池；沒有就用模擬英雄與整個卡池。 */
+  heroId?: string;
 }
 
 const ENERGY_SYSTEMS = [
@@ -42,25 +48,34 @@ const ENERGY_SYSTEMS = [
 ];
 
 /**
- * 1. 三種能量制度 × 三種打法（英雄都是 50 HP）：先後手平衡，以及結論會不會因打法而變。
- * 2. 新制 × 英雄 40／60／70 HP（均衡打法）：英雄血量夠不夠。
+ * 1. 三種能量制度 × 三種打法（英雄 35 HP）：先後手平衡，以及結論會不會因打法而變。
+ * 2. 新制 × 英雄 25–50 HP（均衡打法）：英雄血量怎麼影響對局長度。
+ * 3. 新制 × 範例卡的每個英雄（均衡打法）：用他自己能用的卡組牌，看實際的對局長度與先後手。
  */
 export const EXPERIMENTS: Experiment[] = [
   ...ENERGY_SYSTEMS.flatMap((system) =>
     Object.entries(STYLES).map(([styleId, style]) => ({
-      id: `${system.id}/${styleId}/50`,
+      id: `${system.id}/${styleId}/${BASE_HP}`,
       label: system.label,
       rules: system.rules,
-      heroHp: 50,
+      heroHp: BASE_HP,
       style,
     })),
   ),
-  ...HERO_HPS.filter((hp) => hp !== 50).map((hp) => ({
+  ...HERO_HPS.filter((hp) => hp !== BASE_HP).map((hp) => ({
     id: `new/balanced/${hp}`,
     label: '新制',
     rules: {},
     heroHp: hp,
     style: STYLES.balanced,
+  })),
+  ...SAMPLE_HEROES.map((hero) => ({
+    id: `hero/${hero.id}`,
+    label: hero.name,
+    rules: {},
+    heroHp: hero.hp,
+    style: STYLES.balanced,
+    heroId: hero.id,
   })),
 ];
 
@@ -72,8 +87,9 @@ export const mirrorDeck = (seed: number): string[] => buildDeck(seed, null);
  * 所以不同規則之間的差異，不會是剛好抽到不同牌造成的。
  */
 export function gameConfig(experiment: Experiment, game: number): GameConfig {
-  const deck = mirrorDeck(game * 7919 + 17);
-  const heroId = `sim-${experiment.heroHp}`;
+  const seed = game * 7919 + 17;
+  const heroId = experiment.heroId ?? `sim-${experiment.heroHp}`;
+  const deck = experiment.heroId ? buildDeck(seed, heroId, deckPool(db, heroId)) : mirrorDeck(seed);
   return {
     seed: game + 1,
     players: [
