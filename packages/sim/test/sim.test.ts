@@ -6,7 +6,7 @@ import { EXPERIMENTS, engine, gameConfig, mirrorDeck } from '../src/experiments'
 import { playMatch } from '../src/match';
 
 describe('模擬環境', () => {
-  it('進化線照 2/1/1 帶：一階不會比基礎多、二階不會比一階多', () => {
+  it('進化線照 2/2/1 帶：一階不會比基礎多、二階不會比一階多', () => {
     for (let seed = 0; seed < 50; seed++) {
       const deck = mirrorDeck(seed);
       const count = (id: string) => deck.filter((card) => card === id).length;
@@ -86,9 +86,9 @@ describe('機器人', () => {
     const state = opening();
     const a = state.activePlayer;
     const b: PlayerId = a === 0 ? 1 : 0;
-    put(state, b, 0, 'wandering-mercenary'); // HP 2
-    state.players[a].energy = 2;
-    state.players[a].hand = [{ uid: state.nextUid++, cardId: 'ice-shard' }];
+    put(state, b, 0, 'wandering-mercenary'); // HP 3
+    state.players[a].energy = 3;
+    state.players[a].hand = [{ uid: state.nextUid++, cardId: 'devouring-flame' }]; // 只打生物 4
     const pick = chooseAction(engine, state, a, STYLES.balanced);
     expect(pick.action).toMatchObject({ type: 'castSpell', target: { kind: 'creature', player: b, zone: 0 } });
   });

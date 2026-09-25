@@ -775,7 +775,7 @@ function setupScreen(): string {
   const problems = custom ? deckIssues(db, app.heroId, custom).problems : [];
   const colors = describeColors(hero(app.heroId).colors);
   const deckText = !custom
-    ? `還沒有自訂牌組：每局從${colors}與無色的卡自動組一副（進化線照 2/1/1 帶）。`
+    ? `還沒有自訂牌組：每局從${colors}與無色的卡自動組一副（進化線照 2/2/1 帶）。`
     : problems.length
       ? `自訂牌組還不能用：${problems[0]}`
       : `用你的自訂牌組（${custom.length} 張）。`;

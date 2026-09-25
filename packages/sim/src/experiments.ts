@@ -24,8 +24,8 @@ import { buildDeck } from './deck';
 
 const ALL_COLORS: Color[] = ['white', 'blue', 'black', 'red', 'green'];
 /** 英雄基準 HP。 */
-export const BASE_HP = 30;
-export const HERO_HPS = [20, 25, 30, 35, 40] as const;
+export const BASE_HP = 55;
+export const HERO_HPS = [35, 45, 55, 65, 75] as const;
 const simHero = (hp: number): HeroDef => ({ kind: 'hero', id: `sim-${hp}`, name: `模擬英雄 ${hp}`, colors: ALL_COLORS, hp });
 
 export const db = buildCardDb(SAMPLE_CARDS, [...SAMPLE_HEROES, ...HERO_HPS.map(simHero)]);
@@ -96,7 +96,7 @@ export const EXPERIMENTS: Experiment[] = [
   ),
 ];
 
-/** 模擬用的牌組：進化線照 2/1/1 帶，其餘隨機；模擬英雄沒有英雄進化卡。同一個 seed 一定組出同一副。 */
+/** 模擬用的牌組：進化線照 2/2/1 帶，其餘隨機；模擬英雄沒有英雄進化卡。同一個 seed 一定組出同一副。 */
 export const mirrorDeck = (seed: number): string[] => buildDeck(seed, null);
 
 /**
