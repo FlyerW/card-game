@@ -1,10 +1,11 @@
 import {
-  attackBonus,
-  creatureDef,
+  attackPower,
+  creatureSkills,
   currentHp,
   heroHp,
-  isAsleep,
+  isDisarmed,
   isParalyzed,
+  isSilenced,
   isTaunting,
   other,
   type CardDb,
@@ -43,26 +44,28 @@ export const STYLES: Record<'balanced' | 'aggro' | 'control', BotStyle> = {
   control: { name: '控場', enemyHero: 1.0, ownHero: 1.5, creatureHp: 1.5, creatureThreat: 1.5, hand: 2.0, maxEnergy: 2.5, taunt: 4 },
 };
 
-/** 一隻生物最強的一招能打多少：單體傷害或範圍傷害取大者，再加攻擊加成。純功能型生物算 2。 */
+/** 一隻生物每回合最多能打多少：攻擊力，或技能的單體、範圍傷害，取大者。沉默或繳械的那一種不算。 */
 function threat(db: CardDb, state: GameState, creature: Creature): number {
-  let best = 0;
-  for (const skill of creatureDef(db, creature).skills) {
-    const damage = skill.effects.reduce(
-      (sum, effect) => sum + (effect.type === 'damage' || effect.type === 'damageEnemyCreatures' ? effect.amount : 0),
-      0,
-    );
-    best = Math.max(best, damage);
+  let best = isDisarmed(state, creature) ? 0 : attackPower(db, state, creature);
+  if (!isSilenced(state, creature)) {
+    for (const skill of creatureSkills(db, creature)) {
+      const damage = skill.effects.reduce(
+        (sum, effect) => sum + (effect.type === 'damage' || effect.type === 'damageEnemyCreatures' ? effect.amount : 0),
+        0,
+      );
+      best = Math.max(best, damage);
+    }
   }
-  return best === 0 ? 2 : best + attackBonus(db, state, creature);
+  return Math.max(best, 1);
 }
 
 function boardValue(db: CardDb, state: GameState, player: PlayerId, style: BotStyle): number {
   let value = 0;
   for (const creature of state.players[player].zones) {
     if (creature === null) continue;
-    // 中毒、灼燒每回合都扣，粗估再撐兩回合；麻痺、沉睡的生物暫時打不了人。
+    // 中毒、灼燒每回合都扣，粗估再撐兩回合；麻痺的生物暫時打不了人。
     const hp = Math.max(1, currentHp(db, state, creature) - 2 * (creature.poison + creature.burn));
-    const disabled = isParalyzed(state, creature) || isAsleep(state, creature);
+    const disabled = isParalyzed(state, creature);
     value += style.creatureHp * hp + style.creatureThreat * threat(db, state, creature) * (disabled ? 0.4 : 1);
     if (isTaunting(state, creature)) value += style.taunt;
   }

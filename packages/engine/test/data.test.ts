@@ -21,6 +21,7 @@ const creature = (patch: Partial<Extract<DeckCardDef, { kind: 'creature' }>>): D
   colors: [],
   stage: 0,
   cost: 1,
+  attack: 1,
   hp: 5,
   skills: [skill('a'), skill('b')],
   ...patch,
@@ -81,6 +82,25 @@ describe('範例卡池', () => {
     }
   });
 
+  it('技能數照稀有度：N 沒有、R 與 SR 一個、UR 兩個', () => {
+    const expected = { N: 0, R: 1, SR: 1, UR: 2 } as const;
+    for (const card of sample.cards.values()) {
+      if (card.kind === 'creature') expect(card.skills.length, card.name).toBe(expected[card.rarity]);
+    }
+  });
+
+  it('無色生物比同費用、同稀有度的有色生物弱一點', () => {
+    const stats = (card: DeckCardDef) => (card.kind === 'creature' ? card.attack + card.hp : 0);
+    // 有進場效果、關鍵字或再生的生物，數值本來就扣過，不拿來比。
+    const creatures = [...sample.cards.values()].filter(
+      (card) => card.kind === 'creature' && card.stage === 0 && !card.entry && !card.keywords && !card.regenerate,
+    );
+    for (const plain of creatures.filter((card) => card.colors.length === 0)) {
+      const rivals = creatures.filter((card) => card.colors.length > 0 && card.cost === plain.cost && card.rarity === plain.rarity);
+      for (const rival of rivals) expect(stats(plain), `${plain.name} 對 ${rival.name}`).toBeLessThanOrEqual(stats(rival));
+    }
+  });
+
   it('每個顏色都有一條進化線', () => {
     const cards = [...sample.cards.values()];
     for (const color of colors) {
@@ -94,7 +114,7 @@ describe('卡面文字', () => {
   it('由資料產生', () => {
     const hound = db.cards.get('hound')!;
     expect(describeCard(hound, (id) => db.cards.get(id)!.name)).toEqual([
-      'hound　R・無色・一階，由pup進化｜能量 2｜HP 10',
+      'hound　R・無色・一階，由pup進化｜能量 2｜攻 2｜HP 10',
       'bite2（能量 1）：〔任意目標〕造成 2 傷害',
       'sniff（能量 1）：抽 1 張牌',
     ]);
@@ -106,9 +126,9 @@ describe('卡面文字', () => {
 });
 
 describe('資料驗證', () => {
-  it('N 生物可以只有一個技能，其他稀有度至少兩個', () => {
-    expect(problems([creature({ rarity: 'N', skills: [skill('a')] })])).toBe('');
-    expect(problems([creature({ rarity: 'R', skills: [skill('a')] })])).toContain('R 生物至少要有 2 個技能');
+  it('攻擊力不能是負數', () => {
+    expect(problems([creature({ attack: -1 })])).toContain('攻擊力必須是非負整數');
+    expect(problems([creature({ attack: 0 })])).toBe('');
   });
 
   it('每次進化稀有度升一級：N → R → SR、R → SR → UR 都可以', () => {
@@ -150,11 +170,11 @@ describe('資料驗證', () => {
     expect(bad({ kind: 'enemy', allow: 'any' }, [{ type: 'heal', amount: 1 }])).toContain('回復只能指定我方目標');
     expect(bad({ kind: 'enemy', allow: 'any' }, [{ type: 'halveHp' }])).toContain('HP 減半只能指定對手的生物');
     expect(bad({ kind: 'enemy', allow: 'hero' }, [{ type: 'poison', amount: 1 }])).toContain('異常狀態只能指定對手的生物');
-    expect(bad({ kind: 'lane', lane: 'opposite' }, [{ type: 'sleep' }])).toBe('');
+    expect(bad({ kind: 'lane', lane: 'opposite' }, [{ type: 'silence' }])).toBe('');
   });
 
   it('id 不能重複；一次列出所有問題', () => {
-    const message = problems([creature({}), creature({ rarity: 'R', skills: [skill('a')] })]);
+    const message = problems([creature({}), creature({ hp: 0 })]);
     expect(message).toContain('重複的 id：c');
     expect(message.split('\n').length).toBeGreaterThanOrEqual(2);
   });

@@ -10,8 +10,10 @@ export const PACE = {
   turn: 10,
   /** 每個動作：選牌或技能、選目標、看動畫，秒。 */
   play: 6,
+  /** 每次攻擊：點生物、點目標，比出牌快，秒。 */
+  attack: 3,
 } as const;
 
 /** 一局的預估秒數。 */
 export const estimateSeconds = (o: MatchOutcome): number =>
-  o.turns * PACE.turn + o.plays * PACE.play;
+  o.turns * PACE.turn + o.plays * PACE.play + o.attacks * PACE.attack;

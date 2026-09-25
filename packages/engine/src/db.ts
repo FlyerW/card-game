@@ -28,7 +28,10 @@ function targetProblem(effect: Effect, spec: TargetSpec): string | null {
     case 'poison':
     case 'burn':
     case 'paralyze':
-    case 'sleep':
+    case 'silence':
+    case 'disarm':
+    case 'weaken':
+    case 'curse':
       if (effect.all) return null;
       return (spec.kind === 'enemy' && spec.allow !== 'hero') || spec.kind === 'lane'
         ? null
@@ -40,8 +43,9 @@ function targetProblem(effect: Effect, spec: TargetSpec): string | null {
 
 function usesTarget(effect: Effect): boolean {
   if (effect.type === 'buff') return effect.on === 'target';
-  if ((effect.type === 'halveHp' || effect.type === 'poison' || effect.type === 'burn' || effect.type === 'paralyze' || effect.type === 'sleep') && effect.all) return false;
-  return ['damage', 'heal', 'halveHp', 'destroy', 'destroyCreature', 'poison', 'burn', 'paralyze', 'sleep'].includes(effect.type);
+  const statuses = ['poison', 'burn', 'paralyze', 'silence', 'disarm', 'weaken', 'curse'];
+  if ((effect.type === 'halveHp' || statuses.includes(effect.type)) && 'all' in effect && effect.all) return false;
+  return ['damage', 'heal', 'halveHp', 'destroy', 'destroyCreature', ...statuses].includes(effect.type);
 }
 
 function checkAbility(ability: Ability, where: string, isCreatureSkill: boolean): string[] {
@@ -95,12 +99,10 @@ function checkCard(
   switch (card.kind) {
     case 'creature': {
       if (!Number.isInteger(card.hp) || card.hp <= 0) problems.push(`${where}：HP 必須是正整數`);
+      if (!Number.isInteger(card.attack) || card.attack < 0) problems.push(`${where}：攻擊力必須是非負整數`);
       if (card.regenerate !== undefined && (!Number.isInteger(card.regenerate) || card.regenerate <= 0)) {
         problems.push(`${where}：再生必須是正整數`);
       }
-      // N 卡是單純的數值卡，可以只有一個技能；其他稀有度至少兩個。
-      const minSkills = card.rarity === 'N' ? 1 : 2;
-      if (card.skills.length < minSkills) problems.push(`${where}：${card.rarity} 生物至少要有 ${minSkills} 個技能`);
       for (const skill of card.skills) problems.push(...checkAbility(skill, where, true));
       if (card.entry) problems.push(...checkAbility({ ...card.entry, cost: 0 }, `${where}的進場效果`, true));
       if (card.stage === 0 && card.evolvesFrom !== undefined) {
@@ -127,6 +129,8 @@ function checkCard(
           problems.push(`${where}：${key} 必須是非負整數`);
         }
       }
+      // 道具的技能由裝著它的生物發動，跟生物技能一樣可以用位置。
+      for (const skill of card.skills ?? []) problems.push(...checkAbility(skill, where, true));
       break;
     case 'heroEvolution': {
       const hero = heroes.get(card.evolvesFrom);
@@ -143,8 +147,9 @@ function checkCard(
     }
     case 'field':
       problems.push(...checkModifier(card.creatures, where));
-      if (card.ceilingBonus !== undefined && (!Number.isInteger(card.ceilingBonus) || card.ceilingBonus < 0)) {
-        problems.push(`${where}：ceilingBonus 必須是非負整數`);
+      for (const key of ['ceilingBonus', 'extraDraw', 'heroRegenerate', 'enemyDecay'] as const) {
+        const value = card[key];
+        if (value !== undefined && (!Number.isInteger(value) || value < 0)) problems.push(`${where}：${key} 必須是非負整數`);
       }
       break;
   }

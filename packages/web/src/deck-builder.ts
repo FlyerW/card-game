@@ -129,7 +129,7 @@ const byCost = (x: DeckCardDef, y: DeckCardDef) =>
 
 function poolCard(card: DeckCardDef, deck: readonly string[], focus: string | null): string {
   const n = count(deck, card.id);
-  const hp = card.kind === 'creature' ? `<span class="c-hp">HP ${card.hp}</span>` : '';
+  const hp = card.kind === 'creature' ? `<span class="c-hp"><span class="c-atk">⚔${card.attack}</span> HP ${card.hp}</span>` : '';
   const evo = card.kind === 'creature' && card.stage > 0;
   const addWhy = addProblem(deck, card.id);
   return `<div class="pool-card${n ? ' in-deck' : ''}${focus === card.id ? ' focused' : ''}">

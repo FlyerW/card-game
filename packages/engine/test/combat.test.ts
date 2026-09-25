@@ -23,16 +23,16 @@ describe('傷害與擊倒', () => {
     expect(reject(state, { type: 'endTurn', player: a })).toBe('GAME_OVER');
   });
 
-  it('道具：技能傷害加成與減傷都會套用', () => {
+  it('道具：攻擊加成只加在攻擊上，技能傷害不變；減傷兩種都擋', () => {
     let { state, a, b } = start();
     place(state, a, 0, 'hitter', { item: { uid: 900, cardId: 'blade' } });
     place(state, a, 1, 'hitter', { item: { uid: 901, cardId: 'blade' } });
     place(state, b, 0, 'taunter', { item: { uid: 902, cardId: 'armor' } });
     state.players[a].energy = 5;
     state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0, target: creatureAt(b, 0) });
-    expect(at(state, b, 0)?.damage).toBe(5); // 5 + 2 − 2
-    state = act(state, { type: 'useSkill', player: a, zone: 1, skill: 0, target: hero(b) });
-    expect(state.players[b].heroDamage).toBe(7); // 英雄沒有減傷
+    expect(at(state, b, 0)?.damage).toBe(3); // 5 − 2，利爪不加技能傷害
+    state = act(state, { type: 'attack', player: a, zone: 1, target: hero(b) });
+    expect(state.players[b].heroDamage).toBe(4); // 攻擊 2 + 利爪 2，英雄沒有減傷
   });
 
   it('減傷不會讓傷害變成負數', () => {
@@ -55,8 +55,8 @@ describe('增益指示物', () => {
     expect([maxHp(db, state, bruiser), currentHp(db, state, bruiser), attackBonus(db, state, bruiser)]).toEqual([13, 9, 3]);
 
     state = endTurn(endTurn(state));
-    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 2, target: hero(b) });
-    expect(state.players[b].heroDamage).toBe(4); // 1 + 3
+    state = act(state, { type: 'attack', player: a, zone: 0, target: hero(b) });
+    expect(state.players[b].heroDamage).toBe(5); // 攻擊 2 + 3
   });
 
   it('只加攻擊：HP 上限不變', () => {
@@ -76,13 +76,13 @@ describe('增益指示物', () => {
     expect(at(state, a, 0)).toMatchObject({ attackCounters: 6, hpCounters: 6 });
   });
 
-  it('範圍傷害的每一次都吃攻擊加成', () => {
+  it('攻擊加成不加在技能上，範圍技能也一樣', () => {
     let { state, a, b } = start();
     place(state, a, 0, 'bruiser', { attackCounters: 2 });
     place(state, b, 0, 'taunter');
     place(state, b, 4, 'taunter');
     state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 3 });
-    expect([at(state, b, 0)?.damage, at(state, b, 4)?.damage]).toEqual([3, 3]);
+    expect([at(state, b, 0)?.damage, at(state, b, 4)?.damage]).toEqual([1, 1]);
   });
 });
 
@@ -172,7 +172,7 @@ describe('進化', () => {
 
     state = act(state, { type: 'useSkill', player: a, zone: 1, skill: 0, target: hero(b) });
     state = act(state, { type: 'evolve', player: a, card: give(state, a, 'hound'), zone: 1 });
-    expect(reject(state, { type: 'useSkill', player: a, zone: 1, skill: 0, target: hero(b) })).toBe('SKILL_ALREADY_USED');
+    expect(reject(state, { type: 'useSkill', player: a, zone: 1, skill: 0, target: hero(b) })).toBe('ALREADY_ACTED');
   });
 
   it('指示物與道具在進化後保留', () => {

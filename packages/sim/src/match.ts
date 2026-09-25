@@ -8,8 +8,10 @@ export interface MatchOutcome {
   turns: number;
   /** 勝方英雄剩下的 HP，看勝負有多懸殊。平手時為 null。 */
   winnerHeroHp: number | null;
-  /** 雙方出牌、發動技能、天生技等動作的次數，不含結束回合。 */
+  /** 雙方出牌、發動技能、天生技等動作的次數，不含攻擊與結束回合。 */
   plays: number;
+  /** 雙方生物攻擊的次數。 */
+  attacks: number;
 }
 
 /** 兩個機器人打一局。雙方都保留起手牌不重抽。 */
@@ -24,9 +26,11 @@ export function playMatch(engine: Engine, config: GameConfig, style: BotStyle, m
   }
 
   let plays = 0;
+  let attacks = 0;
   for (let i = 0; i < maxActions && state.phase !== 'over'; i++) {
     const pick = chooseAction(engine, state, engine.actor(state), style);
-    if (pick.action.type !== 'endTurn') plays++;
+    if (pick.action.type === 'attack') attacks++;
+    else if (pick.action.type !== 'endTurn') plays++;
     state = pick.state;
   }
   if (state.result === null) throw new Error(`超過 ${maxActions} 個動作仍未分出勝負`);
@@ -39,5 +43,6 @@ export function playMatch(engine: Engine, config: GameConfig, style: BotStyle, m
     turns: state.turn,
     winnerHeroHp: view === null ? null : view.you.heroHp,
     plays,
+    attacks,
   };
 }

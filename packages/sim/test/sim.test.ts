@@ -74,8 +74,9 @@ function put(state: GameState, player: PlayerId, zone: number, cardId: string, d
   const uid = state.nextUid++;
   const creature: Creature = {
     uid, owner: player, cards: [{ uid, cardId }], damage, attackCounters: 0, hpCounters: 0, item: null,
-    summonedTurn: 0, evolvedTurn: null, skillUsedTurn: null, tauntUntilTurn: null,
-    poison: 0, burn: 0, paralyzedUntilTurn: null, asleepUntilTurn: null,
+    summonedTurn: 0, evolvedTurn: null, actedTurn: null, tauntUntilTurn: null,
+    poison: 0, burn: 0, paralyzedUntilTurn: null, silencedUntilTurn: null, disarmedUntilTurn: null,
+    weakenedUntilTurn: null, cursedUntilTurn: null,
   };
   state.players[player].zones[zone] = creature;
 }
@@ -85,7 +86,7 @@ describe('機器人', () => {
     const state = opening();
     const a = state.activePlayer;
     const b: PlayerId = a === 0 ? 1 : 0;
-    put(state, b, 0, 'wandering-mercenary', 4); // HP 8，剩 4
+    put(state, b, 0, 'wandering-mercenary'); // HP 2
     state.players[a].energy = 2;
     state.players[a].hand = [{ uid: state.nextUid++, cardId: 'ice-shard' }];
     const pick = chooseAction(engine, state, a, STYLES.balanced);

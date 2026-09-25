@@ -24,8 +24,8 @@ import { buildDeck } from './deck';
 
 const ALL_COLORS: Color[] = ['white', 'blue', 'black', 'red', 'green'];
 /** 英雄基準 HP。 */
-export const BASE_HP = 35;
-export const HERO_HPS = [25, 30, 35, 40, 50] as const;
+export const BASE_HP = 30;
+export const HERO_HPS = [20, 25, 30, 35, 40] as const;
 const simHero = (hp: number): HeroDef => ({ kind: 'hero', id: `sim-${hp}`, name: `模擬英雄 ${hp}`, colors: ALL_COLORS, hp });
 
 export const db = buildCardDb(SAMPLE_CARDS, [...SAMPLE_HEROES, ...HERO_HPS.map(simHero)]);

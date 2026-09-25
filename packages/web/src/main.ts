@@ -49,7 +49,7 @@ const THEM = (): PlayerId => other(YOU);
 const BOT: PlayerId = 1;
 const BOT_STEP_MS = 750;
 /** 存檔格式。引擎的狀態改了就加一，舊版存下來的對局就不接著打。 */
-const SAVE_FORMAT = 2;
+const SAVE_FORMAT = 3;
 
 // ─── 狀態 ────────────────────────────────────────────────────────────────────
 
@@ -233,6 +233,14 @@ const actsForCard = (uid: number) => legal().filter((a) => 'card' in a && a.card
 const actsForSkill = (zone: number, skill: number) =>
   legal().filter((a) => a.type === 'useSkill' && a.zone === zone && a.skill === skill);
 const actsForPower = () => legal().filter((a) => a.type === 'heroPower');
+const actsForAttack = (zone: number) => legal().filter((a) => a.type === 'attack' && a.zone === zone);
+
+/** 這隻生物能發動的技能：自己的，加上道具給的。 */
+function skillsOf(cv: CreatureView) {
+  const def = card(cv.cardId);
+  const item = cv.item ? card(cv.item) : null;
+  return [...(def.kind === 'creature' ? def.skills : []), ...(item?.kind === 'item' ? (item.skills ?? []) : [])];
+}
 
 /** 目前選取狀態下，點哪個位置會執行哪個動作。 */
 function choices(): Map<string, Action> {
@@ -243,6 +251,11 @@ function choices(): Map<string, Action> {
     for (const a of actsForCard(sel.uid)) {
       if ((a.type === 'summon' || a.type === 'evolve') && a.zone === sel.zone && a.target) map.set(targetKey(a.target), a);
     }
+    return map;
+  }
+  if (sel.kind === 'creature' && sel.player === YOU) {
+    // 選了自己的生物：發光的對手生物與英雄就是能攻擊的目標。
+    for (const a of actsForAttack(sel.zone)) if (a.type === 'attack') map.set(targetKey(a.target), a);
     return map;
   }
   const acts =
@@ -393,15 +406,30 @@ function handReason(def: DeckCardDef, you: SideView): string {
   }
 }
 
-function skillReason(cv: CreatureView, cost: number, energy: number): string {
+/** 攻擊與技能共用的限制；沒有就是 null。 */
+function actReason(cv: CreatureView): string | null {
   const def = card(cv.cardId);
   const haste = def.kind === 'creature' && def.keywords?.includes('haste');
-  if (cv.paralyzed) return '麻痺中，不能發動技能';
-  if (cv.asleep) return '沉睡中，不能發動技能';
-  if (cv.skillUsedThisTurn) return '這回合已經發動過技能';
-  if (cv.summonedThisTurn && !haste) return '召喚當回合不能發動技能';
+  if (cv.paralyzed) return '麻痺中，不能攻擊、不能發動技能';
+  if (cv.actedThisTurn) return '這回合已經攻擊或發動過技能';
+  if (cv.summonedThisTurn && !haste) return '召喚當回合不能攻擊、不能發動技能';
+  return null;
+}
+
+function skillReason(cv: CreatureView, cost: number, energy: number): string {
+  const reason = actReason(cv);
+  if (reason) return reason;
+  if (cv.silenced) return '沉默中，不能發動技能';
   if (cost > energy) return `能量不足：需要 ${cost}`;
   return '目前沒有可以指定的目標';
+}
+
+function attackReason(cv: CreatureView): string {
+  const reason = actReason(cv);
+  if (reason) return reason;
+  if (cv.disarmed) return '被繳械，不能攻擊';
+  if (cv.attack <= 0) return '攻擊力是 0，不能攻擊';
+  return '沒有可以攻擊的目標';
 }
 
 function lines(texts: string[]): string {
@@ -413,15 +441,17 @@ function lines(texts: string[]): string {
 const myMove = (view: PlayerView) => view.phase === 'main' && view.activePlayer === YOU && !app.busy && !app.pending;
 
 function creatureStatus(cv: CreatureView): string {
-  const tags: string[] = [`HP ${cv.hp} / ${cv.maxHp}`];
-  if (cv.attackBonus) tags.push(`技能傷害 +${cv.attackBonus}`);
+  const tags: string[] = [`攻擊 ${cv.attack}${cv.attackBonus ? `（含加成 +${cv.attackBonus}）` : ''}`, `HP ${cv.hp} / ${cv.maxHp}`];
   if (cv.damageReduction) tags.push(`受到傷害 −${cv.damageReduction}`);
   if (cv.item) tags.push(`道具：${nameOf(cv.item)}`);
   if (cv.taunting) tags.push('挑釁中');
   if (cv.poison) tags.push(`中毒 ${cv.poison}：牠的回合開始時失去 ${cv.poison} HP`);
   if (cv.burn) tags.push(`灼燒 ${cv.burn}：牠的回合結束時受到 ${cv.burn} 傷害`);
-  if (cv.paralyzed) tags.push('麻痺：不能發動技能');
-  if (cv.asleep) tags.push('沉睡：不能發動技能，受到傷害就醒');
+  if (cv.paralyzed) tags.push('麻痺：不能攻擊、不能發動技能');
+  if (cv.silenced) tags.push('沉默：不能發動技能');
+  if (cv.disarmed) tags.push('繳械：不能攻擊');
+  if (cv.weakened) tags.push('虛弱：攻擊與反擊的傷害減半');
+  if (cv.cursed) tags.push('詛咒：技能傷害減半');
   if (cv.evolutionChain.length > 1) tags.push(`進化：${cv.evolutionChain.map(nameOf).join(' → ')}`);
   return `<ul class="tags">${tags.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>`;
 }
@@ -447,7 +477,7 @@ function detail(view: PlayerView): string {
     return (
       toast +
       `<p class="d-head">你的回合</p>
-       <p class="d-line">點手牌出牌；點你的生物選技能發動；點任何卡可以看說明。</p>
+       <p class="d-line">點手牌出牌；點你的生物，再點發光的對手生物或英雄攻擊，或選技能發動；點任何卡可以看說明。</p>
        <p class="d-line">能量 ${view.you.energy} / ${view.you.maxEnergy}。沒花完的能量不會留下來，你的下個回合開始時重置。</p>`
     );
   }
@@ -478,8 +508,16 @@ function detail(view: PlayerView): string {
     const def = card(cv.cardId);
     let body = lines(describeCard(def, nameOf)) + creatureStatus(cv);
     if (sel.player === YOU && def.kind === 'creature') {
+      const attacks = actsForAttack(sel.zone);
+      const orSkill = skillsOf(cv).length > 0 ? '或選一個技能發動（花能量，不會被反擊）。' : '';
+      body +=
+        attacks.length > 0
+          ? `<p class="hint">點發光的對手生物或英雄攻擊：不花能量，打生物時對方會反擊。${orSkill}</p>`
+          : myTurn
+            ? `<p class="hint blocked">${esc(attackReason(cv))}</p>`
+            : '';
       body += '<div class="skills">';
-      def.skills.forEach((skill, index) => {
+      skillsOf(cv).forEach((skill, index) => {
         const acts = actsForSkill(sel.zone, index);
         const reason = myTurn && acts.length === 0 ? skillReason(cv, skill.cost, view.you.energy) : '';
         body += `<button class="skill" data-skill="${sel.zone}:${index}" ${acts.length === 0 ? 'disabled' : ''}>
@@ -513,10 +551,7 @@ function detail(view: PlayerView): string {
   }
 
   if (sel.kind === 'skill' || sel.kind === 'heroPower') {
-    const ability =
-      sel.kind === 'skill'
-        ? (card(view.you.zones[sel.zone]!.cardId) as Extract<DeckCardDef, { kind: 'creature' }>).skills[sel.skill]!
-        : powerOf(view.you)!;
+    const ability = sel.kind === 'skill' ? skillsOf(view.you.zones[sel.zone]!)[sel.skill]! : powerOf(view.you)!;
     return toast + `<p class="d-head">選擇目標</p><p class="d-line">${esc(describeAbility(ability))}</p><p class="hint">發光的就是可以選的目標。</p>` + cancel;
   }
 
@@ -544,25 +579,32 @@ function zone(cv: CreatureView | null, player: PlayerId, index: number, picks: M
   }
   const def = card(cv.cardId);
   const myTurn = myMove(view);
-  if (player === YOU && myTurn && def.kind === 'creature' && def.skills.some((_, i) => actsForSkill(index, i).length > 0)) classes.push('ready');
-  if (player === YOU && (cv.skillUsedThisTurn || cv.summonedThisTurn) && view.activePlayer === YOU) classes.push('spent');
+  if (player === YOU && myTurn && (actsForAttack(index).length > 0 || skillsOf(cv).some((_, i) => actsForSkill(index, i).length > 0))) {
+    classes.push('ready');
+  }
+  if (player === YOU && (cv.actedThisTurn || cv.summonedThisTurn) && view.activePlayer === YOU) classes.push('spent');
   if (cv.taunting) classes.push('taunt');
   const badges: string[] = [];
-  if (cv.attackBonus) badges.push(`<i class="badge atk">攻+${cv.attackBonus}</i>`);
+
   if (cv.damageReduction) badges.push(`<i class="badge def">減${cv.damageReduction}</i>`);
   if (cv.item) badges.push(`<i class="badge item">${esc(nameOf(cv.item))}</i>`);
   if (cv.taunting) badges.push('<i class="badge taunt">挑釁</i>');
   if (cv.poison) badges.push(`<i class="badge poison">毒${cv.poison}</i>`);
   if (cv.burn) badges.push(`<i class="badge burn">燒${cv.burn}</i>`);
   if (cv.paralyzed) badges.push('<i class="badge para">麻痺</i>');
-  if (cv.asleep) badges.push('<i class="badge sleep">沉睡</i>');
-  const hurt = cv.hp < cv.maxHp ? ' hurt' : '';
+  if (cv.silenced) badges.push('<i class="badge silence">沉默</i>');
+  if (cv.disarmed) badges.push('<i class="badge disarm">繳械</i>');
+  if (cv.weakened) badges.push('<i class="badge weak">虛弱</i>');
+  if (cv.cursed) badges.push('<i class="badge curse">詛咒</i>');
+  // 滿血是綠色，受過傷是紅色；攻擊力有加成時標成金色。
+  const hurt = cv.hp < cv.maxHp ? ' hurt' : ' full';
+  const buffed = cv.attackBonus > 0 ? ' up' : '';
   // 左上角顯示這隻生物總共花了多少費用，進化過的顯示成 4+3，一眼看出對手在牠身上投資了多少。
   const invested = cv.evolutionChain.map((id) => card(id).cost).join('+');
-  return `<button class="${classes.join(' ')} r-${def.rarity}" data-key="${key}" aria-label="${esc(def.name)}，費用 ${invested}，HP ${cv.hp}">
+  return `<button class="${classes.join(' ')} r-${def.rarity}" data-key="${key}" aria-label="${esc(def.name)}，費用 ${invested}，攻擊 ${cv.attack}，HP ${cv.hp}">
     <span class="z-top"><span class="z-cost">${invested}</span><span class="rarity">${def.rarity}</span>${pips(def.colors)}</span>
     <span class="z-name">${esc(def.name)}</span>
-    <span class="z-hp${hurt}"><b>${cv.hp}</b><small>/${cv.maxHp}</small></span>
+    <span class="z-stats"><span class="z-atk${buffed}" title="攻擊">⚔<b>${cv.attack}</b></span><span class="z-hp${hurt}" title="HP"><b>${cv.hp}</b><small>/${cv.maxHp}</small></span></span>
     <span class="badges">${badges.join('')}</span>
   </button>`;
 }
@@ -580,7 +622,7 @@ function heroPlate(side: SideView, player: PlayerId, picks: Map<string, Action>)
   const h = hero(side.heroId);
   const key = `h${player}`;
   const pct = Math.max(0, Math.round((side.heroHp / side.heroMaxHp) * 100));
-  const classes = ['hero'];
+  const classes = ['hero', side.heroHp < side.heroMaxHp ? 'hurt' : 'full'];
   if (picks.has(key)) classes.push('pick');
   if (app.selection?.kind === 'hero' && app.selection.player === player) classes.push('selected');
   const extra = player !== YOU ? `<span class="h-hand">手牌 ${side.handCount}</span>` : '';
@@ -625,7 +667,7 @@ function hand(view: PlayerView): string {
       const def = card(held.cardId);
       const playable = actsForCard(held.uid).length > 0;
       const selected = app.selection?.kind === 'hand' && app.selection.uid === held.uid;
-      const hp = def.kind === 'creature' ? `<span class="c-hp">HP ${def.hp}</span>` : '';
+      const hp = def.kind === 'creature' ? `<span class="c-hp"><span class="c-atk">⚔${def.attack}</span> HP ${def.hp}</span>` : '';
       const isEvolution = def.kind === 'creature' && def.stage > 0;
       return `<button class="card k-${def.kind} r-${def.rarity}${playable ? ' playable' : ''}${selected ? ' selected' : ''}" data-hand="${held.uid}">
         <span class="c-cost${isEvolution ? ' evo' : ''}">${isEvolution ? '+' : ''}${def.cost}</span>
@@ -754,12 +796,13 @@ function setupScreen(): string {
       <ul>
         <li>能量：先攻第一回合 1 點、後攻 2 點，之後每回合上限 +2，最高 12。每個回合開始時補滿。</li>
         <li>點手牌出牌。生物要選一個空格召喚；道具要選自己的生物；進化卡要點場上對應的生物。</li>
-        <li>點你的生物，選一個技能發動。每隻生物每回合一個技能，召喚當回合不能發動（有【速攻】的例外）。發動技能不會結束回合，要按「結束回合」。</li>
+        <li>每隻生物有攻擊力（⚔）和 HP。HP 滿的是綠色，受過傷的是紅色。</li>
+        <li>點你的生物，再點發光的對手生物或英雄就是攻擊：不花能量，打生物時對方會用牠的攻擊力反擊，打英雄不會被反擊。也可以改成發動一個技能：要花能量，不會被反擊。攻擊和技能每隻每回合合計一次，召喚當回合都不行（有【速攻】的例外）。</li>
         <li>正對面、斜對角的技能，目標格空著就會打到後面的英雄。</li>
-        <li>對手的生物在挑釁時，選得到牠的技能都必須打牠；只打英雄的技能不受影響。</li>
+        <li>對手的生物在挑釁時，只能攻擊牠；選得到牠的技能也必須打牠，只打英雄的技能不受影響。</li>
         <li>手牌上限 10 張，滿手時抽到的牌直接進棄牌區。場地卡放在自己的場地區，只強化自己的生物。</li>
         <li>有些英雄有英雄進化卡：HP 上限增加、天生技變強，每局只能進化一次。</li>
-        <li>異常狀態只會中在生物身上：中毒（回合開始時失去 HP）、灼燒（回合結束時受到傷害）、麻痺、沉睡（都不能發動技能，沉睡被打就醒）。進化會解除全部。</li>
+        <li>異常狀態只會中在生物身上：中毒（回合開始時失去 HP）、灼燒（回合結束時受到傷害）、麻痺（不能攻擊也不能發動技能）、沉默（不能發動技能）、繳械（不能攻擊）、虛弱（攻擊傷害減半）、詛咒（技能傷害減半）。後面五種都到牠的下個回合結束，進化會解除全部。</li>
         <li>把對手英雄的 HP 打到 0 就贏了。</li>
       </ul>
       <p class="note">試玩說明：範例卡有 ${SAMPLE_CARDS.length} 張，牌組照正式規則：40 張、同名最多 3 張、只能放英雄顏色內的卡與無色卡。

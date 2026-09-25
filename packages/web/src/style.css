@@ -163,13 +163,22 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
   padding: 2px 5px; font-variant-numeric: tabular-nums; letter-spacing: .02em;
 }
 .z-name { align-self: start; font: 700 14px/1.2 var(--display); word-break: break-all; }
-.z-hp { align-self: start; text-align: right; white-space: nowrap; font-family: var(--num); }
+/* 名字右邊：攻擊力與 HP。HP 滿的是綠色、受過傷的是紅色；攻擊力有加成時是金色。 */
+.z-stats { align-self: start; display: flex; align-items: baseline; gap: 6px; white-space: nowrap; font-family: var(--num); }
+.z-atk { color: var(--ink-soft); font-size: 13px; }
+.z-atk b { font-size: 22px; font-weight: 700; line-height: 1; color: #ffd08a; margin-left: 1px; }
+.z-atk.up b { color: var(--r-ur); }
 .z-hp b { font-size: 24px; font-weight: 700; line-height: 1; }
 .z-hp small { color: var(--ink-soft); font-size: 13px; }
+.z-hp.full b { color: var(--heal); }
 .z-hp.hurt b { color: var(--damage); }
+.hero.full .h-hp b { color: var(--heal); }
+.hero.hurt .h-hp b { color: var(--damage); }
+.c-atk { color: #ffd08a; }
 .badges { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 3px; min-height: 0; }
 .badge { font-style: normal; font-size: 10.5px; line-height: 1.4; padding: 0 5px; border-radius: 3px; background: #0004; color: var(--ink-soft); }
-.badge.poison { color: #c9a0ff; } .badge.burn { color: #ff9a7a; } .badge.para { color: #ffe27a; } .badge.sleep { color: #9fc3ff; }
+.badge.poison { color: #c9a0ff; } .badge.burn { color: #ff9a7a; } .badge.para { color: #ffe27a; } .badge.silence { color: #9fc3ff; }
+.badge.disarm { color: #f3dcae; } .badge.weak { color: #a8d8a0; } .badge.curse { color: #d59be8; }
 .badge.atk { color: #ffb38a; } .badge.def { color: #9fdcea; } .badge.item { color: #d7c8f0; } .badge.taunt { color: #1d1408; background: var(--white); }
 .r-R.zone { border-top: 3px solid var(--r-r); } .r-SR.zone { border-top: 3px solid var(--r-sr); } .r-UR.zone { border-top: 3px solid var(--r-ur); }
 .zone.taunt { box-shadow: 0 0 0 2px var(--white) inset; }
@@ -366,7 +375,7 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .compact .midline { padding-block: 2px; margin-block: 0; }
 .compact .end-turn { padding: 5px 16px; }
 .compact .z-name { font-size: 12.5px; }
-.compact .z-hp b { font-size: 19px; }
+.compact .z-hp b { font-size: 19px; } .compact .z-atk b { font-size: 17px; }
 .compact .hand { padding-top: 6px; margin-top: 0; }
 .compact .card { width: 82px; min-height: 96px; padding: 6px 6px 4px; }
 .compact .card .c-name { font-size: 12.5px; margin-top: 2px; }
@@ -385,9 +394,9 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
   .row { grid-template-columns: 36px repeat(5, minmax(0, 1fr)) 36px; gap: 4px; }
   /* 手機的格子太窄，HP 放回名字下面，不然名字會被擠成直的 */
   .zone { padding: 4px; aspect-ratio: 3 / 4.2; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto 1fr auto; }
-  .z-hp { align-self: end; text-align: left; }
+  .z-stats { align-self: end; gap: 4px; }
   .z-name { font-size: 11.5px; }
-  .z-hp b { font-size: 18px; } .z-hp small { font-size: 11px; }
+  .z-hp b { font-size: 18px; } .z-hp small { font-size: 11px; } .z-atk b { font-size: 16px; }
   .z-top .pips, .badge.item, .zone .rarity { display: none; }
   .z-cost { font-size: 11px; padding: 1px 3px; }
   .f-label { display: none; } .f-name { font-size: 10px; }

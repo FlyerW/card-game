@@ -1,14 +1,16 @@
 import { nextRandom } from './rng';
 import {
-  attackBonus,
+  attackPower,
   cardDef,
   ceiling,
   currentCardId,
   currentHp,
   damageReduction,
+  fieldDef,
   hasKeyword,
   heroHp,
-  isAsleep,
+  isCursed,
+  isWeakened,
   other,
   ownersTurn,
   regeneration,
@@ -125,11 +127,6 @@ function dealDamage(ctx: Ctx, target: Target, creature: Creature | null, amount:
     const dealt = Math.max(0, amount - damageReduction(ctx.db, ctx.state, creature));
     creature.damage += dealt;
     ctx.events.push({ type: 'damaged', target, amount: dealt });
-    // 沉睡的生物受到傷害就醒來；減傷擋到 0 不算受到傷害。
-    if (dealt > 0 && target.kind === 'creature' && isAsleep(ctx.state, creature)) {
-      creature.asleepUntilTurn = null;
-      ctx.events.push({ type: 'wokeUp', player: target.player, zone: target.zone });
-    }
     return dealt;
   }
   return 0;
@@ -148,8 +145,10 @@ function healCreature(ctx: Ctx, creature: Creature, target: Target, amount: numb
   ctx.events.push({ type: 'healed', target, amount: healed });
 }
 
+type StatusEffect = Extract<Effect, { type: 'poison' | 'burn' | 'paralyze' | 'silence' | 'disarm' | 'weaken' | 'curse' }>;
+
 /** 對一隻生物施加異常狀態。 */
-function inflict(ctx: Ctx, creature: Creature, player: PlayerId, zone: number, effect: Extract<Effect, { type: 'poison' | 'burn' | 'paralyze' | 'sleep' }>): void {
+function inflict(ctx: Ctx, creature: Creature, player: PlayerId, zone: number, effect: StatusEffect): void {
   const { state } = ctx;
   let status: StatusKind;
   let amount: number | undefined;
@@ -166,9 +165,21 @@ function inflict(ctx: Ctx, creature: Creature, player: PlayerId, zone: number, e
       creature.paralyzedUntilTurn = ownersTurn(state, creature.owner, 1);
       status = 'paralysis';
       break;
-    case 'sleep':
-      creature.asleepUntilTurn = ownersTurn(state, creature.owner, 1);
-      status = 'sleep';
+    case 'silence':
+      creature.silencedUntilTurn = ownersTurn(state, creature.owner, 1);
+      status = 'silence';
+      break;
+    case 'disarm':
+      creature.disarmedUntilTurn = ownersTurn(state, creature.owner, 1);
+      status = 'disarm';
+      break;
+    case 'weaken':
+      creature.weakenedUntilTurn = ownersTurn(state, creature.owner, 1);
+      status = 'weakness';
+      break;
+    case 'curse':
+      creature.cursedUntilTurn = ownersTurn(state, creature.owner, 1);
+      status = 'curse';
       break;
   }
   ctx.events.push({ type: 'statusApplied', player, zone, status, ...(amount === undefined ? {} : { amount }) });
@@ -177,15 +188,24 @@ function inflict(ctx: Ctx, creature: Creature, player: PlayerId, zone: number, e
 /** 進化會解除全部異常狀態。 */
 export function clearStatuses(ctx: Ctx, creature: Creature, player: PlayerId, zone: number): void {
   const had =
-    creature.poison > 0 || creature.burn > 0 || creature.paralyzedUntilTurn !== null || creature.asleepUntilTurn !== null;
+    creature.poison > 0 ||
+    creature.burn > 0 ||
+    creature.paralyzedUntilTurn !== null ||
+    creature.silencedUntilTurn !== null ||
+    creature.disarmedUntilTurn !== null ||
+    creature.weakenedUntilTurn !== null ||
+    creature.cursedUntilTurn !== null;
   creature.poison = 0;
   creature.burn = 0;
   creature.paralyzedUntilTurn = null;
-  creature.asleepUntilTurn = null;
+  creature.silencedUntilTurn = null;
+  creature.disarmedUntilTurn = null;
+  creature.weakenedUntilTurn = null;
+  creature.cursedUntilTurn = null;
   if (had) ctx.events.push({ type: 'statusesCleared', player, zone });
 }
 
-/** 回合開始：這位玩家中毒的生物失去 HP。失去 HP 不算傷害，所以減傷擋不住、也不會叫醒沉睡的生物。 */
+/** 回合開始：這位玩家中毒的生物失去 HP。失去 HP 不算傷害，所以減傷擋不住。 */
 export function tickPoison(ctx: Ctx, player: PlayerId): void {
   const { db, state } = ctx;
   state.players[player].zones.forEach((creature, zone) => {
@@ -209,6 +229,54 @@ export function tickRegenerate(ctx: Ctx, player: PlayerId): void {
   });
 }
 
+/** 回合開始：自己的場地卡讓英雄回復，或讓對手每隻生物失去 HP。 */
+export function tickField(ctx: Ctx, player: PlayerId): void {
+  const { db, state } = ctx;
+  const field = fieldDef(db, state, player);
+  if (field?.heroRegenerate) healHero(ctx, player, field.heroRegenerate);
+  if (field?.enemyDecay) {
+    const enemy = other(player);
+    state.players[enemy].zones.forEach((creature, zone) => {
+      if (creature === null) return;
+      const lost = Math.min(field.enemyDecay!, currentHp(db, state, creature));
+      creature.damage += lost;
+      ctx.events.push({ type: 'hpLost', target: { kind: 'creature', player: enemy, zone }, amount: lost });
+    });
+    cleanup(ctx);
+  }
+}
+
+/** 吸血：這隻生物造成多少傷害，擁有者的英雄就回復多少。 */
+function lifesteal(ctx: Ctx, creature: Creature, dealt: number): void {
+  if (dealt > 0 && hasKeyword(ctx.db, creature, 'lifesteal')) healHero(ctx, creature.owner, dealt);
+}
+
+/** 攻擊或反擊打多少：攻擊力，虛弱時減半。 */
+const strikeDamage = (ctx: Ctx, creature: Creature): number => {
+  const power = attackPower(ctx.db, ctx.state, creature);
+  return isWeakened(ctx.state, creature) ? Math.floor(power / 2) : power;
+};
+
+/**
+ * 生物攻擊：打英雄就只是造成傷害；打生物時，雙方同時用攻擊力打對方（被攻擊的一方反擊）。
+ * 被攻擊的一方就算麻痺、沉默、繳械也會反擊，反擊不算牠的行動。
+ */
+export function combat(ctx: Ctx, player: PlayerId, zone: number, target: Target): void {
+  const { state } = ctx;
+  const attacker = state.players[player].zones[zone]!;
+  const power = strikeDamage(ctx, attacker);
+  ctx.events.push({ type: 'attacked', player, zone, cardId: currentCardId(attacker), target });
+  if (target.kind === 'creature') {
+    const defender = state.players[target.player].zones[target.zone]!;
+    const counter = strikeDamage(ctx, defender);
+    lifesteal(ctx, attacker, dealDamage(ctx, target, defender, power));
+    lifesteal(ctx, defender, dealDamage(ctx, { kind: 'creature', player, zone }, attacker, counter));
+  } else {
+    lifesteal(ctx, attacker, dealDamage(ctx, target, null, power));
+  }
+  cleanup(ctx);
+}
+
 /** 回合結束：這位玩家灼燒的生物受到傷害。算傷害，減傷擋得住。 */
 export function tickBurn(ctx: Ctx, player: PlayerId): void {
   ctx.state.players[player].zones.forEach((creature, zone) => {
@@ -230,17 +298,18 @@ function applyEffect(
   const { db, state } = ctx;
   const me = source.player;
   const player = state.players[me];
-  const bonus = sourceCreature === null ? 0 : attackBonus(db, state, sourceCreature);
   const creature = liveCreature(state, target, targetUid);
-  // 吸血：這隻生物造成多少傷害，自己的英雄就回復多少。
-  const lifesteal = (dealt: number) => {
-    if (dealt > 0 && sourceCreature !== null && hasKeyword(db, sourceCreature, 'lifesteal')) healHero(ctx, me, dealt);
+  // 技能傷害就是卡上的數字，不加攻擊力；發動的生物被詛咒時減半。
+  const cursed = sourceCreature !== null && isCursed(state, sourceCreature);
+  const skillDamage = (amount: number) => (cursed ? Math.floor(amount / 2) : amount);
+  const steal = (dealt: number) => {
+    if (sourceCreature !== null) lifesteal(ctx, sourceCreature, dealt);
   };
 
   switch (effect.type) {
     case 'damage':
       if (target !== null && (target.kind === 'hero' || creature !== null)) {
-        lifesteal(dealDamage(ctx, target, creature, effect.amount + bonus));
+        steal(dealDamage(ctx, target, creature, skillDamage(effect.amount)));
       }
       return;
 
@@ -248,9 +317,9 @@ function applyEffect(
       const enemy = other(me);
       let dealt = 0;
       state.players[enemy].zones.forEach((each, zone) => {
-        if (each !== null) dealt += dealDamage(ctx, { kind: 'creature', player: enemy, zone }, each, effect.amount + bonus);
+        if (each !== null) dealt += dealDamage(ctx, { kind: 'creature', player: enemy, zone }, each, skillDamage(effect.amount));
       });
-      lifesteal(dealt);
+      steal(dealt);
       return;
     }
 
@@ -382,7 +451,10 @@ function applyEffect(
     case 'poison':
     case 'burn':
     case 'paralyze':
-    case 'sleep':
+    case 'silence':
+    case 'disarm':
+    case 'weaken':
+    case 'curse':
       if (effect.all) {
         const enemy = other(me);
         state.players[enemy].zones.forEach((each, zone) => {

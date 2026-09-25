@@ -131,7 +131,7 @@ describe('能量', () => {
     expect(state.players[a]).toMatchObject({ maxEnergy: 4, energy: 4 });
 
     Object.assign(state.players[a], { energy: 5, maxEnergy: 12 });
-    at(state, a, 0)!.skillUsedTurn = null;
+    at(state, a, 0)!.actedTurn = null;
     state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0 });
     expect(state.players[a].maxEnergy).toBe(12);
   });
@@ -182,7 +182,7 @@ describe('回合', () => {
     place(state, a, 1, 'hitter');
     state.players[a].energy = 5;
     state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0, target: hero(b) });
-    expect(reject(state, { type: 'useSkill', player: a, zone: 0, skill: 0, target: hero(b) })).toBe('SKILL_ALREADY_USED');
+    expect(reject(state, { type: 'useSkill', player: a, zone: 0, skill: 0, target: hero(b) })).toBe('ALREADY_ACTED');
     state = act(state, { type: 'useSkill', player: a, zone: 1, skill: 0, target: hero(b) });
     expect(state.players[b].heroDamage).toBe(10);
 

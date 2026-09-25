@@ -5,6 +5,7 @@ import type {
   CreatureDef,
   CreatureModifier,
   DeckCardDef,
+  FieldDef,
   GameState,
   HeroDef,
   HeroEvolutionDef,
@@ -91,9 +92,27 @@ export const maxHp = (db: CardDb, state: GameState, creature: Creature): number 
 export const currentHp = (db: CardDb, state: GameState, creature: Creature): number =>
   maxHp(db, state, creature) - creature.damage;
 
-/** 技能傷害加成：攻擊指示物、道具、場地卡與英雄被動。 */
+/** 攻擊力加成：攻擊指示物、道具、場地卡與英雄被動。 */
 export const attackBonus = (db: CardDb, state: GameState, creature: Creature): number =>
   creature.attackCounters + (itemDef(db, creature)?.attack ?? 0) + aura(db, state, creature.owner).attack;
+
+/** 目前的攻擊力：卡上的攻擊力加上加成。 */
+export const attackPower = (db: CardDb, state: GameState, creature: Creature): number =>
+  creatureDef(db, creature).attack + attackBonus(db, state, creature);
+
+/** 這隻生物能發動的技能：自己的技能，加上道具給的。 */
+export const creatureSkills = (db: CardDb, creature: Creature): Ability[] => [
+  ...creatureDef(db, creature).skills,
+  ...(itemDef(db, creature)?.skills ?? []),
+];
+
+/** 自己場地區的場地卡；沒有就是 null。 */
+export function fieldDef(db: CardDb, state: GameState, player: PlayerId): FieldDef | null {
+  const card = state.players[player].field;
+  if (card === null) return null;
+  const def = cardDef(db, card.cardId);
+  return def.kind === 'field' ? def : null;
+}
 
 export const damageReduction = (db: CardDb, state: GameState, creature: Creature): number =>
   (itemDef(db, creature)?.damageReduction ?? 0) + aura(db, state, creature.owner).damageReduction;
@@ -128,13 +147,25 @@ export function ceiling(db: CardDb, state: GameState, player: PlayerId): number 
 export const isTaunting = (state: GameState, creature: Creature): boolean =>
   creature.tauntUntilTurn !== null && state.turn <= creature.tauntUntilTurn;
 
-/** 麻痺：到擁有者的下一個回合結束前都不能發動技能。 */
+/** 麻痺：到擁有者的下一個回合結束前都不能攻擊、不能發動技能。 */
 export const isParalyzed = (state: GameState, creature: Creature): boolean =>
   creature.paralyzedUntilTurn !== null && state.turn <= creature.paralyzedUntilTurn;
 
-/** 沉睡：不能發動技能，受到傷害就醒來。 */
-export const isAsleep = (state: GameState, creature: Creature): boolean =>
-  creature.asleepUntilTurn !== null && state.turn <= creature.asleepUntilTurn;
+/** 繳械：不能攻擊，技能照常。 */
+export const isDisarmed = (state: GameState, creature: Creature): boolean =>
+  creature.disarmedUntilTurn !== null && state.turn <= creature.disarmedUntilTurn;
+
+/** 沉默：不能發動技能，攻擊照常。 */
+export const isSilenced = (state: GameState, creature: Creature): boolean =>
+  creature.silencedUntilTurn !== null && state.turn <= creature.silencedUntilTurn;
+
+/** 虛弱：攻擊與反擊的傷害減半。 */
+export const isWeakened = (state: GameState, creature: Creature): boolean =>
+  creature.weakenedUntilTurn !== null && state.turn <= creature.weakenedUntilTurn;
+
+/** 詛咒：技能與進場效果的傷害減半。 */
+export const isCursed = (state: GameState, creature: Creature): boolean =>
+  creature.cursedUntilTurn !== null && state.turn <= creature.cursedUntilTurn;
 
 /**
  * 擁有者往後數第 n 個回合的回合編號。回合雙方輪流，所以現在是擁有者的回合時，

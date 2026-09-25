@@ -1,12 +1,16 @@
 import {
   attackBonus,
+  attackPower,
   ceiling,
   currentCardId,
   currentHp,
   damageReduction,
   heroHp,
   heroMaxHp,
-  isAsleep,
+  isCursed,
+  isDisarmed,
+  isSilenced,
+  isWeakened,
   isParalyzed,
   isTaunting,
   maxHp,
@@ -21,6 +25,8 @@ export interface CreatureView {
   evolutionChain: string[];
   hp: number;
   maxHp: number;
+  /** 目前的攻擊力（含加成）。 */
+  attack: number;
   attackBonus: number;
   damageReduction: number;
   attackCounters: number;
@@ -32,8 +38,11 @@ export interface CreatureView {
   /** 灼燒的數字，0 表示沒有。 */
   burn: number;
   paralyzed: boolean;
-  asleep: boolean;
-  skillUsedThisTurn: boolean;
+  silenced: boolean;
+  disarmed: boolean;
+  weakened: boolean;
+  cursed: boolean;
+  actedThisTurn: boolean;
   summonedThisTurn: boolean;
 }
 
@@ -79,6 +88,7 @@ function creatureView(db: CardDb, state: GameState, creature: Creature): Creatur
     evolutionChain: creature.cards.map((card) => card.cardId),
     hp: currentHp(db, state, creature),
     maxHp: maxHp(db, state, creature),
+    attack: attackPower(db, state, creature),
     attackBonus: attackBonus(db, state, creature),
     damageReduction: damageReduction(db, state, creature),
     attackCounters: creature.attackCounters,
@@ -88,8 +98,11 @@ function creatureView(db: CardDb, state: GameState, creature: Creature): Creatur
     poison: creature.poison,
     burn: creature.burn,
     paralyzed: isParalyzed(state, creature),
-    asleep: isAsleep(state, creature),
-    skillUsedThisTurn: creature.skillUsedTurn === state.turn,
+    silenced: isSilenced(state, creature),
+    disarmed: isDisarmed(state, creature),
+    weakened: isWeakened(state, creature),
+    cursed: isCursed(state, creature),
+    actedThisTurn: creature.actedTurn === state.turn,
     summonedThisTurn: creature.summonedTurn === state.turn,
   };
 }

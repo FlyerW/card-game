@@ -55,6 +55,7 @@ interface Summary {
   /** 預估落在 5–10 分鐘的比例。 */
   inTarget: number;
   meanPlays: number;
+  meanAttacks: number;
 }
 
 function summarize(experiment: Experiment, outcomes: MatchOutcome[]): Summary {
@@ -79,6 +80,7 @@ function summarize(experiment: Experiment, outcomes: MatchOutcome[]): Summary {
     meanWinnerHp: winnerHps.reduce((sum, hp) => sum + hp, 0) / winnerHps.length,
     ...minutes(outcomes),
     meanPlays: outcomes.reduce((sum, o) => sum + o.plays, 0) / outcomes.length,
+    meanAttacks: outcomes.reduce((sum, o) => sum + o.attacks, 0) / outcomes.length,
   };
 }
 
@@ -142,10 +144,10 @@ function report(summaries: Summary[], seconds: number): string {
     '|---|---|---|---|---|---|---|---|---|---|---|';
   const heroRow = (s: Summary) =>
     `| ${s.experiment.label} | ${s.experiment.heroHp} | **${pct(s.firstWinRate)}** | ${pct(s.ci[0])} – ${pct(s.ci[1])} | ${verdict(s)} | ` +
-    `${s.meanTurns.toFixed(1)} | ${s.meanPlays.toFixed(1)} | ${time(s)} | ${s.meanWinnerHp.toFixed(1)} |`;
+    `${s.meanTurns.toFixed(1)} | ${s.meanPlays.toFixed(1)} | ${s.meanAttacks.toFixed(1)} | ${time(s)} | ${s.meanWinnerHp.toFixed(1)} |`;
   const heroHeader =
-    '| 英雄 | HP | 先攻勝率 | 95% 信賴區間 | 判讀 | 平均回合數 | 平均動作數 | 預估時間 | 時間 10–90% | 5–10 分鐘 | 勝方剩餘 HP |\n' +
-    '|---|---|---|---|---|---|---|---|---|---|---|';
+    '| 英雄 | HP | 先攻勝率 | 95% 信賴區間 | 判讀 | 平均回合數 | 平均動作數 | 平均攻擊數 | 預估時間 | 時間 10–90% | 5–10 分鐘 | 勝方剩餘 HP |\n' +
+    '|---|---|---|---|---|---|---|---|---|---|---|---|';
   const simHero = (s: Summary) => s.experiment.heroId === undefined;
   const matchup = (s: Summary) => s.experiment.opponentId !== undefined;
   const side = (s: Summary) => (s.heroCi[0] > 0.5 ? '前者有利' : s.heroCi[1] < 0.5 ? '後者有利' : '看不出差距');
@@ -194,6 +196,7 @@ function report(summaries: Summary[], seconds: number): string {
     '',
     `- 每個回合 ${PACE.turn} 秒（抽牌、看場面、按結束回合）`,
     `- 每個動作 ${PACE.play} 秒（出牌、發動技能、選目標、看動畫）`,
+    `- 每次攻擊 ${PACE.attack} 秒（點生物、點目標）`,
     '',
     '這些是粗估，有真人試玩的數據後要改。「5–10 分鐘」是預估時間落在 5 到 10 分鐘之間的對局比例。',
     '',

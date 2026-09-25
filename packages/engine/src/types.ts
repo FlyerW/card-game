@@ -9,8 +9,8 @@ export type Color = 'white' | 'blue' | 'black' | 'red' | 'green';
 export type PlayerId = 0 | 1;
 
 /**
- * 速攻：召喚當回合就能發動技能。
- * 吸血：這隻生物的技能與進場效果造成傷害時，自己的英雄回復等量的 HP。
+ * 速攻：召喚當回合就能攻擊或發動技能。
+ * 吸血：這隻生物造成傷害時（攻擊、反擊、技能、進場效果），自己的英雄回復等量的 HP。
  */
 export type Keyword = 'haste' | 'lifesteal';
 
@@ -23,7 +23,7 @@ export const RARITIES: readonly Rarity[] = ['N', 'R', 'SR', 'UR'];
 
 /** 對生物的持續加成，來自道具、場地卡或英雄被動。 */
 export interface CreatureModifier {
-  /** 技能傷害加成。 */
+  /** 攻擊力加成：只加在攻擊與反擊上，技能傷害不變。 */
   attack?: number;
   /** HP 上限加成。 */
   hp?: number;
@@ -49,7 +49,7 @@ export type TargetSpec =
   | { kind: 'enemyItemOrField' };
 
 export type Effect =
-  /** 對目標造成傷害。生物技能的傷害會加上攻擊指示物與道具加成。 */
+  /** 對目標造成傷害。技能傷害就是卡上的數字，不加攻擊力。 */
   | { type: 'damage'; amount: number }
   /** 對對手每隻生物各造成傷害。 */
   | { type: 'damageEnemyCreatures'; amount: number }
@@ -69,7 +69,7 @@ export type Effect =
   /** 發動者挑釁，直到對手下回合結束。 */
   | { type: 'taunt' }
   /**
-   * 放增益指示物。attack 讓之後的技能傷害增加，hp 讓 HP 上限增加。
+   * 放增益指示物。attack 讓攻擊力增加，hp 讓 HP 上限增加。
    * 「增益 N」就是 attack 與 hp 各 N。
    */
   | { type: 'buff'; attack: number; hp: number; on: 'self' | 'target' }
@@ -89,13 +89,19 @@ export type Effect =
   | { type: 'poison'; amount: number; all?: boolean }
   /** 灼燒 N：牠的擁有者回合結束時受到 N 傷害（算傷害，減傷擋得住）。再中一次取大的。 */
   | { type: 'burn'; amount: number; all?: boolean }
-  /** 麻痺：不能發動技能，直到擁有者的下一個回合結束。 */
+  /** 麻痺：不能攻擊、不能發動技能，直到擁有者的下一個回合結束。 */
   | { type: 'paralyze'; all?: boolean }
-  /** 沉睡：不能發動技能，直到擁有者的下一個回合結束；受到傷害就提早醒來。 */
-  | { type: 'sleep'; all?: boolean };
+  /** 沉默：不能發動技能（攻擊照常），直到擁有者的下一個回合結束。 */
+  | { type: 'silence'; all?: boolean }
+  /** 繳械：不能攻擊（技能照常，被攻擊時照樣反擊），直到擁有者的下一個回合結束。 */
+  | { type: 'disarm'; all?: boolean }
+  /** 虛弱：攻擊與反擊的傷害減半（無條件捨去），直到擁有者的下一個回合結束。 */
+  | { type: 'weaken'; all?: boolean }
+  /** 詛咒：技能與進場效果的傷害減半（無條件捨去），直到擁有者的下一個回合結束。 */
+  | { type: 'curse'; all?: boolean };
 
 /** 異常狀態的種類。 */
-export type StatusKind = 'poison' | 'burn' | 'paralysis' | 'sleep';
+export type StatusKind = 'poison' | 'burn' | 'paralysis' | 'silence' | 'disarm' | 'weakness' | 'curse';
 
 /** 生物技能、英雄天生技，以及法術的效果部分，都是 Ability。 */
 export interface Ability {
@@ -120,6 +126,8 @@ export interface CreatureDef extends CardBase {
   cost: number;
   /** 進化生物才有：從哪張卡進化而來。 */
   evolvesFrom?: string;
+  /** 攻擊力：攻擊時打多少，被攻擊時反擊多少。 */
+  attack: number;
   hp: number;
   skills: Ability[];
   keywords?: Keyword[];
@@ -145,12 +153,14 @@ export interface SpellDef extends CardBase {
 export interface ItemDef extends CardBase {
   kind: 'item';
   cost: number;
-  /** 這隻生物的技能傷害加成。 */
+  /** 這隻生物的攻擊力加成。 */
   attack?: number;
   /** 這隻生物受到的傷害減少。 */
   damageReduction?: number;
   /** 這隻生物的 HP 上限加成。 */
   hp?: number;
+  /** 裝上之後多的技能，排在生物自己的技能後面。 */
+  skills?: Ability[];
 }
 
 /** 場地卡放在自己的場地區，效果只作用在自己身上。 */
@@ -161,6 +171,12 @@ export interface FieldDef extends CardBase {
   creatures?: CreatureModifier;
   /** 提高自己的最高上限。突破型，目前範例卡不使用。 */
   ceilingBonus?: number;
+  /** 自己的回合開始時多抽幾張。 */
+  extraDraw?: number;
+  /** 自己的回合開始時，自己的英雄回復多少。 */
+  heroRegenerate?: number;
+  /** 自己的回合開始時，對手每隻生物失去多少 HP（不算傷害）。 */
+  enemyDecay?: number;
 }
 
 export interface HeroPassive {
@@ -253,7 +269,8 @@ export interface Creature {
   item: CardRef | null;
   summonedTurn: number;
   evolvedTurn: number | null;
-  skillUsedTurn: number | null;
+  /** 這回合攻擊過或發動過技能：兩者每回合合計一次。 */
+  actedTurn: number | null;
   /** 挑釁持續到這個回合結束（含）。 */
   tauntUntilTurn: number | null;
   /** 中毒的數字，0 表示沒有中毒。 */
@@ -262,8 +279,14 @@ export interface Creature {
   burn: number;
   /** 麻痺到這個回合結束（含）。 */
   paralyzedUntilTurn: number | null;
-  /** 沉睡到這個回合結束（含）；受到傷害就提早清掉。 */
-  asleepUntilTurn: number | null;
+  /** 沉默到這個回合結束（含）。 */
+  silencedUntilTurn: number | null;
+  /** 繳械到這個回合結束（含）。 */
+  disarmedUntilTurn: number | null;
+  /** 虛弱到這個回合結束（含）。 */
+  weakenedUntilTurn: number | null;
+  /** 詛咒到這個回合結束（含）。 */
+  cursedUntilTurn: number | null;
 }
 
 export interface PlayerState {
@@ -322,6 +345,8 @@ export type Action =
   | { type: 'summon'; player: PlayerId; card: number; zone: number; target?: Target }
   | { type: 'evolve'; player: PlayerId; card: number; zone: number; target?: Target }
   | { type: 'useSkill'; player: PlayerId; zone: number; skill: number; target?: Target }
+  /** 生物攻擊對手的生物或英雄：不花能量；打生物時對方會反擊。 */
+  | { type: 'attack'; player: PlayerId; zone: number; target: Target }
   | { type: 'heroPower'; player: PlayerId; target?: Target }
   | { type: 'evolveHero'; player: PlayerId; card: number; target?: Target }
   | { type: 'castSpell'; player: PlayerId; card: number; target?: Target }
@@ -348,6 +373,8 @@ export type GameEvent =
   | { type: 'evolved'; player: PlayerId; zone: number; from: string; to: string }
   | { type: 'heroEvolved'; player: PlayerId; cardId: string }
   | { type: 'abilityUsed'; player: PlayerId; source: 'creature' | 'hero' | 'spell' | 'entry'; cardId: string; ability: string }
+  /** 生物攻擊，接著是雙方受到傷害的事件。 */
+  | { type: 'attacked'; player: PlayerId; zone: number; cardId: string; target: Target }
   | { type: 'itemAttached'; player: PlayerId; zone: number; cardId: string }
   | { type: 'fieldPlayed'; player: PlayerId; cardId: string }
   | { type: 'damaged'; target: Target; amount: number }
@@ -368,5 +395,4 @@ export type GameEvent =
   | { type: 'statusTriggered'; player: PlayerId; zone: number; status: 'poison' | 'burn'; amount: number }
   /** 進化解除了全部異常狀態。 */
   | { type: 'statusesCleared'; player: PlayerId; zone: number }
-  | { type: 'wokeUp'; player: PlayerId; zone: number }
   | { type: 'gameOver'; result: GameResult };

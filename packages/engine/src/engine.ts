@@ -1,36 +1,43 @@
 import { validateDeck } from './deck';
 import { fail, RuleError, type ErrorCode } from './errors';
 import {
+  attackPower,
   cardDef,
   ceiling,
   creatureDef,
+  creatureSkills,
   currentCardId,
+  fieldDef,
   heroDef,
   heroPower as currentHeroPower,
-  isAsleep,
+  isDisarmed,
+  isSilenced,
   isParalyzed,
   other,
 } from './queries';
 import {
   cleanup,
   clearStatuses,
+  combat,
   drawCards,
   endGame,
   randomInt,
   resolveAbility,
   shuffle,
   tickBurn,
+  tickField,
   tickPoison,
   tickRegenerate,
   type Ctx,
 } from './resolve';
 import { DEFAULT_RULES } from './rules';
-import { baseTargets, legalTargets, sameTarget, type AbilitySource } from './targeting';
+import { attackTargets, baseTargets, legalTargets, sameTarget, type AbilitySource } from './targeting';
 import { viewFor } from './view';
 import type {
   Ability,
   Action,
   CardDb,
+  Creature,
   CreatureDef,
   CardRef,
   GameEvent,
@@ -172,7 +179,7 @@ function startTurn(ctx: Ctx, player: PlayerId): void {
     endGame(ctx, { winner: other(player), reason: 'deckOut' });
     return;
   }
-  drawCards(ctx, player, 1);
+  drawCards(ctx, player, 1 + (fieldDef(db, state, player)?.extraDraw ?? 0));
 
   // 能量在這裡重置：第一個回合用起始值，之後每回合成長，再補滿。
   // 場地卡被破壞後最高上限可能比能量上限低，這裡會一併壓回去。
@@ -184,6 +191,7 @@ function startTurn(ctx: Ctx, player: PlayerId): void {
   p.energy = p.maxEnergy + (isFirstTurn && !isFirstPlayer ? rules.secondPlayerBonusEnergy : 0);
   tickRegenerate(ctx, player);
   tickPoison(ctx, player);
+  if (state.phase === 'main') tickField(ctx, player);
 }
 
 // ─── 各個動作 ────────────────────────────────────────────────────────────────
@@ -234,12 +242,15 @@ function summon(ctx: Ctx, a: ActionOf<'summon'>): void {
     item: null,
     summonedTurn: state.turn,
     evolvedTurn: null,
-    skillUsedTurn: null,
+    actedTurn: null,
     tauntUntilTurn: null,
     poison: 0,
     burn: 0,
     paralyzedUntilTurn: null,
-    asleepUntilTurn: null,
+    silencedUntilTurn: null,
+    disarmedUntilTurn: null,
+    weakenedUntilTurn: null,
+    cursedUntilTurn: null,
   };
   ctx.events.push({ type: 'summoned', player: a.player, zone: a.zone, cardId: card.cardId });
   triggerEntry(ctx, def, a.player, a.zone, a.target);
@@ -270,23 +281,49 @@ function evolve(ctx: Ctx, a: ActionOf<'evolve'>): void {
   triggerEntry(ctx, def, a.player, a.zone, a.target);
 }
 
+/** 攻擊與發動技能共用的檢查：每回合合計一次、召喚當回合不行（速攻例外）、麻痺不行。 */
+function checkCanAct(ctx: Ctx, creature: Creature, what: string): void {
+  const { db, state } = ctx;
+  const def = creatureDef(db, creature);
+  if (creature.actedTurn === state.turn) fail('ALREADY_ACTED', `${def.name} 這回合已經攻擊或發動過技能`);
+  if (creature.summonedTurn === state.turn && !def.keywords?.includes('haste')) {
+    fail('SUMMONED_THIS_TURN', `召喚當回合不能${what}`);
+  }
+  if (isParalyzed(state, creature)) fail('PARALYZED', `${def.name} 麻痺中，不能${what}`);
+}
+
+/** 生物攻擊：不花能量，每回合跟技能合計一次。 */
+function attack(ctx: Ctx, a: ActionOf<'attack'>): void {
+  const { db, state } = ctx;
+  const creature = ownCreature(state, a.player, a.zone);
+  const def = creatureDef(db, creature);
+  checkCanAct(ctx, creature, '攻擊');
+  if (isDisarmed(state, creature)) fail('DISARMED', `${def.name} 被繳械，不能攻擊`);
+  if (attackPower(db, state, creature) <= 0) fail('NO_ATTACK', `${def.name} 的攻擊力是 0，不能攻擊`);
+  const legal = attackTargets(state, a.player);
+  if (!legal.some((t) => sameTarget(t, a.target))) {
+    const enemy = other(a.player);
+    const wouldBeLegal = a.target.player === enemy && a.target.kind !== 'field' && (a.target.kind === 'hero' || state.players[enemy].zones[a.target.zone] != null);
+    if (wouldBeLegal) fail('MUST_TARGET_TAUNT', '對手有挑釁中的生物，必須先攻擊牠');
+    fail('ILLEGAL_TARGET', '只能攻擊對手的生物或英雄');
+  }
+  creature.actedTurn = state.turn;
+  combat(ctx, a.player, a.zone, a.target);
+}
+
 function useSkill(ctx: Ctx, a: ActionOf<'useSkill'>): void {
   const { db, state } = ctx;
   const p = state.players[a.player];
   const creature = ownCreature(state, a.player, a.zone);
   const def = creatureDef(db, creature);
-  const skill = def.skills[a.skill] ?? fail('INVALID_SKILL', `${def.name} 沒有第 ${a.skill + 1} 個技能`);
-  if (creature.skillUsedTurn === state.turn) fail('SKILL_ALREADY_USED', `${def.name} 這回合已經發動過技能`);
-  if (creature.summonedTurn === state.turn && !def.keywords?.includes('haste')) {
-    fail('SUMMONED_THIS_TURN', '召喚當回合不能發動技能');
-  }
-  if (isParalyzed(state, creature)) fail('PARALYZED', `${def.name} 麻痺中，不能發動技能`);
-  if (isAsleep(state, creature)) fail('ASLEEP', `${def.name} 沉睡中，不能發動技能`);
+  const skill = creatureSkills(db, creature)[a.skill] ?? fail('INVALID_SKILL', `${def.name} 沒有第 ${a.skill + 1} 個技能`);
+  checkCanAct(ctx, creature, '發動技能');
+  if (isSilenced(state, creature)) fail('SILENCED', `${def.name} 沉默中，不能發動技能`);
 
   const source: AbilitySource = { kind: 'creature', player: a.player, zone: a.zone };
   const target = chooseTarget(ctx, skill, source, a.target);
   pay(p, skill.cost);
-  creature.skillUsedTurn = state.turn;
+  creature.actedTurn = state.turn;
   ctx.events.push({ type: 'abilityUsed', player: a.player, source: 'creature', cardId: def.id, ability: skill.name });
   resolveAbility(ctx, skill, source, target);
 }
@@ -434,6 +471,8 @@ function dispatch(ctx: Ctx, action: Action): void {
       return evolve(ctx, action);
     case 'useSkill':
       return useSkill(ctx, action);
+    case 'attack':
+      return attack(ctx, action);
     case 'heroPower':
       return heroPower(ctx, action);
     case 'evolveHero':
@@ -532,7 +571,7 @@ export function createEngine(db: CardDb) {
     if (ref.kind === 'skill') {
       const creature = state.players[player].zones[ref.zone];
       if (creature == null) return [];
-      ability = creatureDef(db, creature).skills[ref.skill];
+      ability = creatureSkills(db, creature)[ref.skill];
       source = { kind: 'creature', player, zone: ref.zone };
     } else if (ref.kind === 'heroPower') {
       ability = currentHeroPower(db, state, player);
@@ -593,7 +632,8 @@ export function createEngine(db: CardDb) {
     }
     p.zones.forEach((creature, zone) => {
       if (creature === null) return;
-      creatureDef(db, creature).skills.forEach((skill, index) => {
+      for (const target of attackTargets(state, player)) candidates.push({ type: 'attack', player, zone, target });
+      creatureSkills(db, creature).forEach((skill, index) => {
         const ref: AbilityRef = { kind: 'skill', zone, skill: index };
         withTargets({ type: 'useSkill', player, zone, skill: index }, skill, targetsFor(state, player, ref));
       });

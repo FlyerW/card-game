@@ -67,9 +67,15 @@ export function describeEffect(effect: Effect): string {
     case 'burn':
       return `${effect.all ? '對手每隻生物' : ''}灼燒 ${effect.amount}（牠的回合結束時受到 ${effect.amount} 傷害）`;
     case 'paralyze':
-      return `${effect.all ? '對手每隻生物' : ''}麻痺（到牠的下個回合結束前不能發動技能）`;
-    case 'sleep':
-      return `${effect.all ? '對手每隻生物' : ''}沉睡（到牠的下個回合結束前不能發動技能，受到傷害就醒）`;
+      return `${effect.all ? '對手每隻生物' : ''}麻痺（到牠的下個回合結束前不能攻擊、不能發動技能）`;
+    case 'silence':
+      return `${effect.all ? '對手每隻生物' : ''}沉默（到牠的下個回合結束前不能發動技能，攻擊照常）`;
+    case 'disarm':
+      return `${effect.all ? '對手每隻生物' : ''}繳械（到牠的下個回合結束前不能攻擊，技能照常）`;
+    case 'weaken':
+      return `${effect.all ? '對手每隻生物' : ''}虛弱（到牠的下個回合結束前，攻擊與反擊的傷害減半）`;
+    case 'curse':
+      return `${effect.all ? '對手每隻生物' : ''}詛咒（到牠的下個回合結束前，技能傷害減半）`;
   }
 }
 
@@ -89,16 +95,16 @@ export const describeEntry = (entry: Omit<Ability, 'cost'>): string => `進場 $
 /** 關鍵字與再生，各自一行說明。 */
 function describeTraits(card: CreatureDef): string[] {
   const lines: string[] = [];
-  if (card.keywords?.includes('haste')) lines.push('速攻：召喚當回合就能發動技能');
-  if (card.keywords?.includes('lifesteal')) lines.push('吸血：牠的技能與進場效果造成傷害時，你的英雄回復等量的 HP');
+  if (card.keywords?.includes('haste')) lines.push('速攻：召喚當回合就能攻擊或發動技能');
+  if (card.keywords?.includes('lifesteal')) lines.push('吸血：牠造成傷害時（攻擊、反擊、技能），你的英雄回復等量的 HP');
   if (card.regenerate) lines.push(`再生 ${card.regenerate}：你的回合開始時，牠回復 ${card.regenerate} HP`);
   return lines;
 }
 
-/** 「我方生物 HP 上限 +2、技能傷害 +1」這類持續加成的說明。 */
+/** 「我方生物攻擊 +1、HP 上限 +2」這類持續加成的說明。 */
 function describeModifier(modifier: CreatureModifier | undefined): string[] {
   const parts: string[] = [];
-  if (modifier?.attack) parts.push(`技能傷害 +${modifier.attack}`);
+  if (modifier?.attack) parts.push(`攻擊 +${modifier.attack}`);
   if (modifier?.hp) parts.push(`HP 上限 +${modifier.hp}`);
   if (modifier?.damageReduction) parts.push(`受到傷害 −${modifier.damageReduction}`);
   if (modifier?.regenerate) parts.push(`再生 ${modifier.regenerate}（你的回合開始時回復 ${modifier.regenerate} HP）`);
@@ -113,6 +119,15 @@ function describeOwnEffects(creatures: CreatureModifier | undefined, ceilingBonu
   return parts.join('；');
 }
 
+/** 場地卡在自己回合開始時的效果。 */
+function describeFieldTriggers(field: Extract<DeckCardDef, { kind: 'field' }>): string[] {
+  const lines: string[] = [];
+  if (field.extraDraw) lines.push(`你的回合開始時多抽 ${field.extraDraw} 張`);
+  if (field.heroRegenerate) lines.push(`你的回合開始時，你的英雄回復 ${field.heroRegenerate} HP`);
+  if (field.enemyDecay) lines.push(`你的回合開始時，對手每隻生物失去 ${field.enemyDecay} HP`);
+  return lines;
+}
+
 const STAGE_NAMES = ['基礎', '一階', '二階'] as const;
 
 /** 整張卡的說明，第一行是標題，其餘是效果。費用一律寫成「能量 N」；進化生物寫的是進化要花的能量。 */
@@ -124,14 +139,21 @@ export function describeCard(card: DeckCardDef, names: (id: string) => string = 
       const stage = STAGE_NAMES[card.stage];
       const from = card.evolvesFrom === undefined ? '' : `，由${names(card.evolvesFrom)}進化`;
       const entry = card.entry ? [describeEntry(card.entry)] : [];
-      return [`${card.name}　${tag}・${stage}${from}｜${cost}｜HP ${card.hp}`, ...describeTraits(card), ...entry, ...card.skills.map(describeAbility)];
+      return [`${card.name}　${tag}・${stage}${from}｜${cost}｜攻 ${card.attack}｜HP ${card.hp}`, ...describeTraits(card), ...entry, ...card.skills.map(describeAbility)];
     }
     case 'spell':
       return [`${card.name}　${tag}・法術｜${cost}`, describeEffects(card)];
     case 'item':
-      return [`${card.name}　${tag}・道具｜${cost}`, `這隻生物${describeModifier(card).join('、')}`];
-    case 'field':
-      return [`${card.name}　${tag}・場地｜${cost}`, describeOwnEffects(card.creatures, card.ceilingBonus)];
+      const stats = describeModifier(card);
+      return [
+        `${card.name}　${tag}・道具｜${cost}`,
+        ...(stats.length > 0 ? [`這隻生物${stats.join('、')}`] : []),
+        ...(card.skills ?? []).map((skill) => `多一個技能 ${describeAbility(skill)}`),
+      ];
+    case 'field': {
+      const own = describeOwnEffects(card.creatures, card.ceilingBonus);
+      return [`${card.name}　${tag}・場地｜${cost}`, ...(own ? [own] : []), ...describeFieldTriggers(card)];
+    }
     case 'heroEvolution': {
       const lines = [`${card.name}　${tag}・英雄進化｜${cost}｜由${names(card.evolvesFrom)}進化`];
       if (card.entry) lines.push(describeEntry(card.entry));

@@ -86,6 +86,12 @@ export function describeEvents(
         lines.push({ text, tone: tone(event.player) });
         break;
       }
+      case 'attacked':
+        lines.push({
+          text: `${who(event.player)}的 ${ZONE[event.zone]} ${name(event.cardId)} 攻擊${targetText(event.target)}`,
+          tone: tone(event.player),
+        });
+        break;
       case 'heroEvolved':
         lines.push({ text: `${who(event.player)}的英雄進化為 ${name(event.cardId)}`, tone: tone(event.player) });
         break;
@@ -136,7 +142,15 @@ export function describeEvents(
         lines.push({ text: `　${who(event.player)}的最高上限 +${event.amount}`, tone: 'turn' });
         break;
       case 'statusApplied': {
-        const label = { poison: `中毒 ${event.amount ?? ''}`, burn: `灼燒 ${event.amount ?? ''}`, paralysis: '麻痺', sleep: '沉睡' }[event.status];
+        const label = {
+          poison: `中毒 ${event.amount ?? ''}`,
+          burn: `灼燒 ${event.amount ?? ''}`,
+          paralysis: '麻痺',
+          silence: '沉默',
+          disarm: '繳械',
+          weakness: '虛弱',
+          curse: '詛咒',
+        }[event.status];
         lines.push({ text: `　${targetText({ kind: 'creature', player: event.player, zone: event.zone })}${label.trim()}`, tone: 'turn' });
         break;
       }
@@ -148,9 +162,6 @@ export function describeEvents(
         break;
       case 'statusesCleared':
         lines.push({ text: `　${ZONE[event.zone]} 進化，異常狀態全部解除`, tone: 'turn' });
-        break;
-      case 'wokeUp':
-        lines.push({ text: `　${targetText({ kind: 'creature', player: event.player, zone: event.zone })}醒了`, tone: 'turn' });
         break;
       case 'gameOver': {
         const { winner, reason } = event.result;

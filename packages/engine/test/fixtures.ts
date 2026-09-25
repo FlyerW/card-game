@@ -17,7 +17,7 @@ const creature = (
   id: string,
   skills: Ability[],
   extra: Partial<Extract<DeckCardDef, { kind: 'creature' }>> = {},
-): DeckCardDef => ({ kind: 'creature', id, name: id, rarity: 'R', colors: [], stage: 0, cost: 1, hp: 10, skills, ...extra });
+): DeckCardDef => ({ kind: 'creature', id, name: id, rarity: 'R', colors: [], stage: 0, cost: 1, attack: 2, hp: 10, skills, ...extra });
 
 export const TEST_CARDS: DeckCardDef[] = [
   creature('wolf', [hit('bite', ANY, 3)], { rarity: 'N', hp: 6 }),
@@ -109,7 +109,10 @@ export const TEST_CARDS: DeckCardDef[] = [
   ]),
   creature('mesmer', [
     { name: 'stun', cost: 1, target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'paralyze' }] },
-    { name: 'lull', cost: 1, target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'sleep' }] },
+    { name: 'hush', cost: 1, target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'silence' }] },
+    { name: 'unarm', cost: 1, target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'disarm' }] },
+    { name: 'sap', cost: 1, target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'weaken' }] },
+    { name: 'hex', cost: 1, target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'curse' }] },
   ]),
   {
     kind: 'spell', id: 'dart', name: 'dart', rarity: 'N', colors: [], cost: 1,
@@ -135,6 +138,15 @@ export const TEST_CARDS: DeckCardDef[] = [
     cost: 3, evolvesFrom: 'pinger', hpBonus: 5,
     entry: { name: 'flare', target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'damage', amount: 4 }] },
   },
+
+  // 攻擊：數值各不相同的生物
+  creature('brute', [hit('smash', ANY, 4)], { attack: 5, hp: 6 }),
+  creature('wall', [], { rarity: 'N', attack: 0, hp: 8 }),
+  // 道具給的技能；場地卡在回合開始時的效果
+  { kind: 'item', id: 'wand', name: 'wand', rarity: 'R', colors: [], cost: 1, attack: 1, skills: [hit('zap', ANY, 3)] },
+  { kind: 'field', id: 'library', name: 'library', rarity: 'R', colors: [], cost: 1, extraDraw: 1 },
+  { kind: 'field', id: 'chapel', name: 'chapel', rarity: 'R', colors: [], cost: 1, heroRegenerate: 2 },
+  { kind: 'field', id: 'bog', name: 'bog', rarity: 'R', colors: [], cost: 1, enemyDecay: 1 },
 
   // 吸血、再生、全體回復、消滅
   creature('leech', [hit('drain4', ANY, 4), { name: 'drainAll', cost: 1, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }], {

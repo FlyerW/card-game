@@ -70,6 +70,20 @@ export function baseTargets(state: GameState, ability: Ability, source: AbilityS
 }
 
 /**
+ * 生物攻擊能選的目標：對手的每隻生物與英雄，不管格子位置。
+ * 對手有挑釁中的生物時，只能攻擊挑釁的生物。
+ */
+export function attackTargets(state: GameState, player: PlayerId): Target[] {
+  const enemy = other(player);
+  const creatures = creatureTargets(state, enemy);
+  const taunting = creatures.filter((target) => {
+    const creature = target.kind === 'creature' ? state.players[enemy].zones[target.zone] : null;
+    return creature != null && isTaunting(state, creature);
+  });
+  return taunting.length > 0 ? taunting : [...creatures, { kind: 'hero', player: enemy }];
+}
+
+/**
  * 實際能選的目標。
  *
  * 挑釁：技能能選到挑釁中的對手生物，就必須選牠。

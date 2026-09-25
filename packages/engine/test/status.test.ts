@@ -85,41 +85,63 @@ describe('麻痺', () => {
   });
 });
 
-describe('沉睡', () => {
-  it('不能發動技能，受到傷害就醒來', () => {
-    let { state, a, b } = start();
-    place(state, a, 0, 'mesmer');
-    place(state, a, 1, 'hitter');
-    place(state, b, 0, 'taunter');
-    state.players[a].energy = 5;
-    const asleep = act(state, { type: 'useSkill', player: a, zone: 0, skill: 1, target: creatureAt(b, 0) });
-    expect(reject(endTurn(asleep), { type: 'useSkill', player: b, zone: 0, skill: 0 })).toBe('ASLEEP');
-
-    // 同一個回合再打牠一下，牠就醒了，自己的回合照常發動技能。
-    state = act(asleep, { type: 'useSkill', player: a, zone: 1, skill: 0, target: creatureAt(b, 0) });
-    expect(at(state, b, 0)!.asleepUntilTurn).toBeNull();
-    state = endTurn(state);
-    act(state, { type: 'useSkill', player: b, zone: 0, skill: 0 });
-  });
-
-  it('沒被打的話，持續到擁有者的下一個回合結束', () => {
+describe('沉默', () => {
+  it('不能發動技能，攻擊照常；到擁有者的下一個回合結束', () => {
     let { state, a, b } = start({ deckSize: 60 });
     place(state, a, 0, 'mesmer');
     place(state, b, 0, 'taunter');
     state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 1, target: creatureAt(b, 0) });
-    state = endTurn(state); // b 第 1 個回合
-    expect(reject(state, { type: 'useSkill', player: b, zone: 0, skill: 0 })).toBe('ASLEEP');
-    state = endTurn(endTurn(state)); // b 第 2 個回合：醒了
+    state = endTurn(state); // b 的回合
+    expect(reject(state, { type: 'useSkill', player: b, zone: 0, skill: 0 })).toBe('SILENCED');
+    act(state, { type: 'attack', player: b, zone: 0, target: hero(a) });
+    state = endTurn(endTurn(state)); // b 的下一個回合：解除
     act(state, { type: 'useSkill', player: b, zone: 0, skill: 0 });
   });
+});
 
-  it('失去 HP 不算受到傷害，中毒不會叫醒牠', () => {
+describe('繳械', () => {
+  it('不能攻擊，技能照常；被攻擊時照樣反擊', () => {
     let { state, a, b } = start();
-    place(state, b, 0, 'taunter', { poison: 1, asleepUntilTurn: 10 });
+    place(state, a, 0, 'mesmer');
+    place(state, a, 1, 'brute');
+    place(state, b, 0, 'hitter'); // 攻擊 2
+    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 2, target: creatureAt(b, 0) });
+    state = act(state, { type: 'attack', player: a, zone: 1, target: creatureAt(b, 0) });
+    expect(at(state, a, 1)!.damage).toBe(2); // 繳械的生物還是會反擊
     state = endTurn(state);
-    expect(at(state, b, 0)!.damage).toBe(1);
-    expect(at(state, b, 0)!.asleepUntilTurn).toBe(10);
-    expect(a).not.toBe(b);
+    expect(reject(state, { type: 'attack', player: b, zone: 0, target: hero(a) })).toBe('DISARMED');
+    act(state, { type: 'useSkill', player: b, zone: 0, skill: 0, target: hero(a) });
+  });
+});
+
+describe('虛弱', () => {
+  it('攻擊與反擊的傷害減半，技能傷害不變', () => {
+    let { state, a, b } = start();
+    place(state, a, 0, 'mesmer');
+    place(state, a, 1, 'hitter');
+    place(state, b, 0, 'brute'); // 攻擊 5
+    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 3, target: creatureAt(b, 0) });
+    state = act(state, { type: 'attack', player: a, zone: 1, target: creatureAt(b, 0) });
+    expect(at(state, a, 1)!.damage).toBe(2); // 反擊 5 減半捨去
+    state = endTurn(state);
+    state = act(state, { type: 'attack', player: b, zone: 0, target: hero(a) });
+    expect(state.players[a].heroDamage).toBe(2);
+    state = act(endTurn(endTurn(state)), { type: 'useSkill', player: b, zone: 0, skill: 0, target: hero(a) });
+    expect(state.players[a].heroDamage).toBe(2 + 4);
+  });
+});
+
+describe('詛咒', () => {
+  it('技能傷害減半，攻擊照常', () => {
+    let { state, a, b } = start();
+    place(state, a, 0, 'mesmer');
+    place(state, b, 0, 'brute');
+    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 4, target: creatureAt(b, 0) });
+    state = endTurn(state);
+    state = act(state, { type: 'useSkill', player: b, zone: 0, skill: 0, target: hero(a) });
+    expect(state.players[a].heroDamage).toBe(2); // 4 減半
+    state = act(endTurn(endTurn(state)), { type: 'attack', player: b, zone: 0, target: hero(a) });
+    expect(state.players[a].heroDamage).toBe(2 + 5);
   });
 });
 
@@ -138,13 +160,13 @@ describe('對手每隻生物', () => {
 describe('進化', () => {
   it('解除全部異常狀態，已受的傷害保留', () => {
     let { state, a } = start();
-    place(state, a, 0, 'pup', { damage: 2, poison: 3, burn: 2, paralyzedUntilTurn: 9, asleepUntilTurn: 9 });
+    place(state, a, 0, 'pup', { damage: 2, poison: 3, burn: 2, paralyzedUntilTurn: 9, silencedUntilTurn: 9, weakenedUntilTurn: 9 });
     const card = give(state, a, 'hound');
     state.players[a].energy = 5;
     const result = engine.apply(state, { type: 'evolve', player: a, card, zone: 0 });
     if (!result.ok) throw new Error(result.error.message);
     const evolved = at(result.state, a, 0)!;
-    expect(evolved).toMatchObject({ damage: 2, poison: 0, burn: 0, paralyzedUntilTurn: null, asleepUntilTurn: null });
+    expect(evolved).toMatchObject({ damage: 2, poison: 0, burn: 0, paralyzedUntilTurn: null, silencedUntilTurn: null, weakenedUntilTurn: null });
     expect(result.events).toContainEqual({ type: 'statusesCleared', player: a, zone: 0 });
   });
 });
