@@ -1,0 +1,12 @@
+{
+  "name": "@card-game/sim",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./bot": "./src/bot.ts"
+  },
+  "dependencies": {
+    "@card-game/engine": "*"
+  }
+}

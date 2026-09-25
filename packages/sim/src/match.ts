@@ -1,0 +1,37 @@
+import type { Engine, GameConfig, GameResult, PlayerId } from '@card-game/engine';
+import { chooseAction, type BotStyle } from './bot';
+
+export interface MatchOutcome {
+  firstPlayer: PlayerId;
+  result: GameResult;
+  /** 全局回合數：先攻第 1 回合是 1、後攻第 1 回合是 2。 */
+  turns: number;
+  /** 勝方英雄剩下的 HP，看勝負有多懸殊。平手時為 null。 */
+  winnerHeroHp: number | null;
+}
+
+/** 兩個機器人打一局。雙方都保留起手牌不重抽。 */
+export function playMatch(engine: Engine, config: GameConfig, style: BotStyle, maxActions = 5000): MatchOutcome {
+  const created = engine.createGame(config);
+  if (!created.ok) throw new Error(created.error.message);
+  let state = created.state;
+  for (const player of [0, 1] as const) {
+    const kept = engine.apply(state, { type: 'mulligan', player, cards: [] });
+    if (!kept.ok) throw new Error(kept.error.message);
+    state = kept.state;
+  }
+
+  for (let i = 0; i < maxActions && state.phase !== 'over'; i++) {
+    state = chooseAction(engine, state, state.activePlayer, style).state;
+  }
+  if (state.result === null) throw new Error(`超過 ${maxActions} 個動作仍未分出勝負`);
+
+  const { winner } = state.result;
+  const view = winner === 'draw' ? null : engine.viewFor(state, winner);
+  return {
+    firstPlayer: state.firstPlayer,
+    result: state.result,
+    turns: state.turn,
+    winnerHeroHp: view === null ? null : view.you.heroHp,
+  };
+}
