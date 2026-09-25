@@ -72,12 +72,17 @@ export function describeEvents(
         const text =
           event.source === 'spell'
             ? `${who(event.player)}施放 ${name(event.cardId)}`
-            : event.source === 'hero'
+            : event.source === 'entry'
+              ? `　${name(event.cardId)} 進場「${event.ability}」`
+              : event.source === 'hero'
               ? `${who(event.player)}的英雄發動天生技「${event.ability}」`
               : `${who(event.player)}的 ${name(event.cardId)} 發動「${event.ability}」`;
         lines.push({ text, tone: tone(event.player) });
         break;
       }
+      case 'heroEvolved':
+        lines.push({ text: `${who(event.player)}的英雄進化為 ${name(event.cardId)}`, tone: tone(event.player) });
+        break;
       case 'itemAttached':
         lines.push({
           text: `${who(event.player)}替 ${ZONE[event.zone]} 裝上 ${name(event.cardId)}`,

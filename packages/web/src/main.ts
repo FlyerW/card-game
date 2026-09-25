@@ -3,6 +3,7 @@ import {
   describeAbility,
   describeCard,
   describeHero,
+  heroPower,
   sampleDb,
   SAMPLE_CARDS,
   SAMPLE_HEROES,
@@ -18,6 +19,7 @@ import {
   type Target,
 } from '@card-game/engine';
 import { chooseAction, STYLES } from '@card-game/sim/bot';
+import { buildDeck } from '@card-game/sim/deck';
 import { describeEvents, ZONE, type LogLine } from './log';
 import './style.css';
 
@@ -31,6 +33,8 @@ const BOT_STEP_MS = 750;
 
 type Selection =
   | { kind: 'hand'; uid: number }
+  /** 已經選好召喚或進化的格子，正在選進場效果的目標。 */
+  | { kind: 'entry'; uid: number; zone: number }
   | { kind: 'creature'; player: PlayerId; zone: number }
   | { kind: 'skill'; zone: number; skill: number }
   | { kind: 'heroPower' }
@@ -96,25 +100,9 @@ function kindLabel(def: DeckCardDef): string {
       return '道具';
     case 'field':
       return '場地';
+    case 'heroEvolution':
+      return '英雄進化';
   }
-}
-
-/** 試玩用牌組：從全部範例卡隨機組 40 張（每種最多 3 張），不限顏色。 */
-function randomDeck(seed: number): string[] {
-  const pool = SAMPLE_CARDS.flatMap((c) => [c.id, c.id, c.id]);
-  let t = seed >>> 0;
-  const random = () => {
-    t = (t + 0x6d2b79f5) >>> 0;
-    let x = t;
-    x = Math.imul(x ^ (x >>> 15), x | 1);
-    x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
-    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
-  };
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j]!, pool[i]!];
-  }
-  return pool.slice(0, 40);
 }
 
 // ─── 合法動作與可點的目標 ─────────────────────────────────────────────────────
@@ -139,11 +127,21 @@ function choices(): Map<string, Action> {
   const map = new Map<string, Action>();
   const sel = app.selection;
   if (sel === null) return map;
+  if (sel.kind === 'entry') {
+    for (const a of actsForCard(sel.uid)) {
+      if ((a.type === 'summon' || a.type === 'evolve') && a.zone === sel.zone && a.target) map.set(targetKey(a.target), a);
+    }
+    return map;
+  }
   const acts =
     sel.kind === 'hand' ? actsForCard(sel.uid) : sel.kind === 'skill' ? actsForSkill(sel.zone, sel.skill) : sel.kind === 'heroPower' ? actsForPower() : [];
   for (const a of acts) {
-    if (a.type === 'summon' || a.type === 'evolve' || a.type === 'attachItem') map.set(`z${YOU}${a.zone}`, a);
-    else if ((a.type === 'castSpell' || a.type === 'useSkill' || a.type === 'heroPower') && a.target) map.set(targetKey(a.target), a);
+    // 同一格可能對應好幾個動作（進場效果的不同目標），先記第一個，點下去時再決定要不要進入選目標。
+    if (a.type === 'summon' || a.type === 'evolve' || a.type === 'attachItem') {
+      if (!map.has(`z${YOU}${a.zone}`)) map.set(`z${YOU}${a.zone}`, a);
+    } else if ((a.type === 'castSpell' || a.type === 'useSkill' || a.type === 'heroPower') && a.target) {
+      map.set(targetKey(a.target), a);
+    }
   }
   return map;
 }
@@ -207,8 +205,8 @@ function startGame(): void {
   const created = engine.createGame({
     seed,
     players: [
-      { heroId: app.heroId, deck: randomDeck(seed ^ 0x9e3779b9) },
-      { heroId: rival, deck: randomDeck(seed + 1) },
+      { heroId: app.heroId, deck: buildDeck(seed ^ 0x9e3779b9, app.heroId) },
+      { heroId: rival, deck: buildDeck(seed + 1, rival) },
     ],
     skipDeckValidation: true,
   });
@@ -225,8 +223,9 @@ function startGame(): void {
 
 // ─── 說明欄的文字 ────────────────────────────────────────────────────────────
 
-function handReason(def: DeckCardDef, energy: number): string {
-  if (def.cost > energy) return `能量不足：需要 ${def.cost}，目前 ${energy}`;
+function handReason(def: DeckCardDef, you: SideView): string {
+  if (def.kind === 'heroEvolution' && def.evolvesFrom !== you.heroId) return '這不是你英雄的進化卡';
+  if (def.cost > you.energy) return `能量不足：需要 ${def.cost}，目前 ${you.energy}`;
   switch (def.kind) {
     case 'creature':
       return def.stage === 0
@@ -238,6 +237,8 @@ function handReason(def: DeckCardDef, energy: number): string {
       return '場上沒有可以裝備的生物（每隻限一張道具）';
     case 'field':
       return '場地卡每回合只能放一張';
+    case 'heroEvolution':
+      return '英雄已經進化過（每局限一次）';
   }
 }
 
@@ -289,11 +290,12 @@ function detail(view: PlayerView): string {
     const acts = actsForCard(sel.uid);
     let hint = '';
     if (!myTurn) hint = '<p class="hint">輪到你的時候才能出牌。</p>';
-    else if (acts.length === 0) hint = `<p class="hint blocked">${esc(handReason(def, view.you.energy))}</p>`;
+    else if (acts.length === 0) hint = `<p class="hint blocked">${esc(handReason(def, view.you))}</p>`;
     else if (acts.some((a) => a.type === 'summon')) hint = '<p class="hint">點一個空的生物格召喚。</p>';
     else if (acts.some((a) => a.type === 'evolve')) hint = '<p class="hint">點要進化的生物。</p>';
     else if (acts.some((a) => a.type === 'attachItem')) hint = '<p class="hint">點你要裝上道具的生物。</p>';
     else if (acts.some((a) => a.type === 'playField')) hint = '<button class="primary" data-do="direct">放到場地區</button>';
+    else if (acts.some((a) => a.type === 'evolveHero')) hint = '<button class="primary" data-do="direct">進化英雄</button>';
     else if (acts.some((a) => a.type === 'castSpell' && !a.target)) hint = '<button class="primary" data-do="direct">施放</button>';
     else hint = '<p class="hint">點選法術的目標。</p>';
     return toast + lines(describeCard(def, nameOf)) + hint + cancel;
@@ -319,17 +321,31 @@ function detail(view: PlayerView): string {
     return toast + body + cancel;
   }
 
+  if (sel.kind === 'entry') {
+    const held = view.you.hand.find((c) => c.uid === sel.uid);
+    const def = held ? card(held.cardId) : null;
+    const entry = def?.kind === 'creature' ? def.entry : undefined;
+    if (!entry) return toast;
+    return (
+      toast +
+      `<p class="d-head">選擇進場效果的目標</p><p class="d-line">${esc(def!.name)} 放在 ${ZONE[sel.zone]}</p>
+       <p class="d-line">${esc(describeAbility({ ...entry, cost: 0 }).replace('（0）', ''))}</p><p class="hint">發光的就是可以選的目標。</p>` +
+      cancel
+    );
+  }
+
   if (sel.kind === 'skill' || sel.kind === 'heroPower') {
     const ability =
       sel.kind === 'skill'
         ? (card(view.you.zones[sel.zone]!.cardId) as Extract<DeckCardDef, { kind: 'creature' }>).skills[sel.skill]!
-        : hero(view.you.heroId).power!;
+        : heroPower(db, app.state!, YOU)!;
     return toast + `<p class="d-head">選擇目標</p><p class="d-line">${esc(describeAbility(ability))}</p><p class="hint">發光的就是可以選的目標。</p>` + cancel;
   }
 
   if (sel.kind === 'hero') {
     const side = sel.player === YOU ? view.you : view.opponent;
-    return toast + lines(describeHero(hero(side.heroId))) + `<ul class="tags"><li>HP ${side.heroHp} / ${side.heroMaxHp}</li></ul>` + cancel;
+    const evolved = side.heroEvolution ? lines(describeCard(card(side.heroEvolution), nameOf)) : '';
+    return toast + lines(describeHero(hero(side.heroId))) + evolved + `<ul class="tags"><li>HP ${side.heroHp} / ${side.heroMaxHp}</li></ul>` + cancel;
   }
 
   const side = sel.player === YOU ? view.you : view.opponent;
@@ -344,7 +360,7 @@ function zone(cv: CreatureView | null, player: PlayerId, index: number, picks: M
   const selected = sel?.kind === 'creature' && sel.player === player && sel.zone === index;
   const classes = ['zone'];
   if (picks.has(key)) classes.push('pick');
-  if (selected || (sel?.kind === 'skill' && player === YOU && sel.zone === index)) classes.push('selected');
+  if (selected || ((sel?.kind === 'skill' || sel?.kind === 'entry') && player === YOU && sel.zone === index)) classes.push('selected');
   if (!cv) {
     return `<button class="${classes.join(' ')} empty" data-key="${key}" aria-label="${player === YOU ? '你' : '對手'}的 ${ZONE[index]} 空格"><span class="zone-num">${ZONE[index]}</span></button>`;
   }
@@ -359,9 +375,11 @@ function zone(cv: CreatureView | null, player: PlayerId, index: number, picks: M
   if (cv.item) badges.push(`<i class="badge item">${esc(nameOf(cv.item))}</i>`);
   if (cv.taunting) badges.push('<i class="badge taunt">挑釁</i>');
   const hurt = cv.hp < cv.maxHp ? ' hurt' : '';
-  return `<button class="${classes.join(' ')} r-${def.rarity}" data-key="${key}" aria-label="${esc(def.name)}，HP ${cv.hp}">
+  // 左上角顯示這隻生物總共花了多少費用，進化過的顯示成 4+3，一眼看出對手在牠身上投資了多少。
+  const invested = cv.evolutionChain.map((id) => card(id).cost).join('+');
+  return `<button class="${classes.join(' ')} r-${def.rarity}" data-key="${key}" aria-label="${esc(def.name)}，費用 ${invested}，HP ${cv.hp}">
     <span class="zone-num">${ZONE[index]}</span>
-    <span class="z-top"><span class="rarity">${def.rarity}</span>${pips(def.colors)}</span>
+    <span class="z-top"><span class="z-cost">${invested}</span><span class="rarity">${def.rarity}</span>${pips(def.colors)}</span>
     <span class="z-name">${esc(def.name)}</span>
     <span class="z-hp${hurt}"><b>${cv.hp}</b><small>/${cv.maxHp}</small></span>
     <span class="badges">${badges.join('')}</span>
@@ -385,8 +403,10 @@ function heroPlate(side: SideView, player: PlayerId, picks: Map<string, Action>)
   if (picks.has(key)) classes.push('pick');
   if (app.selection?.kind === 'hero' && app.selection.player === player) classes.push('selected');
   const extra = player === BOT ? `<span class="h-hand">手牌 ${side.handCount}</span>` : '';
-  return `<button class="${classes.join(' ')}" data-key="${key}" aria-label="${esc(h.name)}，HP ${side.heroHp}">
-    <span class="h-name">${esc(h.name)}</span>${pips(h.colors)}
+  const name = side.heroEvolution ? nameOf(side.heroEvolution) : h.name;
+  if (side.heroEvolution) classes.push('evolved');
+  return `<button class="${classes.join(' ')}" data-key="${key}" aria-label="${esc(name)}，HP ${side.heroHp}">
+    <span class="h-name">${esc(name)}</span>${pips(h.colors)}
     <span class="h-hp"><b>${side.heroHp}</b><small>/${side.heroMaxHp}</small></span>
     <span class="h-bar"><i style="width:${pct}%"></i></span>${extra}</button>`;
 }
@@ -407,7 +427,7 @@ function sideRows(side: SideView, player: PlayerId, picks: Map<string, Action>, 
 
   let heroRow = `<div class="row hero-row">${heroPlate(side, player, picks)}`;
   if (player === YOU) {
-    const power = hero(side.heroId).power;
+    const power = heroPower(db, app.state!, YOU);
     if (power) {
       const usable = actsForPower().length > 0;
       heroRow += `<button class="power${app.selection?.kind === 'heroPower' ? ' selected' : ''}" data-do="power" ${usable ? '' : 'disabled'}>
@@ -425,8 +445,9 @@ function hand(view: PlayerView): string {
       const playable = actsForCard(held.uid).length > 0;
       const selected = app.selection?.kind === 'hand' && app.selection.uid === held.uid;
       const hp = def.kind === 'creature' ? `<span class="c-hp">HP ${def.hp}</span>` : '';
+      const isEvolution = def.kind === 'creature' && def.stage > 0;
       return `<button class="card k-${def.kind} r-${def.rarity}${playable ? ' playable' : ''}${selected ? ' selected' : ''}" data-hand="${held.uid}">
-        <span class="c-cost">${def.cost}</span>
+        <span class="c-cost${isEvolution ? ' evo' : ''}">${isEvolution ? '+' : ''}${def.cost}</span>
         <span class="c-top"><span class="rarity">${def.rarity}</span>${pips(def.colors)}</span>
         <span class="c-name">${esc(def.name)}</span>
         <span class="c-kind">${kindLabel(def)}</span>${hp}</button>`;
@@ -498,6 +519,8 @@ function playScreen(): string {
 function setupScreen(): string {
   const heroes = SAMPLE_HEROES.map((h) => {
     const [head, ...body] = describeHero(h);
+    const evolution = SAMPLE_CARDS.find((c) => c.kind === 'heroEvolution' && c.evolvesFrom === h.id);
+    if (evolution) body.push(`可進化為 ${evolution.name}（${evolution.cost}）`);
     const chosen = h.id === app.heroId;
     return `<button class="hero-pick${chosen ? ' chosen' : ''}" data-hero="${h.id}" aria-pressed="${chosen}">
       <span class="hp-big">${h.hp}</span><span class="hp-unit">HP</span>
@@ -518,6 +541,7 @@ function setupScreen(): string {
         <li>正對面、斜對角的技能，目標格空著就會打到後面的英雄。</li>
         <li>對手的生物在挑釁時，選得到牠的技能都必須打牠；只打英雄的技能不受影響。</li>
         <li>手牌上限 10 張，滿手時抽到的牌直接進棄牌區。場地卡放在自己的場地區，只強化自己的生物。</li>
+        <li>有些英雄有英雄進化卡：HP 上限增加、天生技變強，每局只能進化一次。</li>
         <li>把對手英雄的 HP 打到 0 就贏了。</li>
       </ul>
       <p class="note">試玩說明：範例卡只有 ${SAMPLE_CARDS.length} 張，單色組不成 40 張，所以雙方的牌組都從全部範例卡隨機組成，不限顏色。電腦用的是模擬平衡時的均衡打法。</p>
@@ -597,7 +621,14 @@ root.addEventListener('click', (event) => {
     chooseAbility(actsForSkill(z, s), { kind: 'skill', zone: z, skill: s });
   } else if (key) {
     const act = choices().get(key);
-    if (act) perform(act);
+    const sel = app.selection;
+    if (act && (act.type === 'summon' || act.type === 'evolve') && sel?.kind === 'hand') {
+      const options = actsForCard(sel.uid).filter((a) => (a.type === 'summon' || a.type === 'evolve') && a.zone === act.zone);
+      if (options.length > 1) {
+        app.selection = { kind: 'entry', uid: sel.uid, zone: act.zone };
+        render();
+      } else perform(act);
+    } else if (act) perform(act);
     else if (app.state) inspect(key);
   } else if (command === 'start' || command === 'again') {
     startGame();
@@ -615,7 +646,9 @@ root.addEventListener('click', (event) => {
   } else if (command === 'power') {
     chooseAbility(actsForPower(), { kind: 'heroPower' });
   } else if (command === 'direct' && app.selection?.kind === 'hand') {
-    const act = actsForCard(app.selection.uid).find((a) => a.type === 'playField' || (a.type === 'castSpell' && !a.target));
+    const act = actsForCard(app.selection.uid).find(
+      (a) => a.type === 'playField' || a.type === 'evolveHero' || (a.type === 'castSpell' && !a.target),
+    );
     if (act) perform(act);
   } else if (command === 'cancel') {
     app.selection = null;
