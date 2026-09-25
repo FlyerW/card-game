@@ -22,7 +22,7 @@ export function playMatch(engine: Engine, config: GameConfig, style: BotStyle, m
   }
 
   for (let i = 0; i < maxActions && state.phase !== 'over'; i++) {
-    state = chooseAction(engine, state, state.activePlayer, style).state;
+    state = chooseAction(engine, state, engine.actor(state), style).state;
   }
   if (state.result === null) throw new Error(`超過 ${maxActions} 個動作仍未分出勝負`);
 

@@ -90,6 +90,8 @@ export interface Ability {
   cost: number;
   target: TargetSpec;
   effects: Effect[];
+  /** 【瞬發】生物技能：可以在回應時發動，包括對手的回合。仍然算在這隻生物「每回合一個技能」裡。 */
+  instant?: boolean;
 }
 
 interface CardBase {
@@ -125,6 +127,8 @@ export interface SpellDef extends CardBase {
   cost: number;
   target: TargetSpec;
   effects: Effect[];
+  /** 瞬發法術：可以在回應時施放，包括對手的回合。一般法術只能在自己的回合、沒有等待回應時施放。 */
+  instant?: boolean;
 }
 
 export interface ItemDef extends CardBase {
@@ -270,6 +274,28 @@ export interface PlayerState {
   mulliganDone: boolean;
 }
 
+/**
+ * 連鎖上的一個效果：已經宣告、付過費用，還沒結算。
+ * 回應會疊在上面，最後加入的先結算。
+ */
+export interface ChainLink {
+  player: PlayerId;
+  /** 生物技能、進場效果、英雄天生技、法術。 */
+  source: 'creature' | 'entry' | 'hero' | 'spell';
+  /** 生物來源的格子與 uid。結算前牠離場了，牠的技能與進場效果就不發動。 */
+  zone: number | null;
+  sourceUid: number | null;
+  /** 顯示用：生物卡、英雄或法術卡的 id。 */
+  cardId: string;
+  ability: Ability;
+  /** 宣告時選好的目標。 */
+  target: Target | null;
+  /** 目標生物宣告時的 uid；結算時那一格換了別隻，就當作目標消失。 */
+  targetUid: number | null;
+  /** 法術卡本身，結算完才進棄牌區。 */
+  card: CardRef | null;
+}
+
 export type GameOverReason = 'heroDefeated' | 'deckOut' | 'concede';
 
 export interface GameResult {
@@ -289,6 +315,15 @@ export interface GameState {
   players: [PlayerState, PlayerState];
   result: GameResult | null;
   nextUid: number;
+  /** 等待結算的連鎖，[0] 在最底下。 */
+  chain: ChainLink[];
+  /**
+   * 正在等誰決定要不要回應；null 表示沒有在等，輪到的玩家照常行動。
+   * 對手有存能量才會等，沒有存能量就直接結算。
+   */
+  window: PlayerId | null;
+  /** 輪到的玩家已經宣告回合結束，正在等對手最後一次回應。 */
+  endingTurn: boolean;
 }
 
 // ─── 玩家動作 ────────────────────────────────────────────────────────────────
@@ -311,6 +346,8 @@ export type Action =
   | { type: 'attachItem'; player: PlayerId; card: number; zone: number }
   | { type: 'playField'; player: PlayerId; card: number }
   | { type: 'endTurn'; player: PlayerId }
+  /** 不回應：連鎖從最後加入的開始往回結算；在宣告回合結束時不回應，回合就結束。 */
+  | { type: 'pass'; player: PlayerId }
   | { type: 'concede'; player: PlayerId };
 
 // ─── 事件 ────────────────────────────────────────────────────────────────────
@@ -348,4 +385,13 @@ export type GameEvent =
   /** 進化解除了全部異常狀態。 */
   | { type: 'statusesCleared'; player: PlayerId; zone: number }
   | { type: 'wokeUp'; player: PlayerId; zone: number }
+  /** 開始等這位玩家決定要不要回應。 */
+  | { type: 'awaitingResponse'; player: PlayerId }
+  /** 這位玩家用瞬發法術或【瞬發】技能回應，接著是 abilityUsed。 */
+  | { type: 'responded'; player: PlayerId }
+  | { type: 'passed'; player: PlayerId }
+  /** 連鎖有兩個以上的效果時，每個效果結算前都有這個事件，看得出結算順序。 */
+  | { type: 'resolving'; player: PlayerId; cardId: string; ability: string }
+  /** 發動的生物在結算前離場了，效果不發動。 */
+  | { type: 'fizzled'; player: PlayerId; cardId: string; ability: string }
   | { type: 'gameOver'; result: GameResult };

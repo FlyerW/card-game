@@ -115,6 +115,21 @@ export const TEST_CARDS: DeckCardDef[] = [
     target: ANY, effects: [{ type: 'damage', amount: 1 }, { type: 'poison', amount: 2 }],
   },
 
+  // 即時回應
+  { kind: 'spell', id: 'snap', name: 'snap', rarity: 'N', colors: [], cost: 1, instant: true, target: ANY, effects: [{ type: 'damage', amount: 3 }] },
+  {
+    kind: 'spell', id: 'quick-mend', name: 'quick-mend', rarity: 'N', colors: [], cost: 1, instant: true,
+    target: { kind: 'ally', allow: 'any' }, effects: [{ type: 'heal', amount: 4 }],
+  },
+  {
+    kind: 'spell', id: 'freeze', name: 'freeze', rarity: 'N', colors: [], cost: 1, instant: true,
+    target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'paralyze' }],
+  },
+  creature('sentry', [
+    { ...hit('shoot', ANY, 2), instant: true },
+    hit('slow', ANY, 4),
+  ]),
+
   // 英雄進化：只有 pinger 能用
   {
     kind: 'heroEvolution', id: 'pinger-plus', name: 'pinger-plus', rarity: 'SR', colors: ['red'],

@@ -187,6 +187,15 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .end-turn { background: var(--energy); color: #0c2530; border: 0; border-radius: 999px; padding: 8px 20px; font-weight: 700; }
 .end-turn:disabled { background: #2a3a45; color: var(--ink-faint); }
 
+.end-turn.respond-btn { background: var(--pick); color: #1d1408; }
+
+/* ─── 連鎖與回應 ─── */
+.chain { border: 1px solid var(--pick); border-radius: 8px; padding: 6px 10px; background: #f0b35a14; }
+.chain-title { margin: 0 0 4px; font-size: 11.5px; color: var(--pick); letter-spacing: .06em; }
+.chain ol { margin: 0; padding-left: 1.3em; display: grid; gap: 2px; font-size: 12.5px; }
+.chain .t-you { color: #bfe7f1; } .chain .t-bot { color: #f3c9a8; }
+.respond { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+
 /* ─── 手牌 ─── */
 .hand { display: flex; gap: 8px; overflow-x: auto; padding: 8px 2px 6px; margin-top: 4px; border-top: 1px solid var(--mat-edge); }
 .empty-hand { color: var(--ink-faint); margin: 8px; }

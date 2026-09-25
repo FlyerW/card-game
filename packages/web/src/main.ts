@@ -28,6 +28,8 @@ const engine = createEngine(db);
 const YOU: PlayerId = 0;
 const BOT: PlayerId = 1;
 const BOT_STEP_MS = 750;
+/** 輪到你回應但沒有瞬發牌可用時，停一下再自動跳過，紀錄才看得清楚。 */
+const AUTO_PASS_MS = 250;
 
 // ─── 狀態 ────────────────────────────────────────────────────────────────────
 
@@ -53,6 +55,8 @@ interface App extends Saved {
   selection: Selection | null;
   busy: boolean;
   toast: string | null;
+  /** 選了「這回合都不回應」的回合編號。 */
+  skipResponsesTurn: number | null;
 }
 
 const app: App = {
@@ -64,6 +68,7 @@ const app: App = {
   selection: null,
   busy: false,
   toast: null,
+  skipResponsesTurn: null,
 };
 
 interface Float {
@@ -112,7 +117,7 @@ function kindLabel(def: DeckCardDef): string {
 let legalCache: { state: GameState; actions: Action[] } | null = null;
 function legal(): Action[] {
   const s = app.state;
-  if (s === null || app.busy || s.phase !== 'main' || s.activePlayer !== YOU) return [];
+  if (s === null || app.busy || s.phase !== 'main' || engine.actor(s) !== YOU) return [];
   if (legalCache?.state !== s) legalCache = { state: s, actions: engine.legalActions(s, YOU) };
   return legalCache.actions;
 }
@@ -179,20 +184,40 @@ function perform(action: Action): void {
     return;
   }
   step(before, result.state, result.events);
-  if (result.state.phase === 'main' && result.state.activePlayer === BOT) void botTurn();
+  void advance();
 }
 
-/** 電腦的回合：一步一步慢慢播，看得清楚它做了什麼。 */
-async function botTurn(): Promise<void> {
+/** 輪到你回應，但手上沒有能用的瞬發牌，或你選了這回合都不回應，就自動跳過。 */
+function shouldAutoPass(s: GameState): boolean {
+  if (s.window !== YOU) return false;
+  if (app.skipResponsesTurn === s.turn) return true;
+  return engine.legalActions(s, YOU).every((a) => a.type === 'pass');
+}
+
+/**
+ * 輪到電腦做決定（它的回合，或它要不要回應你）就讓它一步一步慢慢播，看得清楚它做了什麼；
+ * 輪到你回應但沒得回應就自動跳過；輪到你真的要做決定時停下來。
+ */
+async function advance(): Promise<void> {
   if (app.busy) return;
   app.busy = true;
   render();
-  while (app.state !== null && app.state.phase === 'main' && app.state.activePlayer === BOT) {
-    await sleep(BOT_STEP_MS);
+  while (app.state !== null && app.state.phase === 'main' && app.screen === 'play') {
     const before = app.state;
-    if (before === null || app.screen !== 'play') break;
-    const pick = chooseAction(engine, before, BOT, STYLES.balanced);
-    step(before, pick.state, pick.events);
+    if (engine.actor(before) === BOT) {
+      await sleep(BOT_STEP_MS);
+      if (app.state !== before) break;
+      const pick = chooseAction(engine, before, BOT, STYLES.balanced);
+      step(before, pick.state, pick.events);
+    } else if (shouldAutoPass(before)) {
+      await sleep(AUTO_PASS_MS);
+      if (app.state !== before) break;
+      const passed = engine.apply(before, { type: 'pass', player: YOU });
+      if (!passed.ok) break;
+      step(before, passed.state, passed.events);
+    } else {
+      break;
+    }
   }
   app.busy = false;
   render();
@@ -217,7 +242,7 @@ function startGame(): void {
   }
   const kept = engine.apply(created.state, { type: 'mulligan', player: BOT, cards: [] });
   if (!kept.ok) return;
-  Object.assign(app, { screen: 'play', state: kept.state, log: [], redraw: [], selection: null, toast: null });
+  Object.assign(app, { screen: 'play', state: kept.state, log: [], redraw: [], selection: null, toast: null, skipResponsesTurn: null });
   render();
 }
 
@@ -258,6 +283,46 @@ function lines(texts: string[]): string {
   return `<p class="d-head">${esc(head ?? '')}</p>${body.map((t) => `<p class="d-line">${esc(t)}</p>`).join('')}`;
 }
 
+/** 現在輪到你做決定：你的回合，或輪到你決定要不要回應。 */
+const myMove = (view: PlayerView) => view.phase === 'main' && (view.window ?? view.activePlayer) === YOU && !app.busy;
+
+function targetLabel(view: PlayerView, target: Target): string {
+  const side = target.player === YOU ? view.you : view.opponent;
+  const owner = target.player === YOU ? '你的' : '電腦的';
+  if (target.kind === 'hero') return `${owner}英雄`;
+  if (target.kind === 'field') return `${owner}場地卡`;
+  const cv = side.zones[target.zone];
+  return `${owner} ${ZONE[target.zone]} ${cv ? nameOf(cv.cardId) : ''}`.trim();
+}
+
+/** 等待結算的連鎖，最上面的先結算。 */
+function chainBox(view: PlayerView): string {
+  if (view.chain.length === 0) return '';
+  const items = [...view.chain]
+    .reverse()
+    .map((l) => {
+      const who = l.player === YOU ? '你' : '電腦';
+      const target = l.target ? ` → ${targetLabel(view, l.target)}` : '';
+      return `<li class="${l.player === YOU ? 't-you' : 't-bot'}">${who}：${esc(nameOf(l.cardId))}「${esc(l.ability)}」${esc(target)}</li>`;
+    })
+    .join('');
+  return `<div class="chain"><p class="chain-title">連鎖・上面的先結算</p><ol>${items}</ol></div>`;
+}
+
+/** 輪到你回應時的說明與按鈕。 */
+function responsePrompt(view: PlayerView): string {
+  const top = view.chain.at(-1);
+  const what = top
+    ? `電腦${top.source === 'spell' ? '施放' : '發動'}「${top.ability}」${top.target ? `，目標是${targetLabel(view, top.target)}` : ''}`
+    : view.endingTurn
+      ? '電腦宣告回合結束'
+      : '電腦剛做了一個動作';
+  return `<p class="d-head">要回應嗎？</p>
+    <p class="d-line">${esc(what)}。你有 ${view.you.energy} 點能量，可以用瞬發法術或【瞬發】技能回應；發光的就是能用的。</p>
+    ${view.endingTurn ? '<p class="d-line">這是這回合最後的機會，你的回合開始時能量會重置。</p>' : ''}
+    <div class="respond"><button class="primary" data-do="pass">不回應</button><button class="ghost" data-do="skip-turn">這回合都不回應</button></div>`;
+}
+
 function creatureStatus(cv: CreatureView): string {
   const tags: string[] = [`HP ${cv.hp} / ${cv.maxHp}`];
   if (cv.attackBonus) tags.push(`技能傷害 +${cv.attackBonus}`);
@@ -276,16 +341,18 @@ function detail(view: PlayerView): string {
   const sel = app.selection;
   const toast = app.toast ? `<p class="toast" role="alert">${esc(app.toast)}</p>` : '';
   const cancel = '<button class="ghost" data-do="cancel">取消</button>';
-  const myTurn = view.phase === 'main' && view.activePlayer === YOU && !app.busy;
+  const myTurn = myMove(view);
 
   if (sel === null) {
     if (view.phase === 'over') return toast + '<p class="d-head">對局結束</p>';
+    if (view.window === YOU && myTurn) return toast + responsePrompt(view);
+    if (view.window === BOT) return toast + '<p class="d-head">等電腦決定要不要回應</p><p class="d-line">電腦還有存下來的能量，可以用瞬發牌回應你。</p>';
     if (!myTurn) return toast + '<p class="d-head">電腦的回合</p><p class="d-line">電腦正在行動，右邊的紀錄會一步一步列出它做了什麼。</p>';
     return (
       toast +
       `<p class="d-head">你的回合</p>
        <p class="d-line">點手牌出牌；點你的生物選技能發動；點任何卡可以看說明。</p>
-       <p class="d-line">能量 ${view.you.energy} / ${view.you.maxEnergy}。沒花完的能量會留到對手的回合，你的回合開始時才重置。</p>`
+       <p class="d-line">能量 ${view.you.energy} / ${view.you.maxEnergy}。沒花完的能量會留到對手的回合，可以拿來用瞬發牌回應；你的回合開始時才重置。</p>`
     );
   }
 
@@ -296,6 +363,7 @@ function detail(view: PlayerView): string {
     const acts = actsForCard(sel.uid);
     let hint = '';
     if (!myTurn) hint = '<p class="hint">輪到你的時候才能出牌。</p>';
+    else if (acts.length === 0 && view.window === YOU && !(def.kind === 'spell' && def.instant)) hint = '<p class="hint blocked">回應只能用瞬發法術</p>';
     else if (acts.length === 0) hint = `<p class="hint blocked">${esc(handReason(def, view.you))}</p>`;
     else if (acts.some((a) => a.type === 'summon')) hint = '<p class="hint">點一個空的生物格召喚。</p>';
     else if (acts.some((a) => a.type === 'evolve')) hint = '<p class="hint">點要進化的生物。</p>';
@@ -317,7 +385,12 @@ function detail(view: PlayerView): string {
       body += '<div class="skills">';
       def.skills.forEach((skill, index) => {
         const acts = actsForSkill(sel.zone, index);
-        const reason = myTurn && acts.length === 0 ? skillReason(cv, skill.cost, view.you.energy) : '';
+        const reason =
+          myTurn && acts.length === 0
+            ? view.window === YOU && !skill.instant
+              ? '回應只能用【瞬發】技能'
+              : skillReason(cv, skill.cost, view.you.energy)
+            : '';
         body += `<button class="skill" data-skill="${sel.zone}:${index}" ${acts.length === 0 ? 'disabled' : ''}>
           <span class="skill-cost">${skill.cost}</span><span class="skill-text">${esc(describeAbility(skill))}</span>
           ${reason ? `<span class="skill-why">${esc(reason)}</span>` : ''}</button>`;
@@ -371,7 +444,7 @@ function zone(cv: CreatureView | null, player: PlayerId, index: number, picks: M
     return `<button class="${classes.join(' ')} empty" data-key="${key}" aria-label="${player === YOU ? '你' : '對手'}的 ${ZONE[index]} 空格"><span class="zone-num">${ZONE[index]}</span></button>`;
   }
   const def = card(cv.cardId);
-  const myTurn = view.phase === 'main' && view.activePlayer === YOU && !app.busy;
+  const myTurn = myMove(view);
   if (player === YOU && myTurn && def.kind === 'creature' && def.skills.some((_, i) => actsForSkill(index, i).length > 0)) classes.push('ready');
   if (player === YOU && (cv.skillUsedThisTurn || cv.summonedThisTurn) && view.activePlayer === YOU) classes.push('spent');
   if (cv.taunting) classes.push('taunt');
@@ -506,20 +579,29 @@ function overlay(view: PlayerView): string {
 function playScreen(): string {
   const view = engine.viewFor(app.state!, YOU);
   const picks = choices();
-  const myTurn = view.phase === 'main' && view.activePlayer === YOU && !app.busy;
+  const myTurn = myMove(view);
+  const waiting = view.window === YOU ? '・等你回應' : view.window === BOT ? '・電腦考慮回應' : '';
   const banner =
-    view.phase === 'mulligan' ? '起手' : view.phase === 'over' ? '對局結束' : `第 ${view.turn} 回合・${view.activePlayer === YOU ? '你的回合' : '電腦的回合'}`;
+    view.phase === 'mulligan'
+      ? '起手'
+      : view.phase === 'over'
+        ? '對局結束'
+        : `第 ${view.turn} 回合・${view.activePlayer === YOU ? '你的回合' : '電腦的回合'}${waiting}`;
+  const turnButton =
+    view.window === YOU
+      ? `<button class="end-turn respond-btn" data-do="pass" ${myTurn ? '' : 'disabled'}>不回應</button>`
+      : `<button class="end-turn" data-do="end" ${myTurn && view.window === null ? '' : 'disabled'}>結束回合</button>`;
   const log = app.log.map((l) => `<li class="t-${l.tone}">${esc(l.text)}</li>`).join('');
   return `<div class="table">
     <section class="board${picks.size ? ' targeting' : ''}" aria-label="牌桌">
       ${sideRows(view.opponent, BOT, picks, view)}
       <div class="midline"><span class="turn">${banner}</span>
-        <button class="end-turn" data-do="end" ${myTurn ? '' : 'disabled'}>結束回合</button></div>
+        ${turnButton}</div>
       ${sideRows(view.you, YOU, picks, view)}
       ${hand(view)}
     </section>
     <aside class="panel">
-      <div class="detail">${detail(view)}</div>
+      <div class="detail">${chainBox(view)}${detail(view)}</div>
       <div class="log-wrap"><p class="log-title">對戰紀錄</p><ol class="log">${log}</ol></div>
       <button class="ghost small" data-do="concede" ${view.phase === 'main' ? '' : 'disabled'}>投降</button>
     </aside>
@@ -652,6 +734,11 @@ root.addEventListener('click', (event) => {
     perform({ type: 'mulligan', player: YOU, cards });
   } else if (command === 'end') {
     perform({ type: 'endTurn', player: YOU });
+  } else if (command === 'pass') {
+    perform({ type: 'pass', player: YOU });
+  } else if (command === 'skip-turn' && app.state) {
+    app.skipResponsesTurn = app.state.turn;
+    perform({ type: 'pass', player: YOU });
   } else if (command === 'concede') {
     perform({ type: 'concede', player: YOU });
   } else if (command === 'power') {
@@ -687,7 +774,7 @@ hot?.snapshot?.(() => ({ screen: app.screen, heroId: app.heroId, state: app.stat
 function start(data: Partial<Saved>): void {
   Object.assign(app, data);
   render();
-  if (app.state?.phase === 'main' && app.state.activePlayer === BOT) void botTurn();
+  void advance();
 }
 
 if (hot?.ready) hot.ready(start);

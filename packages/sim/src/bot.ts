@@ -89,21 +89,38 @@ export function evaluate(db: CardDb, state: GameState, me: PlayerId, style: BotS
 }
 
 /**
+ * 假設雙方都不回應，把等待中的連鎖結算完。
+ * 宣告的效果要等回應結束才結算，評分時看的是結算完的局面。
+ */
+export function assumePasses(engine: Engine, state: GameState): GameState {
+  let current = state;
+  while (current.window !== null && current.phase === 'main') {
+    const result = engine.apply(current, { type: 'pass', player: current.window });
+    if (!result.ok) throw new Error(result.error.message);
+    current = result.state;
+  }
+  return current;
+}
+
+/**
  * 貪婪策略：把每個合法動作都試一遍，挑讓局面分數最高的那個；
- * 沒有任何動作能讓局面變好，就結束回合。只看一步，不預測對手下回合會怎麼打。
+ * 沒有任何動作能讓局面變好，就結束回合（等待回應時就是不回應）。
+ * 只看一步，不預測對手下回合會怎麼打，也假設對手不會回應。
  */
 export function chooseAction(engine: Engine, state: GameState, me: PlayerId, style: BotStyle): Successor {
   const options = engine.successors(state, me);
-  const endTurn = options.find((option) => option.action.type === 'endTurn');
+  const fallback = options.find((option) => option.action.type === 'endTurn' || option.action.type === 'pass');
+  const score = (next: GameState) => evaluate(engine.db, assumePasses(engine, next), me, style);
   let best: Successor | undefined;
-  let bestScore = evaluate(engine.db, state, me, style) + 1e-9; // 必須嚴格變好
+  // 必須比什麼都不做嚴格變好。等待回應時，什麼都不做就是不回應、讓連鎖結算。
+  let bestScore = (state.window === me && fallback ? score(fallback.state) : evaluate(engine.db, state, me, style)) + 1e-9;
   for (const option of options) {
-    if (option.action.type === 'endTurn') continue;
-    const score = evaluate(engine.db, option.state, me, style);
-    if (score > bestScore) {
+    if (option === fallback) continue;
+    const value = score(option.state);
+    if (value > bestScore) {
       best = option;
-      bestScore = score;
+      bestScore = value;
     }
   }
-  return best ?? endTurn ?? options[0]!;
+  return best ?? fallback ?? options[0]!;
 }

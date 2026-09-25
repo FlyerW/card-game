@@ -36,12 +36,21 @@ export function start(opts: { seed?: number; deckSize?: number; filler?: string 
   return { state, a: state.activePlayer, b: other(state.activePlayer) };
 }
 
-/** 執行動作，預期成功，回傳新狀態。 */
-export function act(state: GameState, action: Action): GameState {
+/** 執行動作，預期成功，回傳新狀態。停在等待回應的地方，給測試即時回應用。 */
+export function declare(state: GameState, action: Action): GameState {
   const result = engine.apply(state, action);
   if (!result.ok) throw new Error(`${action.type} 被拒絕：${result.error.code} ${result.error.message}`);
   return result.state;
 }
+
+/** 雙方都不回應，直到不再等待回應為止。 */
+export function passAll(state: GameState): GameState {
+  while (state.window !== null && state.phase === 'main') state = declare(state, { type: 'pass', player: state.window });
+  return state;
+}
+
+/** 執行動作，預期成功，而且對手不回應，回傳結算完的狀態。 */
+export const act = (state: GameState, action: Action): GameState => passAll(declare(state, action));
 
 /** 執行動作，預期被拒絕，回傳錯誤碼。狀態不會被改動。 */
 export function reject(state: GameState, action: Action): string {

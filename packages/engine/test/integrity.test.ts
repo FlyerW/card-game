@@ -39,6 +39,7 @@ function checkInvariants(state: GameState): void {
     }
     if (p.field !== null) cards.push(p.field);
     if (p.heroEvolution !== null) cards.push(p.heroEvolution);
+    for (const pending of state.chain) if (pending.player === player && pending.card !== null) cards.push(pending.card);
     expect(cards).toHaveLength(DECK_SIZE); // 卡片不會憑空出現或消失
     uids.push(...cards.map((card) => card.uid));
     expect(p.energy).toBeGreaterThanOrEqual(0);
@@ -46,6 +47,7 @@ function checkInvariants(state: GameState): void {
   }
   expect(new Set(uids).size).toBe(uids.length); // 同一張卡不會出現在兩個地方
   expect(state.phase === 'over').toBe(state.result !== null);
+  if (state.window === null) expect(state.chain).toEqual([]); // 沒在等回應時，連鎖一定結算完了
 }
 
 function playRandomGame(seed: number) {
@@ -63,9 +65,10 @@ function playRandomGame(seed: number) {
   let rng = seed;
 
   while (state.phase !== 'over' && actions.length < 3000) {
-    const player = state.phase === 'mulligan' ? (state.players[0].mulliganDone ? 1 : 0) : state.activePlayer;
+    const player = engine.actor(state);
     const legal = engine.legalActions(state, player);
-    expect(legal.length).toBeGreaterThan(0); // 永遠至少能結束回合
+    expect(legal.length).toBeGreaterThan(0); // 永遠至少能結束回合或不回應
+    if (state.phase === 'main') expect(engine.legalActions(state, player === 0 ? 1 : 0)).toEqual([]); // 另一方這時不能動
     const [value, next] = nextRandom(rng);
     rng = next;
     const action = legal[Math.floor(value * legal.length)]!;

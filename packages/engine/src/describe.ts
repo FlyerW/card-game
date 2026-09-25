@@ -72,7 +72,8 @@ export function describeEffect(effect: Effect): string {
 export function describeAbility(ability: Ability): string {
   const target = describeTarget(ability.target);
   const effects = ability.effects.map(describeEffect).join('，');
-  return `${ability.name}（${ability.cost}）：${target === null ? '' : `〔${target}〕`}${effects}`;
+  const instant = ability.instant ? '【瞬發】' : '';
+  return `${instant}${ability.name}（${ability.cost}）：${target === null ? '' : `〔${target}〕`}${effects}`;
 }
 
 /** 「我方生物 HP 上限 +2、技能傷害 +1」這類持續加成的說明。 */
@@ -107,7 +108,7 @@ export function describeCard(card: DeckCardDef, names: (id: string) => string = 
       return [`${card.name}　${tag}・${stage}${from}｜${cost}｜HP ${card.hp}${keywords}`, ...entry, ...card.skills.map(describeAbility)];
     }
     case 'spell':
-      return [`${card.name}　${tag}・法術`, describeAbility({ ...card })];
+      return [`${card.name}　${tag}・${card.instant ? '瞬發法術' : '法術'}`, describeAbility({ ...card, instant: false })];
     case 'item':
       return [`${card.name}　${tag}・道具（${card.cost}）`, `這隻生物${describeModifier(card).join('、')}`];
     case 'field':

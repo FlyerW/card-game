@@ -95,6 +95,10 @@ export function cleanup(ctx: Ctx): void {
   else if (defeated.length === 1) endGame(ctx, { winner: other(defeated[0]!), reason: 'heroDefeated' });
 }
 
+/** 目標格子現在那隻生物的 uid。 */
+export const targetCreatureUid = (state: GameState, target: Target | null): number | null =>
+  target?.kind === 'creature' ? (state.players[target.player].zones[target.zone]?.uid ?? null) : null;
+
 /** 目標生物還在原本的格子、而且是同一隻，才回傳牠；前一個效果打死了就回傳 null。 */
 function liveCreature(state: GameState, target: Target | null, uid: number | null): Creature | null {
   if (target?.kind !== 'creature') return null;
@@ -333,12 +337,19 @@ function applyEffect(
   }
 }
 
-/** 依序結算一個技能、天生技或法術的每個效果。 */
-export function resolveAbility(ctx: Ctx, ability: Ability, source: AbilitySource, target: Target | null): void {
+/**
+ * 依序結算一個技能、天生技或法術的每個效果。
+ * targetUid 是宣告時目標生物的 uid；結算時那一格換成別隻（或空了），針對它的效果就不發動。
+ */
+export function resolveAbility(
+  ctx: Ctx,
+  ability: Ability,
+  source: AbilitySource,
+  target: Target | null,
+  targetUid: number | null = targetCreatureUid(ctx.state, target),
+): void {
   const { state } = ctx;
   const sourceCreature = source.kind === 'creature' ? (state.players[source.player].zones[source.zone] ?? null) : null;
-  const targetUid =
-    target?.kind === 'creature' ? (state.players[target.player].zones[target.zone]?.uid ?? null) : null;
   for (const effect of ability.effects) {
     if (state.phase === 'over') return;
     applyEffect(ctx, effect, source, sourceCreature, target, targetUid);
