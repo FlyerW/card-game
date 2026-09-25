@@ -167,7 +167,7 @@ function inflict(ctx: Ctx, creature: Creature, player: PlayerId, zone: number, e
       status = 'paralysis';
       break;
     case 'sleep':
-      creature.asleepUntilTurn = ownersTurn(state, creature.owner, 2);
+      creature.asleepUntilTurn = ownersTurn(state, creature.owner, 1);
       status = 'sleep';
       break;
   }

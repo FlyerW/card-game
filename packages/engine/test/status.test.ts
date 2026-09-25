@@ -92,28 +92,24 @@ describe('沉睡', () => {
     place(state, a, 1, 'hitter');
     place(state, b, 0, 'taunter');
     state.players[a].energy = 5;
-    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 1, target: creatureAt(b, 0) });
+    const asleep = act(state, { type: 'useSkill', player: a, zone: 0, skill: 1, target: creatureAt(b, 0) });
+    expect(reject(endTurn(asleep), { type: 'useSkill', player: b, zone: 0, skill: 0 })).toBe('ASLEEP');
 
-    state = endTurn(state);
-    expect(reject(state, { type: 'useSkill', player: b, zone: 0, skill: 0 })).toBe('ASLEEP');
-
-    state = endTurn(state);
-    state = act(state, { type: 'useSkill', player: a, zone: 1, skill: 0, target: creatureAt(b, 0) });
+    // 同一個回合再打牠一下，牠就醒了，自己的回合照常發動技能。
+    state = act(asleep, { type: 'useSkill', player: a, zone: 1, skill: 0, target: creatureAt(b, 0) });
     expect(at(state, b, 0)!.asleepUntilTurn).toBeNull();
     state = endTurn(state);
     act(state, { type: 'useSkill', player: b, zone: 0, skill: 0 });
   });
 
-  it('沒被打的話，最多持續擁有者的 2 個回合', () => {
+  it('沒被打的話，持續到擁有者的下一個回合結束', () => {
     let { state, a, b } = start({ deckSize: 60 });
     place(state, a, 0, 'mesmer');
     place(state, b, 0, 'taunter');
     state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 1, target: creatureAt(b, 0) });
     state = endTurn(state); // b 第 1 個回合
     expect(reject(state, { type: 'useSkill', player: b, zone: 0, skill: 0 })).toBe('ASLEEP');
-    state = endTurn(endTurn(state)); // b 第 2 個回合
-    expect(reject(state, { type: 'useSkill', player: b, zone: 0, skill: 0 })).toBe('ASLEEP');
-    state = endTurn(endTurn(state)); // b 第 3 個回合：醒了
+    state = endTurn(endTurn(state)); // b 第 2 個回合：醒了
     act(state, { type: 'useSkill', player: b, zone: 0, skill: 0 });
   });
 

@@ -69,7 +69,7 @@ export function describeEffect(effect: Effect): string {
     case 'paralyze':
       return `${effect.all ? '對手每隻生物' : ''}麻痺（到牠的下個回合結束前不能發動技能）`;
     case 'sleep':
-      return `${effect.all ? '對手每隻生物' : ''}沉睡（不能發動技能，受到傷害就醒；最多 2 個回合）`;
+      return `${effect.all ? '對手每隻生物' : ''}沉睡（到牠的下個回合結束前不能發動技能，受到傷害就醒）`;
   }
 }
 

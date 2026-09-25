@@ -91,7 +91,7 @@ export type Effect =
   | { type: 'burn'; amount: number; all?: boolean }
   /** 麻痺：不能發動技能，直到擁有者的下一個回合結束。 */
   | { type: 'paralyze'; all?: boolean }
-  /** 沉睡：不能發動技能；受到傷害就醒來，最多持續擁有者的 2 個回合。 */
+  /** 沉睡：不能發動技能，直到擁有者的下一個回合結束；受到傷害就提早醒來。 */
   | { type: 'sleep'; all?: boolean };
 
 /** 異常狀態的種類。 */
