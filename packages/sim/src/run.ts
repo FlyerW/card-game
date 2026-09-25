@@ -2,7 +2,7 @@
 // 用法：npm run sim -- [--games 2000] [--workers 16]
 // 結果寫到 docs/balance-results.md。
 
-import { SAMPLE_CARDS } from '@card-game/engine';
+import { SAMPLE_CARDS, SAMPLE_HEROES } from '@card-game/engine';
 import { writeFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { Worker } from 'node:worker_threads';
@@ -18,6 +18,8 @@ const arg = (name: string, fallback: number) => {
 const GAMES = arg('games', 2000);
 const WORKERS = arg('workers', Math.max(1, Math.min(16, availableParallelism() - 4)));
 const CHUNK = 100;
+/** 每組實驗打幾局：英雄對戰只打一半，組數多，而且只要看出明顯的強弱。 */
+const gamesFor = (experiment: Experiment) => Math.round(GAMES * (experiment.share ?? 1));
 
 /** Wilson 信賴區間：比直接用 p ± 1.96·√(p(1−p)/n) 在樣本不大時更準。 */
 function wilson(successes: number, n: number, z = 1.96): [number, number] {
@@ -36,6 +38,9 @@ interface Summary {
   games: number;
   firstWinRate: number;
   ci: [number, number];
+  /** 英雄對戰：列在前面那個英雄（玩家 0）的勝率。 */
+  heroWinRate: number;
+  heroCi: [number, number];
   draws: number;
   deckOuts: number;
   meanTurns: number;
@@ -56,6 +61,7 @@ interface Summary {
 function summarize(experiment: Experiment, outcomes: MatchOutcome[]): Summary {
   const decisive = outcomes.filter((o) => o.result.winner !== 'draw');
   const firstWins = decisive.filter((o) => o.result.winner === o.firstPlayer).length;
+  const heroWins = decisive.filter((o) => o.result.winner === 0).length;
   const turns = outcomes.map((o) => o.turns).sort((x, y) => x - y);
   const winnerHps = decisive.map((o) => o.winnerHeroHp!);
   return {
@@ -63,6 +69,8 @@ function summarize(experiment: Experiment, outcomes: MatchOutcome[]): Summary {
     games: outcomes.length,
     firstWinRate: firstWins / decisive.length,
     ci: wilson(firstWins, decisive.length),
+    heroWinRate: heroWins / decisive.length,
+    heroCi: wilson(heroWins, decisive.length),
     draws: outcomes.length - decisive.length,
     deckOuts: outcomes.filter((o) => o.result.reason === 'deckOut').length,
     meanTurns: turns.reduce((sum, t) => sum + t, 0) / turns.length,
@@ -88,9 +96,11 @@ function minutes(outcomes: MatchOutcome[]) {
 
 async function run(): Promise<MatchOutcome[][]> {
   const tasks: Task[] = [];
-  EXPERIMENTS.forEach((_, experiment) => {
-    for (let from = 0; from < GAMES; from += CHUNK) tasks.push({ experiment, from, to: Math.min(GAMES, from + CHUNK) });
+  EXPERIMENTS.forEach((each, experiment) => {
+    const games = gamesFor(each);
+    for (let from = 0; from < games; from += CHUNK) tasks.push({ experiment, from, to: Math.min(games, from + CHUNK) });
   });
+  const total = EXPERIMENTS.reduce((sum, each) => sum + gamesFor(each), 0);
   const results: MatchOutcome[][] = EXPERIMENTS.map(() => []);
   let done = 0;
   const started = Date.now();
@@ -110,7 +120,6 @@ async function run(): Promise<MatchOutcome[][]> {
         worker.on('message', (result: TaskResult) => {
           results[result.experiment]!.push(...result.outcomes);
           done += result.outcomes.length;
-          const total = GAMES * EXPERIMENTS.length;
           process.stderr.write(`\r${done}/${total} 局（${((Date.now() - started) / 1000).toFixed(0)} 秒）`);
           next();
         });
@@ -140,11 +149,26 @@ function report(summaries: Summary[], seconds: number): string {
     '| 英雄 | HP | 先攻勝率 | 95% 信賴區間 | 判讀 | 平均回合數 | 平均動作數 | 要決定的回應 | 預估時間 | 時間 10–90% | 5–10 分鐘 | 勝方剩餘 HP |\n' +
     '|---|---|---|---|---|---|---|---|---|---|---|---|';
   const simHero = (s: Summary) => s.experiment.heroId === undefined;
+  const matchup = (s: Summary) => s.experiment.opponentId !== undefined;
+  const side = (s: Summary) => (s.heroCi[0] > 0.5 ? '前者有利' : s.heroCi[1] < 0.5 ? '後者有利' : '看不出差距');
+  const matchupRow = (s: Summary) =>
+    `| ${s.experiment.label} | **${pct(s.heroWinRate)}** | ${pct(s.heroCi[0])} – ${pct(s.heroCi[1])} | ${side(s)} | ` +
+    `${s.meanTurns.toFixed(1)} | ${s.medianMinutes.toFixed(1)} 分 |`;
+  const matchupHeader = '| 對戰 | 前者勝率 | 95% 信賴區間 | 判讀 | 平均回合數 | 預估時間 |\n|---|---|---|---|---|---|';
+  const winRates = SAMPLE_HEROES.map((hero) => {
+    const games = summaries.filter(matchup).flatMap((s) => {
+      if (s.experiment.heroId === hero.id) return [{ rate: s.heroWinRate, n: s.games }];
+      if (s.experiment.opponentId === hero.id) return [{ rate: 1 - s.heroWinRate, n: s.games }];
+      return [];
+    });
+    const n = games.reduce((sum, g) => sum + g.n, 0);
+    return { hero, rate: games.reduce((sum, g) => sum + g.rate * g.n, 0) / n };
+  }).sort((x, y) => y.rate - x.rate);
   const energy = summaries.filter((s) => simHero(s) && s.experiment.heroHp === BASE_HP);
   const hp = summaries
     .filter((s) => simHero(s) && s.experiment.id.startsWith('new/balanced/'))
     .sort((x, y) => x.experiment.heroHp - y.experiment.heroHp);
-  const heroes = summaries.filter((s) => !simHero(s));
+  const heroes = summaries.filter((s) => !simHero(s) && !matchup(s));
   const draws = summaries.reduce((sum, s) => sum + s.draws, 0);
   const deckOuts = summaries.reduce((sum, s) => sum + s.deckOuts, 0);
   const total = summaries.reduce((sum, s) => sum + s.games, 0);
@@ -152,7 +176,7 @@ function report(summaries: Summary[], seconds: number): string {
   return [
     '# 平衡模擬結果',
     '',
-    `> 由 \`npm run sim\` 產生，請勿手動編輯。每組 ${GAMES} 局，共 ${total} 局，耗時 ${seconds.toFixed(0)} 秒。`,
+    `> 由 \`npm run sim\` 產生，請勿手動編輯。每組 ${GAMES} 局（英雄對戰每組 ${Math.round(GAMES / 2)} 局），共 ${total} 局，耗時 ${seconds.toFixed(0)} 秒。`,
     '',
     '## 環境',
     '',
@@ -192,6 +216,15 @@ function report(summaries: Summary[], seconds: number): string {
     '',
     heroHeader,
     ...heroes.map(heroRow),
+    '',
+    `## 英雄對戰（新制、均衡打法、各自的卡池，每組 ${Math.round(GAMES / 2)} 局）`,
+    '',
+    '兩個範例卡的英雄各用自己能用的卡組牌對打，先後手隨機。看哪個英雄、哪個顏色太強或太弱。',
+    '',
+    matchupHeader,
+    ...summaries.filter(matchup).map(matchupRow),
+    '',
+    `對其他英雄的平均勝率：${winRates.map((w) => `${w.hero.name} ${pct(w.rate)}`).join('、')}。`,
     '',
     '## 其他',
     '',

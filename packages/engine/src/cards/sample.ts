@@ -83,8 +83,10 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
 
   // ── 紅色進化線：N → R → SR ──
   {
+    // 進化時的進場效果算在本體裡：2 傷害約 1 能量，HP 少 2。
     kind: 'creature', id: 'ember-fox-king', name: '焰狐王', rarity: 'R', colors: ['red'],
-    stage: 1, evolvesFrom: 'ember-fox', cost: 3, hp: 13,
+    stage: 1, evolvesFrom: 'ember-fox', cost: 3, hp: 11,
+    entry: { name: '狐火彈', target: ANY, effects: [{ type: 'damage', amount: 2 }] },
     skills: [
       { name: '狐火', cost: 2, target: DIAGONAL, effects: [{ type: 'damage', amount: 7 }, { type: 'draw', count: 1 }] },
       hit('燃魂', 3, HERO, 8),
@@ -92,7 +94,8 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'nine-tailed-fox', name: '九尾天狐', rarity: 'SR', colors: ['red'],
-    stage: 2, evolvesFrom: 'ember-fox-king', cost: 4, hp: 23,
+    stage: 2, evolvesFrom: 'ember-fox-king', cost: 4, hp: 21,
+    entry: { name: '九焰', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] },
     skills: [
       {
         name: '燎天', cost: 4, target: NONE,
@@ -439,22 +442,35 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   },
 
   // ── 英雄進化：每局限一次，費用約 5–7 ──
+  // 像爐石的英雄卡：打出時有進場效果（戰吼），天生技變強或多一個被動。
   {
     kind: 'heroEvolution', id: 'flame-sovereign', name: '烈焰君王', rarity: 'SR', colors: ['red'],
     cost: 6, evolvesFrom: 'flame-lord', hpBonus: 6,
-    power: hit('煉獄', 2, ANY, 3),
+    entry: { name: '焚城', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] },
+    power: hit('煉獄', 2, ANY, 4),
   },
   {
     kind: 'heroEvolution', id: 'world-tree-king', name: '萬木之王', rarity: 'SR', colors: ['green'],
     cost: 5, evolvesFrom: 'forest-king', hpBonus: 8,
+    entry: { name: '萬木回春', target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }] },
     passive: { name: '萬木', creatures: { hp: 1 } },
   },
   {
     kind: 'heroEvolution', id: 'sword-saint', name: '無名劍聖', rarity: 'SR', colors: ['white'],
     cost: 6, evolvesFrom: 'nameless-swordsman', hpBonus: 7,
+    entry: { name: '劍陣', target: ALLY_CREATURE, effects: [{ type: 'buff', attack: 2, hp: 2, on: 'target' }] },
     power: {
       name: '劍意', cost: 2, target: { kind: 'ally', allow: 'creature' },
       effects: [{ type: 'buff', attack: 2, hp: 0, on: 'target' }],
+    },
+  },
+  {
+    kind: 'heroEvolution', id: 'tide-shadow-sovereign', name: '潮影君主', rarity: 'SR', colors: ['blue', 'black'],
+    cost: 6, evolvesFrom: 'tide-shadow-twins', hpBonus: 6,
+    entry: { name: '潮汐吞噬', target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 2 }] },
+    power: {
+      name: '深淵低語', cost: 2, target: NONE,
+      effects: [{ type: 'opponentDiscardRandom', count: 1 }, { type: 'draw', count: 1 }],
     },
   },
 

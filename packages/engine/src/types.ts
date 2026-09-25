@@ -175,6 +175,8 @@ export interface HeroEvolutionDef extends CardBase {
   power?: Ability;
   /** 額外多一個被動，跟原本的被動同時生效。 */
   passive?: HeroPassive;
+  /** 進場效果：打出這張卡時發動，像爐石英雄卡的戰吼。不另外花能量。 */
+  entry?: EntryEffect;
 }
 
 export type DeckCardDef = CreatureDef | SpellDef | ItemDef | FieldDef | HeroEvolutionDef;
@@ -341,7 +343,7 @@ export type Action =
   | { type: 'evolve'; player: PlayerId; card: number; zone: number; target?: Target }
   | { type: 'useSkill'; player: PlayerId; zone: number; skill: number; target?: Target }
   | { type: 'heroPower'; player: PlayerId; target?: Target }
-  | { type: 'evolveHero'; player: PlayerId; card: number }
+  | { type: 'evolveHero'; player: PlayerId; card: number; target?: Target }
   | { type: 'castSpell'; player: PlayerId; card: number; target?: Target }
   | { type: 'attachItem'; player: PlayerId; card: number; zone: number }
   | { type: 'playField'; player: PlayerId; card: number }

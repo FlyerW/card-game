@@ -141,7 +141,7 @@ function choices(): Map<string, Action> {
     // 同一格可能對應好幾個動作（進場效果的不同目標），先記第一個，點下去時再決定要不要進入選目標。
     if (a.type === 'summon' || a.type === 'evolve' || a.type === 'attachItem') {
       if (!map.has(`z${YOU}${a.zone}`)) map.set(`z${YOU}${a.zone}`, a);
-    } else if ((a.type === 'castSpell' || a.type === 'useSkill' || a.type === 'heroPower') && a.target) {
+    } else if ((a.type === 'castSpell' || a.type === 'useSkill' || a.type === 'heroPower' || a.type === 'evolveHero') && a.target) {
       map.set(targetKey(a.target), a);
     }
   }
@@ -367,6 +367,7 @@ function detail(view: PlayerView): string {
     else if (acts.some((a) => a.type === 'evolve')) hint = '<p class="hint">點要進化的生物。</p>';
     else if (acts.some((a) => a.type === 'attachItem')) hint = '<p class="hint">點你要裝上道具的生物。</p>';
     else if (acts.some((a) => a.type === 'playField')) hint = '<button class="primary" data-do="direct">放到場地區</button>';
+    else if (acts.some((a) => a.type === 'evolveHero' && a.target)) hint = '<p class="hint">點選進場效果的目標，英雄就會進化。</p>';
     else if (acts.some((a) => a.type === 'evolveHero')) hint = '<button class="primary" data-do="direct">進化英雄</button>';
     else if (acts.some((a) => a.type === 'castSpell' && !a.target)) hint = '<button class="primary" data-do="direct">施放</button>';
     else hint = '<p class="hint">點選法術的目標。</p>';

@@ -36,6 +36,7 @@ import type {
   CardRef,
   GameEvent,
   GameState,
+  HeroEvolutionDef,
   PlayerId,
   PlayerState,
   Rules,
@@ -412,7 +413,27 @@ function evolveHero(ctx: Ctx, a: ActionOf<'evolveHero'>): void {
   p.heroEvolution = card;
   ctx.events.push({ type: 'heroEvolved', player: a.player, cardId: card.cardId });
   cleanup(ctx);
-  declared(ctx, a.player, null);
+  declared(ctx, a.player, heroEntryLink(ctx, def, a.player, a.target));
+}
+
+/**
+ * 英雄進化卡的進場效果，像爐石英雄卡的戰吼。跟生物的進場效果一樣放上連鎖、有目標就必須選；
+ * 沒有合法目標時英雄照樣進化，只是效果不發動。英雄不會離場，所以一定會結算。
+ */
+function heroEntryLink(ctx: Ctx, def: HeroEvolutionDef, player: PlayerId, chosen: Target | undefined): ChainLink | null {
+  if (def.entry === undefined) {
+    if (chosen !== undefined) fail('TARGET_NOT_ALLOWED', `${def.name} 沒有進場效果，不需要指定目標`);
+    return null;
+  }
+  const ability: Ability = { ...def.entry, cost: 0 };
+  const source: AbilitySource = { kind: 'hero', player };
+  if (ability.target.kind !== 'none' && legalTargets(ctx.state, ability, source).length === 0) {
+    if (chosen !== undefined) fail('ILLEGAL_TARGET', `「${ability.name}」現在沒有可以指定的目標`);
+    return null;
+  }
+  const target = chooseTarget(ctx, ability, source, chosen);
+  ctx.events.push({ type: 'abilityUsed', player, source: 'entry', cardId: def.id, ability: ability.name });
+  return link(ctx, { player, source: 'hero', zone: null, sourceUid: null, cardId: def.id, ability, target, card: null });
 }
 
 function castSpell(ctx: Ctx, a: ActionOf<'castSpell'>): void {
@@ -689,7 +710,10 @@ export function createEngine(db: CardDb) {
       } else if (def.kind === 'field') {
         candidates.push({ type: 'playField', player, card: card.uid });
       } else {
-        candidates.push({ type: 'evolveHero', player, card: card.uid });
+        const entry = def.entry;
+        const targets = entry && entry.target.kind !== 'none' ? legalTargets(state, { ...entry, cost: 0 }, { kind: 'hero', player }) : [];
+        if (targets.length === 0) candidates.push({ type: 'evolveHero', player, card: card.uid });
+        for (const target of targets) candidates.push({ type: 'evolveHero', player, card: card.uid, target });
       }
     }
     skills(false);

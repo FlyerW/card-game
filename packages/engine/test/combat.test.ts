@@ -323,6 +323,24 @@ describe('英雄進化', () => {
     expect(state.players[b].heroDamage).toBe(4);
   });
 
+  it('進場效果：打出時發動，要選目標；沒有合法目標也能進化', () => {
+    let { state, a, b } = pingerGame();
+    place(state, b, 0, 'hitter');
+    const card = give(state, a, 'pinger-flare');
+    expect(reject(state, { type: 'evolveHero', player: a, card: give(state, a, 'pinger-flare'), target: hero(b) })).toBe('ILLEGAL_TARGET');
+    const options = engine.legalActions(state, a).filter((action) => action.type === 'evolveHero' && action.card === card);
+    expect(options).toEqual([{ type: 'evolveHero', player: a, card, target: creatureAt(b, 0) }]);
+    state = act(state, options[0]!);
+    expect(at(state, b, 0)!.damage).toBe(4);
+    expect(heroMaxHp(db, state, a)).toBe(51);
+
+    // 對手場上沒有生物：照樣進化，效果不發動
+    let empty = pingerGame().state;
+    const a2 = empty.activePlayer;
+    empty = act(empty, { type: 'evolveHero', player: a2, card: give(empty, a2, 'pinger-flare') });
+    expect(empty.players[a2].heroEvolution?.cardId).toBe('pinger-flare');
+  });
+
   it('每局只能進化一次', () => {
     let { state, a } = pingerGame();
     state = act(state, { type: 'evolveHero', player: a, card: give(state, a, 'pinger-plus') });

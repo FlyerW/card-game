@@ -129,6 +129,7 @@ function checkCard(
       }
       if (!Number.isInteger(card.hpBonus) || card.hpBonus < 0) problems.push(`${where}：hpBonus 必須是非負整數`);
       if (card.power) problems.push(...checkAbility(card.power, where, false));
+      if (card.entry) problems.push(...checkAbility({ ...card.entry, cost: 0 }, `${where}的進場效果`, false));
       problems.push(...checkModifier(card.passive?.creatures, where));
       break;
     }

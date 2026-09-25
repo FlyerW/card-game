@@ -138,6 +138,13 @@ export const TEST_CARDS: DeckCardDef[] = [
     passive: { name: 'fury', creatures: { attack: 1 } },
   },
 
+  // 有進場效果的英雄進化卡，像爐石英雄卡的戰吼
+  {
+    kind: 'heroEvolution', id: 'pinger-flare', name: 'pinger-flare', rarity: 'SR', colors: ['red'],
+    cost: 3, evolvesFrom: 'pinger', hpBonus: 5,
+    entry: { name: 'flare', target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'damage', amount: 4 }] },
+  },
+
   // 顏色測試
   creature('red-imp', [hit('x', ANY, 1), hit('y', ANY, 1)], { colors: ['red'] }),
   creature('gold-griffin', [hit('x', ANY, 1), hit('y', ANY, 1)], { colors: ['red', 'green'] }),

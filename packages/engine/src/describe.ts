@@ -114,7 +114,9 @@ export function describeCard(card: DeckCardDef, names: (id: string) => string = 
     case 'field':
       return [`${card.name}　${tag}・場地（${card.cost}）`, describeOwnEffects(card.creatures, card.ceilingBonus)];
     case 'heroEvolution': {
-      const lines = [`${card.name}　${tag}・英雄進化（${card.cost}）｜由${names(card.evolvesFrom)}進化`, `英雄 HP 上限 +${card.hpBonus}`];
+      const lines = [`${card.name}　${tag}・英雄進化（${card.cost}）｜由${names(card.evolvesFrom)}進化`];
+      if (card.entry) lines.push(`進場 ${describeAbility({ ...card.entry, cost: 0 }).replace('（0）', '')}`);
+      lines.push(`英雄 HP 上限 +${card.hpBonus}`);
       if (card.power) lines.push(`天生技換成 ${describeAbility(card.power)}`);
       if (card.passive) lines.push(`多一個${describePassive(card.passive)}`);
       lines.push('每局只能進化一次');
