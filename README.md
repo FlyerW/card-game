@@ -4,10 +4,13 @@
 召喚生物、使用技能、施放法術都從池裡付費；每位玩家有一名英雄，英雄的顏色決定牌組能放哪些卡，
 英雄被打倒就輸。遊戲名稱暫定。
 
+> **這是大縮模實驗分支**（`claude/hearthstone-scale`）：生物有攻擊力，每回合可以免費攻擊（會被反擊）或花能量發動技能，
+> 數字縮小到跟爐石差不多。規則見 [docs/design.md 的「大縮模實驗」](docs/design.md#大縮模實驗這個分支)。
+
 ## 目前進度
 
 - [x] 規則設計：[docs/design.md](docs/design.md)（v0.8）
-- [x] 規則引擎：[`packages/engine`](packages/engine)，包括異常狀態、吸血與再生；全部 164 個測試
+- [x] 規則引擎：[`packages/engine`](packages/engine)，包括異常狀態、吸血與再生；全部 181 個測試
 - [x] 平衡模擬：[`packages/sim`](packages/sim)，讓機器人大量對打，比較不同規則、估算一局要打多久。結果見 [docs/balance-results.md](docs/balance-results.md)
 - [x] 網頁試玩版：[`packages/web`](packages/web)，跟電腦對戰，可以自己組牌。引擎和電腦對手都在瀏覽器裡跑，不需要伺服器
 - [x] 伺服器：兩人連線對戰（[`packages/server`](packages/server)），見下面「跟朋友連線對戰」
