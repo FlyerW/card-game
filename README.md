@@ -6,8 +6,8 @@
 
 ## 目前進度
 
-- [x] 規則設計：[docs/design.md](docs/design.md)（v0.7）
-- [x] 規則引擎：[`packages/engine`](packages/engine)，包括異常狀態與即時回應（連鎖）；全部 168 個測試
+- [x] 規則設計：[docs/design.md](docs/design.md)（v0.8）
+- [x] 規則引擎：[`packages/engine`](packages/engine)，包括異常狀態、吸血與再生；全部 164 個測試
 - [x] 平衡模擬：[`packages/sim`](packages/sim)，讓機器人大量對打，比較不同規則、估算一局要打多久。結果見 [docs/balance-results.md](docs/balance-results.md)
 - [x] 網頁試玩版：[`packages/web`](packages/web)，跟電腦對戰，可以自己組牌。引擎和電腦對手都在瀏覽器裡跑，不需要伺服器
 - [x] 伺服器：兩人連線對戰（[`packages/server`](packages/server)），見下面「跟朋友連線對戰」
@@ -77,9 +77,9 @@ docs/
 packages/engine/          規則引擎：純函式庫，不碰網路也不碰畫面
 ├── src/
 │   ├── types.ts          卡牌資料、遊戲狀態、動作、事件的型別
-│   ├── engine.ts         建立對局、執行動作、即時回應與連鎖、列出合法動作、重播
+│   ├── engine.ts         建立對局、執行動作、列出合法動作、重播
 │   ├── targeting.ts      目標判定：位置技能、挑釁
-│   ├── resolve.ts        效果結算、異常狀態、擊倒判定
+│   ├── resolve.ts        效果結算、異常狀態、吸血與再生、擊倒判定
 │   ├── db.ts             卡牌資料驗證
 │   ├── deck.ts           牌組驗證、英雄能用的卡池
 │   ├── view.ts           玩家視角：隱藏對手手牌與牌庫順序
@@ -90,7 +90,7 @@ packages/engine/          規則引擎：純函式庫，不碰網路也不碰畫
 └── test/                 測試用的是獨立的測試卡，調整範例卡的平衡不會讓測試壞掉
 
 packages/sim/             平衡模擬
-├── src/bot.ts            機器人：貪婪策略與局面評分，三種打法；也會用瞬發牌回應
+├── src/bot.ts            機器人：貪婪策略與局面評分，三種打法
 ├── src/deck.ts           自動組牌：進化線照 3/2/1 帶
 ├── src/experiments.ts    實驗設定：比較哪些規則、牌組怎麼組
 ├── src/match.ts          打一局
