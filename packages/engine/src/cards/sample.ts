@@ -8,8 +8,8 @@ import type { Ability, DeckCardDef, HeroDef, TargetSpec } from '../types';
 //
 // 稀有度：N 沒有技能，數值照基準；R 照基準、一個技能；SR 多 2 點 HP、一個技能；UR 多 3 點數值、兩個技能。
 // 無色卡比有顏色的卡少 1 點數值。進場效果、速攻、吸血、再生扣 1 點左右；9 費以上的進場效果不扣。
-// 技能傷害：任意目標、只打英雄 ⌊1.5 × 費用⌋，只打生物、位置再多 1；範圍技能約費用的一半。
-// 法術：只打生物 = 費用 + 1（解得掉同費用的生物），任意目標、只打英雄 = 費用，範圍 ⌈費用 ÷ 2⌉。
+// 單體傷害（技能與法術共用）：任意目標 = 費用 + 1，剛好解掉同費用的生物；只打英雄、只打生物、位置 = 費用 + 2。
+// 附帶其他效果的扣 1–2。範圍傷害約費用的一半；天生技約是同費用技能的一半。
 // 回復約是 v0.8 的 1/2，增益、道具、中毒灼燒約是縮模時的 2 倍。
 
 const ANY: TargetSpec = { kind: 'enemy', allow: 'any' };
@@ -92,15 +92,15 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     kind: 'creature', id: 'astral-dragon', name: '星界巨龍', rarity: 'SR', colors: [],
     stage: 0, cost: 12, attack: 12, hp: 14,
     entry: { name: '星辰啟示', target: NONE, effects: [{ type: 'draw', count: 2 }] },
-    skills: [hit('星隕', 5, ANY, 7)],
+    skills: [hit('星隕', 5, ANY, 6)],
   },
   { kind: 'item', id: 'travel-cloak', name: '旅人斗篷', rarity: 'N', colors: [], cost: 1, hp: 4 },
   {
     // 道具也可以給技能：裝上的生物多一個技能，一樣每回合跟攻擊合計一次。
     kind: 'item', id: 'longbow', name: '長弓', rarity: 'R', colors: [], cost: 2,
-    skills: [hit('射擊', 1, ANY, 1)],
+    skills: [hit('射擊', 1, ANY, 2)],
   },
-  { kind: 'spell', id: 'snare', name: '捕獸夾', rarity: 'N', colors: [], cost: 2, target: CREATURE, effects: [{ type: 'damage', amount: 2 }] },
+  { kind: 'spell', id: 'snare', name: '捕獸夾', rarity: 'N', colors: [], cost: 2, target: CREATURE, effects: [{ type: 'damage', amount: 3 }] },
 
   // ── 白：守護、秩序。挑釁、回復、減傷；異常狀態是沉默與繳械 ──
   { kind: 'creature', id: 'squire', name: '見習騎士', rarity: 'N', colors: ['white'], stage: 0, cost: 2, attack: 2, hp: 3, skills: [] },
@@ -147,7 +147,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     entry: { name: '聖光降臨', target: ALLY, effects: [{ type: 'heal', amount: 5 }] },
     skills: [
       { name: '天使之翼', cost: 2, target: ALLY, effects: [{ type: 'heal', amount: 5 }] },
-      hit('裁決之劍', 4, ANY, 6),
+      hit('裁決之劍', 4, ANY, 5),
     ],
   },
   {
@@ -228,7 +228,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     entry: { name: '萬觸纏身', target: NONE, effects: [{ type: 'paralyze', all: true }] },
     skills: [{ name: '纏繞', cost: 4, target: CREATURE, effects: [{ type: 'damage', amount: 5 }, { type: 'paralyze' }] }],
   },
-  { kind: 'spell', id: 'ice-shard', name: '冰錐', rarity: 'N', colors: ['blue'], cost: 2, target: ANY, effects: [{ type: 'damage', amount: 2 }] },
+  { kind: 'spell', id: 'ice-shard', name: '冰錐', rarity: 'N', colors: ['blue'], cost: 2, target: ANY, effects: [{ type: 'damage', amount: 3 }] },
   { kind: 'spell', id: 'glacial-bind', name: '冰封', rarity: 'R', colors: ['blue'], cost: 2, target: CREATURE, effects: [{ type: 'paralyze' }] },
   {
     kind: 'spell', id: 'counter-current', name: '反制電流', rarity: 'R', colors: ['blue'], cost: 3,
@@ -237,7 +237,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   { kind: 'spell', id: 'inspiration', name: '靈感', rarity: 'R', colors: ['blue'], cost: 3, target: NONE, effects: [{ type: 'draw', count: 2 }] },
   {
     kind: 'spell', id: 'glacial-rift', name: '冰川裂縫', rarity: 'R', colors: ['blue'], cost: 5,
-    target: CREATURE, effects: [{ type: 'damage', amount: 6 }],
+    target: CREATURE, effects: [{ type: 'damage', amount: 7 }],
   },
   {
     kind: 'spell', id: 'thunderstorm', name: '雷暴', rarity: 'SR', colors: ['blue'], cost: 5,
@@ -309,7 +309,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   { kind: 'spell', id: 'shatter', name: '裂解', rarity: 'R', colors: ['black'], cost: 2, target: { kind: 'enemyItemOrField' }, effects: [{ type: 'destroy' }] },
   { kind: 'spell', id: 'toxic-fog', name: '毒霧', rarity: 'R', colors: ['black'], cost: 3, target: NONE, effects: [{ type: 'poison', amount: 2, all: true }] },
   { kind: 'spell', id: 'death-touch', name: '死亡之觸', rarity: 'R', colors: ['black'], cost: 3, target: CREATURE, effects: [{ type: 'halveHp' }] },
-  { kind: 'spell', id: 'annihilate', name: '湮滅', rarity: 'R', colors: ['black'], cost: 4, target: CREATURE, effects: [{ type: 'damage', amount: 5 }] },
+  { kind: 'spell', id: 'annihilate', name: '湮滅', rarity: 'R', colors: ['black'], cost: 4, target: CREATURE, effects: [{ type: 'damage', amount: 6 }] },
   {
     kind: 'spell', id: 'plague', name: '瘟疫', rarity: 'R', colors: ['black'], cost: 4,
     target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }, { type: 'poison', amount: 2, all: true }],
@@ -361,11 +361,11 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     kind: 'creature', id: 'inferno-demon', name: '炎魔', rarity: 'UR', colors: ['red'],
     stage: 0, cost: 11, attack: 13, hp: 14,
     entry: { name: '煉獄降臨', target: HERO, effects: [{ type: 'damage', amount: 4 }, { type: 'damageEnemyCreatures', amount: 3 }] },
-    skills: [hit('爆炎', 4, DIAGONAL, 7), hit('末日烈焰', 6, HERO, 9)],
+    skills: [hit('爆炎', 4, DIAGONAL, 6), hit('末日烈焰', 6, HERO, 8)],
   },
-  { kind: 'spell', id: 'scorching-ray', name: '灼熱射線', rarity: 'N', colors: ['red'], cost: 2, target: HERO, effects: [{ type: 'damage', amount: 2 }] },
-  { kind: 'spell', id: 'fireball', name: '火球術', rarity: 'N', colors: ['red'], cost: 3, target: ANY, effects: [{ type: 'damage', amount: 3 }] },
-  { kind: 'spell', id: 'devouring-flame', name: '烈焰吞噬', rarity: 'R', colors: ['red'], cost: 3, target: CREATURE, effects: [{ type: 'damage', amount: 4 }] },
+  { kind: 'spell', id: 'scorching-ray', name: '灼熱射線', rarity: 'N', colors: ['red'], cost: 2, target: HERO, effects: [{ type: 'damage', amount: 4 }] },
+  { kind: 'spell', id: 'fireball', name: '火球術', rarity: 'N', colors: ['red'], cost: 3, target: ANY, effects: [{ type: 'damage', amount: 4 }] },
+  { kind: 'spell', id: 'devouring-flame', name: '烈焰吞噬', rarity: 'R', colors: ['red'], cost: 3, target: CREATURE, effects: [{ type: 'damage', amount: 5 }] },
   { kind: 'spell', id: 'wildfire', name: '焚野', rarity: 'R', colors: ['red'], cost: 3, target: NONE, effects: [{ type: 'burn', amount: 2, all: true }] },
   { kind: 'spell', id: 'firestorm', name: '烈焰風暴', rarity: 'SR', colors: ['red'], cost: 6, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] },
   {
@@ -444,7 +444,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     kind: 'creature', id: 'earth-titan', name: '大地泰坦', rarity: 'UR', colors: ['green'],
     stage: 0, cost: 12, attack: 14, hp: 15,
     entry: { name: '震地', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] },
-    skills: [hit('泰坦之拳', 5, CREATURE, 8), { name: '地裂', cost: 6, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }],
+    skills: [hit('泰坦之拳', 5, CREATURE, 7), { name: '地裂', cost: 6, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }],
   },
   {
     kind: 'spell', id: 'giant-growth', name: '巨化術', rarity: 'R', colors: ['green'], cost: 2,
@@ -452,7 +452,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   },
   { kind: 'spell', id: 'entangle', name: '藤蔓纏繞', rarity: 'N', colors: ['green'], cost: 1, target: CREATURE, effects: [{ type: 'weaken' }] },
   { kind: 'spell', id: 'forest-breath', name: '森林之息', rarity: 'N', colors: ['green'], cost: 2, target: NONE, effects: [{ type: 'healAll', amount: 3 }] },
-  { kind: 'spell', id: 'hunt', name: '獵殺', rarity: 'N', colors: ['green'], cost: 4, target: CREATURE, effects: [{ type: 'damage', amount: 5 }] },
+  { kind: 'spell', id: 'hunt', name: '獵殺', rarity: 'N', colors: ['green'], cost: 4, target: CREATURE, effects: [{ type: 'damage', amount: 6 }] },
   { kind: 'spell', id: 'energy-crystal', name: '能量結晶', rarity: 'R', colors: ['green'], cost: 2, target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }] },
   // 跳費：能量上限 +1 約 2 能量，所以 4 費跳兩費，或 4 費跳一費再抽 1 張。
   { kind: 'spell', id: 'earth-pulse', name: '大地脈動', rarity: 'R', colors: ['green'], cost: 4, target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 2 }] },
@@ -469,7 +469,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     stage: 0, cost: 8, attack: 10, hp: 11,
     skills: [
       { name: '龍息', cost: 3, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] },
-      hit('焚天', 6, OPPOSITE, 10),
+      hit('焚天', 6, OPPOSITE, 8),
     ],
   },
 
