@@ -1,88 +1,91 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 660" width="760" height="660" font-family="'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 816 660" width="816" height="660" font-family="'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif">
 <title>場上配置</title>
-<desc>由中線往外：生物區、能量區（費用）、英雄。場地卡區在中線左側，雙方共用。牌庫與棄牌在右側。</desc>
-<rect x="8" y="8" width="744" height="644" rx="18" fill="#1d2830" stroke="#3a4a57" stroke-width="2"/>
-<rect x="270" y="28" width="220" height="54" rx="10" fill="#3a3024" stroke="#d4a24c" stroke-width="2"/>
-<text x="380" y="55.0" font-size="17" fill="#f3dcae" font-weight="700" text-anchor="middle" dominant-baseline="central">對手的英雄</text>
-<rect x="122" y="96" width="516" height="46" rx="8" fill="#1c3340" stroke="#4fb3c8" stroke-width="1.5"/>
-<text x="138" y="119.0" font-size="14" fill="#9fdcea" font-weight="700" text-anchor="start" dominant-baseline="central">能量區（費用）</text>
-<circle cx="292" cy="119.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
-<circle cx="319" cy="119.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
-<circle cx="346" cy="119.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
-<circle cx="373" cy="119.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
-<circle cx="400" cy="119.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
-<circle cx="427" cy="119.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
-<circle cx="454" cy="119.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
-<circle cx="481" cy="119.0" r="8" fill="none" stroke="#4fb3c8" stroke-width="1.5"/>
-<circle cx="508" cy="119.0" r="8" fill="none" stroke="#4fb3c8" stroke-width="1.5"/>
-<circle cx="535" cy="119.0" r="8" fill="none" stroke="#4fb3c8" stroke-width="1.5"/>
-<circle cx="562" cy="119.0" r="8" fill="none" stroke="#4fb3c8" stroke-width="1.5"/>
-<circle cx="589" cy="119.0" r="8" fill="none" stroke="#4fb3c8" stroke-width="1.5"/>
-<rect x="122" y="160" width="92" height="104" rx="8" fill="#273744" stroke="#7f9bb0" stroke-width="1.5"/>
-<text x="168.0" y="204.0" font-size="26" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">①</text>
-<text x="168.0" y="236.0" font-size="11" fill="#8fa6b8" font-weight="400" text-anchor="middle" dominant-baseline="central">生物區</text>
-<rect x="228" y="160" width="92" height="104" rx="8" fill="#273744" stroke="#7f9bb0" stroke-width="1.5"/>
-<text x="274.0" y="204.0" font-size="26" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">②</text>
-<text x="274.0" y="236.0" font-size="11" fill="#8fa6b8" font-weight="400" text-anchor="middle" dominant-baseline="central">生物區</text>
-<rect x="334" y="160" width="92" height="104" rx="8" fill="#273744" stroke="#7f9bb0" stroke-width="1.5"/>
-<text x="380.0" y="204.0" font-size="26" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">③</text>
-<text x="380.0" y="236.0" font-size="11" fill="#8fa6b8" font-weight="400" text-anchor="middle" dominant-baseline="central">生物區</text>
-<rect x="440" y="160" width="92" height="104" rx="8" fill="#273744" stroke="#7f9bb0" stroke-width="1.5"/>
-<text x="486.0" y="204.0" font-size="26" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">④</text>
-<text x="486.0" y="236.0" font-size="11" fill="#8fa6b8" font-weight="400" text-anchor="middle" dominant-baseline="central">生物區</text>
-<rect x="546" y="160" width="92" height="104" rx="8" fill="#273744" stroke="#7f9bb0" stroke-width="1.5"/>
-<text x="592.0" y="204.0" font-size="26" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">⑤</text>
-<text x="592.0" y="236.0" font-size="11" fill="#8fa6b8" font-weight="400" text-anchor="middle" dominant-baseline="central">生物區</text>
-<rect x="658" y="194" width="64" height="70" rx="6" fill="#273744" stroke="#7f9bb0" stroke-width="1.5" stroke-dasharray="4 3"/>
-<text x="690" y="229" font-size="13" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">棄牌</text>
-<rect x="658" y="84" width="64" height="70" rx="6" fill="#273744" stroke="#7f9bb0" stroke-width="1.5" stroke-dasharray="none"/>
-<text x="690" y="119" font-size="13" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">牌庫</text>
-<rect x="270" y="578" width="220" height="54" rx="10" fill="#3a3024" stroke="#d4a24c" stroke-width="2"/>
-<text x="380" y="605.0" font-size="17" fill="#f3dcae" font-weight="700" text-anchor="middle" dominant-baseline="central">你的英雄</text>
-<rect x="122" y="518" width="516" height="46" rx="8" fill="#1c3340" stroke="#4fb3c8" stroke-width="1.5"/>
-<text x="138" y="541.0" font-size="14" fill="#9fdcea" font-weight="700" text-anchor="start" dominant-baseline="central">能量區（費用）</text>
-<circle cx="292" cy="541.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
-<circle cx="319" cy="541.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
-<circle cx="346" cy="541.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
-<circle cx="373" cy="541.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
-<circle cx="400" cy="541.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
-<circle cx="427" cy="541.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
-<circle cx="454" cy="541.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
-<circle cx="481" cy="541.0" r="8" fill="none" stroke="#4fb3c8" stroke-width="1.5"/>
-<circle cx="508" cy="541.0" r="8" fill="none" stroke="#4fb3c8" stroke-width="1.5"/>
-<circle cx="535" cy="541.0" r="8" fill="none" stroke="#4fb3c8" stroke-width="1.5"/>
-<circle cx="562" cy="541.0" r="8" fill="none" stroke="#4fb3c8" stroke-width="1.5"/>
-<circle cx="589" cy="541.0" r="8" fill="none" stroke="#4fb3c8" stroke-width="1.5"/>
-<rect x="122" y="396" width="92" height="104" rx="8" fill="#273744" stroke="#7f9bb0" stroke-width="1.5"/>
-<text x="168.0" y="440.0" font-size="26" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">①</text>
-<text x="168.0" y="472.0" font-size="11" fill="#8fa6b8" font-weight="400" text-anchor="middle" dominant-baseline="central">生物區</text>
-<rect x="228" y="396" width="92" height="104" rx="8" fill="#273744" stroke="#7f9bb0" stroke-width="1.5"/>
-<text x="274.0" y="440.0" font-size="26" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">②</text>
-<text x="274.0" y="472.0" font-size="11" fill="#8fa6b8" font-weight="400" text-anchor="middle" dominant-baseline="central">生物區</text>
-<rect x="334" y="396" width="92" height="104" rx="8" fill="#273744" stroke="#7f9bb0" stroke-width="1.5"/>
-<text x="380.0" y="440.0" font-size="26" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">③</text>
-<text x="380.0" y="472.0" font-size="11" fill="#8fa6b8" font-weight="400" text-anchor="middle" dominant-baseline="central">生物區</text>
-<rect x="440" y="396" width="92" height="104" rx="8" fill="#273744" stroke="#7f9bb0" stroke-width="1.5"/>
-<text x="486.0" y="440.0" font-size="26" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">④</text>
-<text x="486.0" y="472.0" font-size="11" fill="#8fa6b8" font-weight="400" text-anchor="middle" dominant-baseline="central">生物區</text>
-<rect x="546" y="396" width="92" height="104" rx="8" fill="#273744" stroke="#7f9bb0" stroke-width="1.5"/>
-<text x="592.0" y="440.0" font-size="26" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">⑤</text>
-<text x="592.0" y="472.0" font-size="11" fill="#8fa6b8" font-weight="400" text-anchor="middle" dominant-baseline="central">生物區</text>
-<rect x="658" y="396" width="64" height="70" rx="6" fill="#273744" stroke="#7f9bb0" stroke-width="1.5" stroke-dasharray="4 3"/>
-<text x="690" y="431" font-size="13" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">棄牌</text>
-<rect x="658" y="506" width="64" height="70" rx="6" fill="#273744" stroke="#7f9bb0" stroke-width="1.5" stroke-dasharray="none"/>
-<text x="690" y="541" font-size="13" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">牌庫</text>
-<line x1="122" y1="330" x2="638" y2="330" stroke="#7f9bb0" stroke-width="1.5" stroke-dasharray="6 6"/>
-<rect x="22" y="282.0" width="86" height="96" rx="8" fill="#26361f" stroke="#8fbf6a" stroke-width="1.5"/>
-<text x="65.0" y="318" font-size="13" fill="#cde6b3" font-weight="700" text-anchor="middle" dominant-baseline="central">場地卡區</text>
-<text x="65.0" y="342" font-size="11" fill="#a9c98c" font-weight="400" text-anchor="middle" dominant-baseline="central">雙方共用</text>
-<line x1="380.0" y1="396" x2="274.0" y2="264" stroke="#e39a6b" stroke-width="2" stroke-dasharray="5 4" opacity="0.85"/>
-<line x1="380.0" y1="396" x2="380.0" y2="264" stroke="#f0b35a" stroke-width="2" stroke-dasharray="5 4" opacity="0.85"/>
-<line x1="380.0" y1="396" x2="486.0" y2="264" stroke="#e39a6b" stroke-width="2" stroke-dasharray="5 4" opacity="0.85"/>
-<rect x="275.0" y="296" width="52" height="20" rx="4" fill="#1d2830"/>
-<text x="301.0" y="306" font-size="11" fill="#e39a6b" font-weight="700" text-anchor="middle" dominant-baseline="central">斜對角</text>
-<rect x="354.0" y="296" width="52" height="20" rx="4" fill="#1d2830"/>
-<text x="380.0" y="306" font-size="11" fill="#f0b35a" font-weight="700" text-anchor="middle" dominant-baseline="central">正對面</text>
-<rect x="433.0" y="296" width="52" height="20" rx="4" fill="#1d2830"/>
-<text x="459.0" y="306" font-size="11" fill="#e39a6b" font-weight="700" text-anchor="middle" dominant-baseline="central">斜對角</text>
+<desc>由中線往外：生物區、能量區（費用）、英雄。每人的場地區在自己生物區左邊，牌庫與棄牌在右邊。</desc>
+<rect x="8" y="8" width="800" height="644" rx="18" fill="#1d2830" stroke="#3a4a57" stroke-width="2"/>
+<rect x="298.0" y="28" width="220" height="54" rx="10" fill="#3a3024" stroke="#d4a24c" stroke-width="2"/>
+<text x="408.0" y="55.0" font-size="17" fill="#f3dcae" font-weight="700" text-anchor="middle" dominant-baseline="central">對手的英雄</text>
+<rect x="150" y="96" width="516" height="46" rx="8" fill="#1c3340" stroke="#4fb3c8" stroke-width="1.5"/>
+<text x="166" y="119.0" font-size="14" fill="#9fdcea" font-weight="700" text-anchor="start" dominant-baseline="central">能量區（費用）</text>
+<circle cx="320" cy="119.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
+<circle cx="347" cy="119.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
+<circle cx="374" cy="119.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
+<circle cx="401" cy="119.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
+<circle cx="428" cy="119.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
+<circle cx="455" cy="119.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
+<circle cx="482" cy="119.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
+<circle cx="509" cy="119.0" r="8" fill="none" stroke="#4fb3c8" stroke-width="1.5"/>
+<circle cx="536" cy="119.0" r="8" fill="none" stroke="#4fb3c8" stroke-width="1.5"/>
+<circle cx="563" cy="119.0" r="8" fill="none" stroke="#4fb3c8" stroke-width="1.5"/>
+<circle cx="590" cy="119.0" r="8" fill="none" stroke="#4fb3c8" stroke-width="1.5"/>
+<circle cx="617" cy="119.0" r="8" fill="none" stroke="#4fb3c8" stroke-width="1.5"/>
+<rect x="150" y="160" width="92" height="104" rx="8" fill="#273744" stroke="#7f9bb0" stroke-width="1.5"/>
+<text x="196.0" y="204.0" font-size="26" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">①</text>
+<text x="196.0" y="236.0" font-size="11" fill="#8fa6b8" font-weight="400" text-anchor="middle" dominant-baseline="central">生物區</text>
+<rect x="256" y="160" width="92" height="104" rx="8" fill="#273744" stroke="#7f9bb0" stroke-width="1.5"/>
+<text x="302.0" y="204.0" font-size="26" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">②</text>
+<text x="302.0" y="236.0" font-size="11" fill="#8fa6b8" font-weight="400" text-anchor="middle" dominant-baseline="central">生物區</text>
+<rect x="362" y="160" width="92" height="104" rx="8" fill="#273744" stroke="#7f9bb0" stroke-width="1.5"/>
+<text x="408.0" y="204.0" font-size="26" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">③</text>
+<text x="408.0" y="236.0" font-size="11" fill="#8fa6b8" font-weight="400" text-anchor="middle" dominant-baseline="central">生物區</text>
+<rect x="468" y="160" width="92" height="104" rx="8" fill="#273744" stroke="#7f9bb0" stroke-width="1.5"/>
+<text x="514.0" y="204.0" font-size="26" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">④</text>
+<text x="514.0" y="236.0" font-size="11" fill="#8fa6b8" font-weight="400" text-anchor="middle" dominant-baseline="central">生物區</text>
+<rect x="574" y="160" width="92" height="104" rx="8" fill="#273744" stroke="#7f9bb0" stroke-width="1.5"/>
+<text x="620.0" y="204.0" font-size="26" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">⑤</text>
+<text x="620.0" y="236.0" font-size="11" fill="#8fa6b8" font-weight="400" text-anchor="middle" dominant-baseline="central">生物區</text>
+<rect x="680" y="160" width="110" height="104" rx="8" fill="#26361f" stroke="#8fbf6a" stroke-width="1.5"/>
+<text x="735.0" y="202.0" font-size="13" fill="#cde6b3" font-weight="700" text-anchor="middle" dominant-baseline="central">場地區</text>
+<text x="735.0" y="224.0" font-size="11" fill="#a9c98c" font-weight="400" text-anchor="middle" dominant-baseline="central">對手的</text>
+<rect x="49.0" y="177.0" width="64" height="70" rx="6" fill="#273744" stroke="#7f9bb0" stroke-width="1.5" stroke-dasharray="4 3"/>
+<text x="81.0" y="212.0" font-size="13" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">棄牌</text>
+<rect x="49.0" y="84" width="64" height="70" rx="6" fill="#273744" stroke="#7f9bb0" stroke-width="1.5" stroke-dasharray="none"/>
+<text x="81.0" y="119" font-size="13" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">牌庫</text>
+<rect x="298.0" y="578" width="220" height="54" rx="10" fill="#3a3024" stroke="#d4a24c" stroke-width="2"/>
+<text x="408.0" y="605.0" font-size="17" fill="#f3dcae" font-weight="700" text-anchor="middle" dominant-baseline="central">你的英雄</text>
+<rect x="150" y="518" width="516" height="46" rx="8" fill="#1c3340" stroke="#4fb3c8" stroke-width="1.5"/>
+<text x="166" y="541.0" font-size="14" fill="#9fdcea" font-weight="700" text-anchor="start" dominant-baseline="central">能量區（費用）</text>
+<circle cx="320" cy="541.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
+<circle cx="347" cy="541.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
+<circle cx="374" cy="541.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
+<circle cx="401" cy="541.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
+<circle cx="428" cy="541.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
+<circle cx="455" cy="541.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
+<circle cx="482" cy="541.0" r="8" fill="#6fd3e6" stroke="#4fb3c8" stroke-width="1.5"/>
+<circle cx="509" cy="541.0" r="8" fill="none" stroke="#4fb3c8" stroke-width="1.5"/>
+<circle cx="536" cy="541.0" r="8" fill="none" stroke="#4fb3c8" stroke-width="1.5"/>
+<circle cx="563" cy="541.0" r="8" fill="none" stroke="#4fb3c8" stroke-width="1.5"/>
+<circle cx="590" cy="541.0" r="8" fill="none" stroke="#4fb3c8" stroke-width="1.5"/>
+<circle cx="617" cy="541.0" r="8" fill="none" stroke="#4fb3c8" stroke-width="1.5"/>
+<rect x="150" y="396" width="92" height="104" rx="8" fill="#273744" stroke="#7f9bb0" stroke-width="1.5"/>
+<text x="196.0" y="440.0" font-size="26" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">①</text>
+<text x="196.0" y="472.0" font-size="11" fill="#8fa6b8" font-weight="400" text-anchor="middle" dominant-baseline="central">生物區</text>
+<rect x="256" y="396" width="92" height="104" rx="8" fill="#273744" stroke="#7f9bb0" stroke-width="1.5"/>
+<text x="302.0" y="440.0" font-size="26" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">②</text>
+<text x="302.0" y="472.0" font-size="11" fill="#8fa6b8" font-weight="400" text-anchor="middle" dominant-baseline="central">生物區</text>
+<rect x="362" y="396" width="92" height="104" rx="8" fill="#273744" stroke="#7f9bb0" stroke-width="1.5"/>
+<text x="408.0" y="440.0" font-size="26" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">③</text>
+<text x="408.0" y="472.0" font-size="11" fill="#8fa6b8" font-weight="400" text-anchor="middle" dominant-baseline="central">生物區</text>
+<rect x="468" y="396" width="92" height="104" rx="8" fill="#273744" stroke="#7f9bb0" stroke-width="1.5"/>
+<text x="514.0" y="440.0" font-size="26" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">④</text>
+<text x="514.0" y="472.0" font-size="11" fill="#8fa6b8" font-weight="400" text-anchor="middle" dominant-baseline="central">生物區</text>
+<rect x="574" y="396" width="92" height="104" rx="8" fill="#273744" stroke="#7f9bb0" stroke-width="1.5"/>
+<text x="620.0" y="440.0" font-size="26" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">⑤</text>
+<text x="620.0" y="472.0" font-size="11" fill="#8fa6b8" font-weight="400" text-anchor="middle" dominant-baseline="central">生物區</text>
+<rect x="26" y="396" width="110" height="104" rx="8" fill="#26361f" stroke="#8fbf6a" stroke-width="1.5"/>
+<text x="81.0" y="438.0" font-size="13" fill="#cde6b3" font-weight="700" text-anchor="middle" dominant-baseline="central">場地區</text>
+<text x="81.0" y="460.0" font-size="11" fill="#a9c98c" font-weight="400" text-anchor="middle" dominant-baseline="central">你的</text>
+<rect x="703.0" y="413.0" width="64" height="70" rx="6" fill="#273744" stroke="#7f9bb0" stroke-width="1.5" stroke-dasharray="4 3"/>
+<text x="735.0" y="448.0" font-size="13" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">棄牌</text>
+<rect x="703.0" y="506" width="64" height="70" rx="6" fill="#273744" stroke="#7f9bb0" stroke-width="1.5" stroke-dasharray="none"/>
+<text x="735.0" y="541" font-size="13" fill="#cfe0ec" font-weight="400" text-anchor="middle" dominant-baseline="central">牌庫</text>
+<line x1="150" y1="330" x2="666" y2="330" stroke="#7f9bb0" stroke-width="1.5" stroke-dasharray="6 6"/>
+<line x1="408.0" y1="396" x2="302.0" y2="264" stroke="#e39a6b" stroke-width="2" stroke-dasharray="5 4" opacity="0.85"/>
+<line x1="408.0" y1="396" x2="408.0" y2="264" stroke="#f0b35a" stroke-width="2" stroke-dasharray="5 4" opacity="0.85"/>
+<line x1="408.0" y1="396" x2="514.0" y2="264" stroke="#e39a6b" stroke-width="2" stroke-dasharray="5 4" opacity="0.85"/>
+<rect x="303.0" y="296" width="52" height="20" rx="4" fill="#1d2830"/>
+<text x="329.0" y="306" font-size="11" fill="#e39a6b" font-weight="700" text-anchor="middle" dominant-baseline="central">斜對角</text>
+<rect x="382.0" y="296" width="52" height="20" rx="4" fill="#1d2830"/>
+<text x="408.0" y="306" font-size="11" fill="#f0b35a" font-weight="700" text-anchor="middle" dominant-baseline="central">正對面</text>
+<rect x="461.0" y="296" width="52" height="20" rx="4" fill="#1d2830"/>
+<text x="487.0" y="306" font-size="11" fill="#e39a6b" font-weight="700" text-anchor="middle" dominant-baseline="central">斜對角</text>
 </svg>
