@@ -30,9 +30,6 @@ export function describeEvents(
   const you = after.viewer;
   const name = (id: string) => db.cards.get(id)?.name ?? db.heroes.get(id)?.name ?? id;
   const who = (player: PlayerId) => (player === you ? '你' : them);
-  /** 法術的效果名就是卡名，只寫一次。 */
-  const ability = (cardId: string, abilityName: string) =>
-    name(cardId) === abilityName ? name(cardId) : `${name(cardId)}「${abilityName}」`;
   const tone = (player: PlayerId): LogLine['tone'] => (player === you ? 'you' : 'bot');
   const targetText = (target: Target): string => {
     if (target.kind === 'hero') return `${who(target.player)}的英雄`;
@@ -41,18 +38,8 @@ export function describeEvents(
   };
 
   const lines: LogLine[] = [];
-  let responding = false;
   for (const event of events) {
     switch (event.type) {
-      case 'responded':
-        responding = true;
-        break;
-      case 'resolving':
-        lines.push({ text: `　結算 ${ability(event.cardId, event.ability)}`, tone: 'turn' });
-        break;
-      case 'fizzled':
-        lines.push({ text: `　${name(event.cardId)} 已經離場，「${event.ability}」沒有發動`, tone: 'turn' });
-        break;
       case 'turnStarted':
         lines.push({ text: `第 ${event.turn} 回合・${who(event.player)}`, tone: 'turn' });
         break;
@@ -96,12 +83,7 @@ export function describeEvents(
               : event.source === 'hero'
               ? `${who(event.player)}的英雄發動天生技「${event.ability}」`
               : `${who(event.player)}的 ${name(event.cardId)} 發動「${event.ability}」`;
-        const response =
-          event.source === 'spell'
-            ? `↳ ${who(event.player)}回應：施放 ${name(event.cardId)}`
-            : `↳ ${who(event.player)}回應：${name(event.cardId)} 發動「${event.ability}」`;
-        lines.push({ text: responding ? response : text, tone: tone(event.player) });
-        responding = false;
+        lines.push({ text, tone: tone(event.player) });
         break;
       }
       case 'heroEvolved':

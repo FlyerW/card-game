@@ -81,20 +81,15 @@ function put(state: GameState, player: PlayerId, zone: number, cardId: string, d
 }
 
 describe('機器人', () => {
-  it('等待回應時會用瞬發牌：先把攻擊者打倒，攻擊就不會打出來', () => {
+  it('打得倒的話，會用法術先把對手的生物打倒', () => {
     const state = opening();
     const a = state.activePlayer;
     const b: PlayerId = a === 0 ? 1 : 0;
-    put(state, a, 0, 'wandering-mercenary', 4); // HP 8，剩 4
-    state.players[a].energy = 5;
-    state.players[b].energy = 2;
-    state.players[b].hand.push({ uid: state.nextUid++, cardId: 'ice-shard' });
-    const attacked = engine.apply(state, { type: 'useSkill', player: a, zone: 0, skill: 0, target: { kind: 'hero', player: b } });
-    if (!attacked.ok) throw new Error(attacked.error.message);
-    expect(attacked.state.window).toBe(b);
-    const pick = chooseAction(engine, attacked.state, b, STYLES.balanced);
-    expect(pick.action).toMatchObject({ type: 'castSpell', target: { kind: 'creature', player: a, zone: 0 } });
-
+    put(state, b, 0, 'wandering-mercenary', 4); // HP 8，剩 4
+    state.players[a].energy = 2;
+    state.players[a].hand = [{ uid: state.nextUid++, cardId: 'ice-shard' }];
+    const pick = chooseAction(engine, state, a, STYLES.balanced);
+    expect(pick.action).toMatchObject({ type: 'castSpell', target: { kind: 'creature', player: b, zone: 0 } });
   });
 
   it('分出勝負時評分是極值', () => {

@@ -15,7 +15,7 @@ export function kindLabel(def: DeckCardDef): string {
     case 'creature':
       return def.stage === 0 ? '生物' : `進化・${def.stage === 1 ? '一階' : '二階'}`;
     case 'spell':
-      return def.instant ? '瞬發法術' : '法術';
+      return '法術';
     case 'item':
       return '道具';
     case 'field':

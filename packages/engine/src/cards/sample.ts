@@ -7,7 +7,7 @@ import type { Ability, DeckCardDef, HeroDef, TargetSpec } from '../types';
 // 只打生物的法術 = 同費用生物的 HP，而且至少比任意目標多 1，一張就能解掉同費用的生物；
 // 範圍法術能清掉便宜 3 費以上的生物。
 //
-// 每個顏色 12 張、無色 8 張（英雄進化卡另計），單色英雄有 20 種卡可以用，組得出 40 張的正式牌組。
+// 每個顏色 14–16 張、無色 8 張（英雄進化卡另計），單色英雄有 22–24 種卡可以用，組得出 40 張的正式牌組。
 // 每個顏色各有一條進化線，也各有自己的異常狀態：白沉睡、藍麻痺、黑中毒、紅灼燒。
 
 const ANY: TargetSpec = { kind: 'enemy', allow: 'any' };
@@ -297,7 +297,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     kind: 'creature', id: 'seraph', name: '熾天使', rarity: 'SR', colors: ['white'],
     stage: 2, evolvesFrom: 'paladin', cost: 4, hp: 23,
     skills: [
-      { name: '神聖庇護', cost: 2, target: ALLY, effects: [{ type: 'heal', amount: 6 }], instant: true },
+      { name: '神聖庇護', cost: 2, target: ALLY, effects: [{ type: 'heal', amount: 8 }] },
       hit('審判之光', 5, OPPOSITE, 18),
     ],
   },
@@ -305,7 +305,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     kind: 'creature', id: 'spring-nun', name: '聖泉修女', rarity: 'R', colors: ['white'],
     stage: 0, cost: 2, hp: 5,
     skills: [
-      { name: '治療', cost: 1, target: ALLY, effects: [{ type: 'heal', amount: 4 }], instant: true },
+      { name: '治療', cost: 1, target: ALLY, effects: [{ type: 'heal', amount: 4 }] },
       hit('聖光', 2, ANY, 4),
     ],
   },
@@ -318,7 +318,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     ],
   },
   {
-    kind: 'spell', id: 'holy-ward', name: '聖盾術', rarity: 'R', colors: ['white'], cost: 2, instant: true,
+    kind: 'spell', id: 'holy-ward', name: '聖盾術', rarity: 'R', colors: ['white'], cost: 1,
     target: ALLY_CREATURE, effects: [{ type: 'buff', attack: 0, hp: 3, on: 'target' }],
   },
 
@@ -342,7 +342,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     skills: [
       {
         name: '麻痺電網', cost: 3, target: CREATURE,
-        effects: [{ type: 'damage', amount: 3 }, { type: 'paralyze' }], instant: true,
+        effects: [{ type: 'damage', amount: 4 }, { type: 'paralyze' }],
       },
       { name: '潮汐知識', cost: 3, target: NONE, effects: [{ type: 'draw', count: 2 }] },
     ],
@@ -366,9 +366,9 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
       { name: '深海呼喚', cost: 3, target: NONE, effects: [{ type: 'draw', count: 2 }] },
     ],
   },
-  { kind: 'spell', id: 'ice-shard', name: '冰錐', rarity: 'N', colors: ['blue'], cost: 2, instant: true, target: ANY, effects: [{ type: 'damage', amount: 4 }] },
+  { kind: 'spell', id: 'ice-shard', name: '冰錐', rarity: 'N', colors: ['blue'], cost: 2, target: ANY, effects: [{ type: 'damage', amount: 5 }] },
   {
-    kind: 'spell', id: 'glacial-bind', name: '冰封', rarity: 'R', colors: ['blue'], cost: 2, instant: true,
+    kind: 'spell', id: 'glacial-bind', name: '冰封', rarity: 'R', colors: ['blue'], cost: 2,
     target: CREATURE, effects: [{ type: 'paralyze' }],
   },
 
@@ -403,7 +403,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     ],
   },
   {
-    kind: 'spell', id: 'death-touch', name: '死亡之觸', rarity: 'R', colors: ['black'], cost: 4, instant: true,
+    kind: 'spell', id: 'death-touch', name: '死亡之觸', rarity: 'R', colors: ['black'], cost: 3,
     target: CREATURE, effects: [{ type: 'halveHp' }],
   },
 
@@ -417,7 +417,8 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
       hit('火舌', 2, ANY, 5),
     ],
   },
-  { kind: 'spell', id: 'scorching-ray', name: '灼熱射線', rarity: 'N', colors: ['red'], cost: 2, instant: true, target: HERO, effects: [{ type: 'damage', amount: 5 }] },
+  // 拿掉瞬發後照基準應該打 6；紅色已經最強，維持 5。
+  { kind: 'spell', id: 'scorching-ray', name: '灼熱射線', rarity: 'N', colors: ['red'], cost: 2, target: HERO, effects: [{ type: 'damage', amount: 5 }] },
 
   // ── 綠：成長、巨大。大型生物、提高能量上限、高 HP ──
   {
@@ -448,11 +449,11 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     ],
   },
   {
-    kind: 'spell', id: 'giant-growth', name: '巨化術', rarity: 'R', colors: ['green'], cost: 3, instant: true,
+    kind: 'spell', id: 'giant-growth', name: '巨化術', rarity: 'R', colors: ['green'], cost: 2,
     target: ALLY_CREATURE, effects: [{ type: 'buff', attack: 2, hp: 3, on: 'target' }],
   },
 
-  // ── 異常狀態的新卡：進場施加狀態、對手每隻生物都中的法術、瞬發 ──
+  // ── 異常狀態的新卡：進場施加狀態、對手每隻生物都中的法術 ──
   // 進場效果照數值基準從本體扣（每 1 能量約少 2 HP）；對手每隻生物都中的狀態約是單體的 1.5 倍能量。
   {
     kind: 'creature', id: 'plague-rat', name: '瘟疫鼠', rarity: 'R', colors: ['black'],
@@ -468,8 +469,8 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     target: NONE, effects: [{ type: 'poison', amount: 2, all: true }],
   },
   {
-    kind: 'spell', id: 'venom-dart', name: '腐毒箭', rarity: 'N', colors: ['black'], cost: 2, instant: true,
-    target: CREATURE, effects: [{ type: 'damage', amount: 1 }, { type: 'poison', amount: 1 }],
+    kind: 'spell', id: 'venom-dart', name: '腐毒箭', rarity: 'N', colors: ['black'], cost: 2,
+    target: CREATURE, effects: [{ type: 'damage', amount: 1 }, { type: 'poison', amount: 2 }],
   },
   { kind: 'item', id: 'bone-armor', name: '骨甲', rarity: 'N', colors: ['black'], cost: 1, attack: 1, hp: 2 },
   {
@@ -493,8 +494,8 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }, { type: 'paralyze', all: true }],
   },
   {
-    kind: 'spell', id: 'counter-current', name: '反制電流', rarity: 'R', colors: ['blue'], cost: 3, instant: true,
-    target: CREATURE, effects: [{ type: 'damage', amount: 2 }, { type: 'paralyze' }],
+    kind: 'spell', id: 'counter-current', name: '反制電流', rarity: 'R', colors: ['blue'], cost: 3,
+    target: CREATURE, effects: [{ type: 'damage', amount: 3 }, { type: 'paralyze' }],
   },
   {
     kind: 'creature', id: 'dream-herald', name: '夢境使者', rarity: 'R', colors: ['white'],
@@ -556,7 +557,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     stage: 0, cost: 10, hp: 24,
     entry: { name: '聖光降臨', target: ALLY, effects: [{ type: 'heal', amount: 8 }] },
     skills: [
-      { name: '天使之翼', cost: 3, target: ALLY, effects: [{ type: 'heal', amount: 8 }], instant: true },
+      { name: '天使之翼', cost: 2, target: ALLY, effects: [{ type: 'heal', amount: 8 }] },
       hit('裁決之劍', 5, ANY, 12),
     ],
   },

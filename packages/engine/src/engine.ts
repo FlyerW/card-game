@@ -19,7 +19,6 @@ import {
   randomInt,
   resolveAbility,
   shuffle,
-  targetCreatureUid,
   tickBurn,
   tickPoison,
   type Ctx,
@@ -31,7 +30,6 @@ import type {
   Ability,
   Action,
   CardDb,
-  ChainLink,
   CreatureDef,
   CardRef,
   GameEvent,
@@ -109,7 +107,7 @@ function ownCreature(state: GameState, player: PlayerId, zone: number) {
 function spellAbility(db: CardDb, cardId: string): Ability | null {
   const def = cardDef(db, cardId);
   if (def.kind !== 'spell') return null;
-  return { name: def.name, cost: def.cost, target: def.target, effects: def.effects, ...(def.instant ? { instant: true } : {}) };
+  return { name: def.name, cost: def.cost, target: def.target, effects: def.effects };
 }
 
 /** 驗證玩家選的目標；只有一個合法目標時可以不選。 */
@@ -132,108 +130,23 @@ function chooseTarget(ctx: Ctx, ability: Ability, source: AbilitySource, chosen:
 }
 
 /**
- * 進場效果：召喚或進化時發動，跟技能一樣放上連鎖，對手可以回應。
- * 有目標可選就必須選（只有一個時可以省略）；場上沒有合法目標時，生物照樣進場，只是效果不發動。
- * 回傳要放上連鎖的效果；沒有就是 null。
+ * 進場效果：召喚或進化時發動。有目標可選就必須選（只有一個時可以省略）；
+ * 場上沒有合法目標時，生物照樣進場，只是效果不發動。
  */
-function entryLink(ctx: Ctx, def: CreatureDef, player: PlayerId, zone: number, chosen: Target | undefined): ChainLink | null {
+function triggerEntry(ctx: Ctx, def: CreatureDef, player: PlayerId, zone: number, chosen: Target | undefined): void {
   if (def.entry === undefined) {
     if (chosen !== undefined) fail('TARGET_NOT_ALLOWED', `${def.name} 沒有進場效果，不需要指定目標`);
-    return null;
+    return;
   }
   const ability: Ability = { ...def.entry, cost: 0 };
   const source: AbilitySource = { kind: 'creature', player, zone };
   if (ability.target.kind !== 'none' && legalTargets(ctx.state, ability, source).length === 0) {
     if (chosen !== undefined) fail('ILLEGAL_TARGET', `「${ability.name}」現在沒有可以指定的目標`);
-    return null;
+    return;
   }
   const target = chooseTarget(ctx, ability, source, chosen);
   ctx.events.push({ type: 'abilityUsed', player, source: 'entry', cardId: def.id, ability: ability.name });
-  const creature = ctx.state.players[player].zones[zone]!;
-  return link(ctx, { player, source: 'entry', zone, sourceUid: creature.uid, cardId: def.id, ability, target, card: null });
-}
-
-function link(ctx: Ctx, parts: Omit<ChainLink, 'targetUid'>): ChainLink {
-  return { ...parts, targetUid: targetCreatureUid(ctx.state, parts.target) };
-}
-
-// ─── 即時回應 ────────────────────────────────────────────────────────────────
-//
-// 每個宣告之後、結算之前，對手可以用存下來的能量回應：瞬發法術，或生物的【瞬發】技能。
-// 回應也可以再被回應，形成連鎖；有一方不回應，整條連鎖就從最後加入的開始往回結算。
-// 對手沒有存能量就不必等，直接結算，節奏不受影響。
-
-/** 宣告了一個動作。有效果就放上連鎖，然後讓對手決定要不要回應。 */
-function declared(ctx: Ctx, player: PlayerId, pending: ChainLink | null): void {
-  if (pending !== null) ctx.state.chain.push(pending);
-  offerResponse(ctx, other(player));
-}
-
-/** 對手有存能量就等他決定；沒有就直接結算。有沒有瞬發牌都一樣要等，才不會洩漏手牌資訊。 */
-function offerResponse(ctx: Ctx, responder: PlayerId): void {
-  const { state } = ctx;
-  if (state.phase === 'over') return;
-  if (state.players[responder].energy > 0) {
-    state.window = responder;
-    ctx.events.push({ type: 'awaitingResponse', player: responder });
-  } else {
-    settle(ctx);
-  }
-}
-
-/** 沒有人要回應了：連鎖從最後加入的開始往回結算。 */
-function settle(ctx: Ctx): void {
-  const { state } = ctx;
-  state.window = null;
-  const hadChain = state.chain.length > 0;
-  const announce = state.chain.length > 1;
-  while (state.chain.length > 0 && state.phase === 'main') resolveLink(ctx, state.chain.pop()!, announce);
-  // 分出勝負時還沒結算的效果不發動，法術卡照樣進棄牌區。
-  for (const rest of state.chain.splice(0)) if (rest.card !== null) state.players[rest.player].discard.push(rest.card);
-  if (state.phase !== 'main' || !state.endingTurn) return;
-  // 宣告回合結束後的回應結算完，對手還可以再用剩下的能量；不用了回合才真的結束。
-  if (hadChain) offerEndOfTurn(ctx);
-  else finishTurn(ctx);
-}
-
-function resolveLink(ctx: Ctx, pending: ChainLink, announce: boolean): void {
-  const { state } = ctx;
-  const { player, zone } = pending;
-  let source: AbilitySource;
-  if (pending.source === 'creature' || pending.source === 'entry') {
-    // 發動的生物在結算前離場了（被打倒，或換成別隻），牠的效果就不發動。
-    if (state.players[player].zones[zone!]?.uid !== pending.sourceUid) {
-      ctx.events.push({ type: 'fizzled', player, cardId: pending.cardId, ability: pending.ability.name });
-      return;
-    }
-    source = { kind: 'creature', player, zone: zone! };
-  } else {
-    source = { kind: pending.source, player };
-  }
-  if (announce) ctx.events.push({ type: 'resolving', player, cardId: pending.cardId, ability: pending.ability.name });
-  resolveAbility(ctx, pending.ability, source, pending.target, pending.targetUid);
-  if (pending.card !== null) state.players[player].discard.push(pending.card);
-}
-
-/** 宣告回合結束：對手還有存能量的話，最後一次回應的機會；下個回合開始時他的能量就會重置。 */
-function offerEndOfTurn(ctx: Ctx): void {
-  const { state } = ctx;
-  const responder = other(state.activePlayer);
-  if (state.players[responder].energy > 0) {
-    state.window = responder;
-    ctx.events.push({ type: 'awaitingResponse', player: responder });
-  } else {
-    finishTurn(ctx);
-  }
-}
-
-// 沒花完的能量留到對手的回合，之後可以用在對手回合的互動；自己的回合開始時才重置。
-function finishTurn(ctx: Ctx): void {
-  const { state } = ctx;
-  state.endingTurn = false;
-  tickBurn(ctx, state.activePlayer);
-  if (state.phase !== 'main') return;
-  startTurn(ctx, other(state.activePlayer));
+  resolveAbility(ctx, ability, source, target);
 }
 
 /** 生物放到 zone 之後，進場效果能選的目標。召喚前就要算，所以把牠自己也算進我方生物。 */
@@ -327,7 +240,7 @@ function summon(ctx: Ctx, a: ActionOf<'summon'>): void {
     asleepUntilTurn: null,
   };
   ctx.events.push({ type: 'summoned', player: a.player, zone: a.zone, cardId: card.cardId });
-  declared(ctx, a.player, entryLink(ctx, def, a.player, a.zone, a.target));
+  triggerEntry(ctx, def, a.player, a.zone, a.target);
 }
 
 function evolve(ctx: Ctx, a: ActionOf<'evolve'>): void {
@@ -352,7 +265,7 @@ function evolve(ctx: Ctx, a: ActionOf<'evolve'>): void {
   creature.evolvedTurn = state.turn;
   ctx.events.push({ type: 'evolved', player: a.player, zone: a.zone, from, to: card.cardId });
   clearStatuses(ctx, creature, a.player, a.zone);
-  declared(ctx, a.player, entryLink(ctx, def, a.player, a.zone, a.target));
+  triggerEntry(ctx, def, a.player, a.zone, a.target);
 }
 
 function useSkill(ctx: Ctx, a: ActionOf<'useSkill'>): void {
@@ -368,15 +281,12 @@ function useSkill(ctx: Ctx, a: ActionOf<'useSkill'>): void {
   if (isParalyzed(state, creature)) fail('PARALYZED', `${def.name} 麻痺中，不能發動技能`);
   if (isAsleep(state, creature)) fail('ASLEEP', `${def.name} 沉睡中，不能發動技能`);
 
-  if (state.window !== null && !skill.instant) fail('NOT_INSTANT', `「${skill.name}」不是【瞬發】技能，不能用來回應`);
-
   const source: AbilitySource = { kind: 'creature', player: a.player, zone: a.zone };
   const target = chooseTarget(ctx, skill, source, a.target);
   pay(p, skill.cost);
   creature.skillUsedTurn = state.turn;
   ctx.events.push({ type: 'abilityUsed', player: a.player, source: 'creature', cardId: def.id, ability: skill.name });
-  const pending = link(ctx, { player: a.player, source: 'creature', zone: a.zone, sourceUid: creature.uid, cardId: def.id, ability: skill, target, card: null });
-  declared(ctx, a.player, pending);
+  resolveAbility(ctx, skill, source, target);
 }
 
 function heroPower(ctx: Ctx, a: ActionOf<'heroPower'>): void {
@@ -391,8 +301,7 @@ function heroPower(ctx: Ctx, a: ActionOf<'heroPower'>): void {
   pay(p, power.cost);
   p.heroPowerUsedTurn = state.turn;
   ctx.events.push({ type: 'abilityUsed', player: a.player, source: 'hero', cardId: hero.id, ability: power.name });
-  const pending = link(ctx, { player: a.player, source: 'hero', zone: null, sourceUid: null, cardId: hero.id, ability: power, target, card: null });
-  declared(ctx, a.player, pending);
+  resolveAbility(ctx, power, source, target);
 }
 
 function evolveHero(ctx: Ctx, a: ActionOf<'evolveHero'>): void {
@@ -413,27 +322,27 @@ function evolveHero(ctx: Ctx, a: ActionOf<'evolveHero'>): void {
   p.heroEvolution = card;
   ctx.events.push({ type: 'heroEvolved', player: a.player, cardId: card.cardId });
   cleanup(ctx);
-  declared(ctx, a.player, heroEntryLink(ctx, def, a.player, a.target));
+  triggerHeroEntry(ctx, def, a.player, a.target);
 }
 
 /**
- * 英雄進化卡的進場效果，像爐石英雄卡的戰吼。跟生物的進場效果一樣放上連鎖、有目標就必須選；
- * 沒有合法目標時英雄照樣進化，只是效果不發動。英雄不會離場，所以一定會結算。
+ * 英雄進化卡的進場效果，像爐石英雄卡的戰吼。跟生物的進場效果一樣，有目標就必須選；
+ * 沒有合法目標時英雄照樣進化，只是效果不發動。
  */
-function heroEntryLink(ctx: Ctx, def: HeroEvolutionDef, player: PlayerId, chosen: Target | undefined): ChainLink | null {
+function triggerHeroEntry(ctx: Ctx, def: HeroEvolutionDef, player: PlayerId, chosen: Target | undefined): void {
   if (def.entry === undefined) {
     if (chosen !== undefined) fail('TARGET_NOT_ALLOWED', `${def.name} 沒有進場效果，不需要指定目標`);
-    return null;
+    return;
   }
   const ability: Ability = { ...def.entry, cost: 0 };
   const source: AbilitySource = { kind: 'hero', player };
   if (ability.target.kind !== 'none' && legalTargets(ctx.state, ability, source).length === 0) {
     if (chosen !== undefined) fail('ILLEGAL_TARGET', `「${ability.name}」現在沒有可以指定的目標`);
-    return null;
+    return;
   }
   const target = chooseTarget(ctx, ability, source, chosen);
   ctx.events.push({ type: 'abilityUsed', player, source: 'entry', cardId: def.id, ability: ability.name });
-  return link(ctx, { player, source: 'hero', zone: null, sourceUid: null, cardId: def.id, ability, target, card: null });
+  resolveAbility(ctx, ability, source, target);
 }
 
 function castSpell(ctx: Ctx, a: ActionOf<'castSpell'>): void {
@@ -442,16 +351,13 @@ function castSpell(ctx: Ctx, a: ActionOf<'castSpell'>): void {
   const card = handCard(p, a.card);
   const spell = spellAbility(db, card.cardId) ?? fail('WRONG_CARD_KIND', `${cardDef(db, card.cardId).name} 不是法術卡`);
 
-  if (state.window !== null && !spell.instant) fail('NOT_INSTANT', `${spell.name} 不是瞬發法術，不能用來回應`);
-
   const source: AbilitySource = { kind: 'spell', player: a.player };
   const target = chooseTarget(ctx, spell, source, a.target);
   pay(p, spell.cost);
   removeFromHand(p, card.uid);
   ctx.events.push({ type: 'abilityUsed', player: a.player, source: 'spell', cardId: card.cardId, ability: spell.name });
-  // 法術卡跟著效果留在連鎖上，結算完才進棄牌區。
-  const pending = link(ctx, { player: a.player, source: 'spell', zone: null, sourceUid: null, cardId: card.cardId, ability: spell, target, card });
-  declared(ctx, a.player, pending);
+  resolveAbility(ctx, spell, source, target);
+  p.discard.push(card);
 }
 
 function attachItem(ctx: Ctx, a: ActionOf<'attachItem'>): void {
@@ -468,7 +374,6 @@ function attachItem(ctx: Ctx, a: ActionOf<'attachItem'>): void {
   creature.item = card;
   ctx.events.push({ type: 'itemAttached', player: a.player, zone: a.zone, cardId: card.cardId });
   cleanup(ctx); // 道具可能改變 HP 上限
-  declared(ctx, a.player, null);
 }
 
 function playField(ctx: Ctx, a: ActionOf<'playField'>): void {
@@ -490,7 +395,6 @@ function playField(ctx: Ctx, a: ActionOf<'playField'>): void {
   p.fieldPlayedTurn = state.turn;
   ctx.events.push({ type: 'fieldPlayed', player: a.player, cardId: card.cardId });
   cleanup(ctx); // 換掉場地卡可能讓生物失去 HP 加成
-  declared(ctx, a.player, null);
 }
 
 /** 讓自己的生物退場，空出格子給新的生物。跟被擊倒一樣，進化堆疊與道具都進棄牌區。 */
@@ -501,17 +405,13 @@ function dismiss(ctx: Ctx, a: ActionOf<'dismiss'>): void {
   p.discard.push(...creature.cards);
   if (creature.item !== null) p.discard.push(creature.item);
   ctx.events.push({ type: 'dismissed', player: a.player, zone: a.zone, cardId: currentCardId(creature) });
-  declared(ctx, a.player, null);
 }
 
-function endTurn(ctx: Ctx): void {
-  ctx.state.endingTurn = true;
-  offerEndOfTurn(ctx);
-}
-
-function pass(ctx: Ctx, a: ActionOf<'pass'>): void {
-  ctx.events.push({ type: 'passed', player: a.player });
-  settle(ctx);
+/** 回合結束：自己灼燒的生物受到傷害，然後換對手。 */
+function endTurn(ctx: Ctx, a: ActionOf<'endTurn'>): void {
+  tickBurn(ctx, a.player);
+  if (ctx.state.phase !== 'main') return;
+  startTurn(ctx, other(a.player));
 }
 
 function dispatch(ctx: Ctx, action: Action): void {
@@ -523,18 +423,6 @@ function dispatch(ctx: Ctx, action: Action): void {
   if (action.type === 'mulligan') return mulligan(ctx, action);
 
   if (state.phase !== 'main') fail('WRONG_PHASE', '雙方都完成重抽後才能開始行動');
-
-  if (state.window !== null) {
-    // 等待回應時，只有被問的那一方能動，而且只能不回應、施放瞬發法術或發動【瞬發】技能。
-    if (action.player !== state.window) fail('WAITING_FOR_RESPONSE', '正在等對手決定要不要回應');
-    if (action.type === 'pass') return pass(ctx, action);
-    if (action.type !== 'castSpell' && action.type !== 'useSkill') {
-      fail('NOT_INSTANT', '回應只能施放瞬發法術，或發動【瞬發】技能');
-    }
-    ctx.events.push({ type: 'responded', player: action.player });
-    return action.type === 'castSpell' ? castSpell(ctx, action) : useSkill(ctx, action);
-  }
-
   if (action.player !== state.activePlayer) fail('NOT_YOUR_TURN', '現在不是你的回合');
 
   switch (action.type) {
@@ -557,9 +445,7 @@ function dispatch(ctx: Ctx, action: Action): void {
     case 'dismiss':
       return dismiss(ctx, action);
     case 'endTurn':
-      return endTurn(ctx);
-    case 'pass':
-      fail('NOTHING_TO_RESPOND', '現在沒有需要回應的東西');
+      return endTurn(ctx, action);
   }
 }
 
@@ -618,9 +504,6 @@ export function createEngine(db: CardDb) {
       players: [newPlayer(config.players[0].heroId), newPlayer(config.players[1].heroId)],
       result: null,
       nextUid: 1,
-      chain: [],
-      window: null,
-      endingTurn: false,
     };
 
     return run(initial, (ctx) => {
@@ -680,29 +563,6 @@ export function createEngine(db: CardDb) {
       if (ability.target.kind === 'none') candidates.push(base);
       else for (const target of targets) candidates.push({ ...base, target });
     };
-    const skills = (instantOnly: boolean) =>
-      p.zones.forEach((creature, zone) => {
-        if (creature === null) return;
-        creatureDef(db, creature).skills.forEach((skill, index) => {
-          if (instantOnly && !skill.instant) return;
-          const ref: AbilityRef = { kind: 'skill', zone, skill: index };
-          withTargets({ type: 'useSkill', player, zone, skill: index }, skill, targetsFor(state, player, ref));
-        });
-      });
-
-    if (state.window !== null) {
-      // 等待回應：只有被問的那一方能動，選項是不回應、瞬發法術、【瞬發】技能。
-      if (state.window !== player) return [];
-      candidates.push({ type: 'pass', player });
-      for (const card of p.hand) {
-        const def = cardDef(db, card.cardId);
-        if (def.kind !== 'spell' || !def.instant) continue;
-        const spell = spellAbility(db, card.cardId)!;
-        withTargets({ type: 'castSpell', player, card: card.uid }, spell, targetsFor(state, player, { kind: 'spell', card: card.uid }));
-      }
-      skills(true);
-      return expand(state, candidates);
-    }
     if (state.activePlayer !== player) return [];
 
     const zones = Array.from({ length: state.rules.zones }, (_, zone) => zone);
@@ -729,9 +589,13 @@ export function createEngine(db: CardDb) {
         for (const target of targets) candidates.push({ type: 'evolveHero', player, card: card.uid, target });
       }
     }
-    skills(false);
     p.zones.forEach((creature, zone) => {
-      if (creature !== null) candidates.push({ type: 'dismiss', player, zone });
+      if (creature === null) return;
+      creatureDef(db, creature).skills.forEach((skill, index) => {
+        const ref: AbilityRef = { kind: 'skill', zone, skill: index };
+        withTargets({ type: 'useSkill', player, zone, skill: index }, skill, targetsFor(state, player, ref));
+      });
+      candidates.push({ type: 'dismiss', player, zone });
     });
     const power = currentHeroPower(db, state, player);
     if (power) withTargets({ type: 'heroPower', player }, power, targetsFor(state, player, { kind: 'heroPower' }));
@@ -748,10 +612,10 @@ export function createEngine(db: CardDb) {
     return out;
   }
 
-  /** 現在輪到誰做決定：等待回應時是被問的一方，否則是輪到的玩家。重抽階段是還沒重抽的一方。 */
+  /** 現在輪到誰做決定：輪到的玩家；重抽階段是還沒重抽的一方。 */
   function actor(state: GameState): PlayerId {
     if (state.phase === 'mulligan') return state.players[0].mulliganDone ? 1 : 0;
-    return state.window ?? state.activePlayer;
+    return state.activePlayer;
   }
 
   /** 列出這位玩家現在所有合法的動作。 */

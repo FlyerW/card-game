@@ -23,6 +23,6 @@ export { RuleError } from './errors';
 export type { ErrorCode } from './errors';
 export * from './describe';
 export { eventsFor } from './view';
-export type { ChainLinkView, CreatureView, PlayerView, SideView } from './view';
+export type { CreatureView, PlayerView, SideView } from './view';
 export { SAMPLE_CARDS, SAMPLE_HEROES, sampleDb } from './cards/sample';
 export * from './types';

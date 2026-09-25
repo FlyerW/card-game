@@ -81,15 +81,11 @@ describe('範例卡池', () => {
     }
   });
 
-  it('每個顏色都有一條進化線，也都有瞬發牌', () => {
+  it('每個顏色都有一條進化線', () => {
     const cards = [...sample.cards.values()];
     for (const color of colors) {
       const own = cards.filter((card) => card.colors.includes(color));
       expect(own.some((card) => card.kind === 'creature' && card.stage > 0), `${color} 進化線`).toBe(true);
-      const instant = own.some(
-        (card) => (card.kind === 'spell' && card.instant) || (card.kind === 'creature' && card.skills.some((skill) => skill.instant)),
-      );
-      expect(instant, `${color} 瞬發`).toBe(true);
     }
   });
 });

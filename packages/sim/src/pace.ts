@@ -10,12 +10,8 @@ export const PACE = {
   turn: 10,
   /** 每個動作：選牌或技能、選目標、看動畫，秒。 */
   play: 6,
-  /** 手上有能用的瞬發牌時，決定要不要回應，秒。 */
-  decision: 4,
-  /** 有存能量、但沒有能用的瞬發牌：按一下不回應（或選了這回合都不回應），秒。 */
-  idle: 1,
 } as const;
 
 /** 一局的預估秒數。 */
 export const estimateSeconds = (o: MatchOutcome): number =>
-  o.turns * PACE.turn + o.plays * PACE.play + o.decisionWindows * PACE.decision + o.idleWindows * PACE.idle;
+  o.turns * PACE.turn + o.plays * PACE.play;

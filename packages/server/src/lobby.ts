@@ -209,7 +209,7 @@ export class Lobby {
     client.send({ t: 'state', view: this.engine.viewFor(state, seat), legal: this.legalFor(state, seat), events: eventsFor(events, seat) });
   }
 
-  /** 這個座位現在能做的動作：重抽階段雙方各自決定，之後只有輪到的人（或被問要不要回應的人）能動。 */
+  /** 這個座位現在能做的動作：重抽階段雙方各自決定，之後只有輪到的人能動。 */
   private legalFor(state: GameState, seat: PlayerId) {
     if (state.phase === 'over') return [];
     if (state.phase === 'main' && this.engine.actor(state) !== seat) return [];

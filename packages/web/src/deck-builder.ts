@@ -131,14 +131,13 @@ function poolCard(card: DeckCardDef, deck: readonly string[], focus: string | nu
   const n = count(deck, card.id);
   const hp = card.kind === 'creature' ? `<span class="c-hp">HP ${card.hp}</span>` : '';
   const evo = card.kind === 'creature' && card.stage > 0;
-  const instant = (card.kind === 'spell' && card.instant) || (card.kind === 'creature' && card.skills.some((skill) => skill.instant));
   const addWhy = addProblem(deck, card.id);
   return `<div class="pool-card${n ? ' in-deck' : ''}${focus === card.id ? ' focused' : ''}">
     <button class="card k-${card.kind} r-${card.rarity}" data-focus="${card.id}" aria-label="${esc(card.name)}，看說明">
       <span class="c-cost${evo ? ' evo' : ''}">${evo ? '+' : ''}${card.cost}</span>
       <span class="c-top"><span class="rarity">${card.rarity}</span>${pips(card.colors)}</span>
       <span class="c-name">${esc(card.name)}</span>
-      <span class="c-kind">${kindLabel(card)}${instant && card.kind === 'creature' ? '・瞬發' : ''}</span>${hp}
+      <span class="c-kind">${kindLabel(card)}</span>${hp}
     </button>
     <div class="pc-count">
       <button data-remove="${card.id}" ${n === 0 ? 'disabled' : ''} aria-label="拿掉一張${esc(card.name)}">−</button>

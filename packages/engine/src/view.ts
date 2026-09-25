@@ -12,16 +12,7 @@ import {
   maxHp,
   other,
 } from './queries';
-import type { CardDb, CardRef, ChainLink, Creature, GameEvent, GameResult, GameState, PlayerId, Target } from './types';
-
-/** 連鎖上的一個效果，雙方都看得到：宣告的動作是公開的。 */
-export interface ChainLinkView {
-  player: PlayerId;
-  source: ChainLink['source'];
-  cardId: string;
-  ability: string;
-  target: Target | null;
-}
+import type { CardDb, CardRef, Creature, GameEvent, GameResult, GameState, PlayerId } from './types';
 
 export interface CreatureView {
   uid: number;
@@ -79,12 +70,6 @@ export interface PlayerView {
   /** 對手的英雄從重抽階段就看得到，可以先看對手是誰再決定要不要重抽。 */
   you: SideView & { hand: CardRef[] };
   opponent: SideView;
-  /** 等待結算的連鎖，[0] 在最底下、最後結算。 */
-  chain: ChainLinkView[];
-  /** 正在等誰決定要不要回應。 */
-  window: PlayerId | null;
-  /** 輪到的玩家已經宣告回合結束，正在等最後一次回應。 */
-  endingTurn: boolean;
 }
 
 function creatureView(db: CardDb, state: GameState, creature: Creature): CreatureView {
@@ -151,14 +136,5 @@ export function viewFor(db: CardDb, state: GameState, player: PlayerId): PlayerV
     result: state.result,
     you: { ...sideView(db, state, player), hand: state.players[player].hand.map((card) => ({ ...card })) },
     opponent: sideView(db, state, other(player)),
-    chain: state.chain.map((link) => ({
-      player: link.player,
-      source: link.source,
-      cardId: link.cardId,
-      ability: link.ability.name,
-      target: link.target,
-    })),
-    window: state.window,
-    endingTurn: state.endingTurn,
   };
 }
