@@ -247,7 +247,8 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     kind: 'spell', id: 'healing-light', name: '治癒之光', rarity: 'N', colors: ['white'], cost: 1,
     target: { kind: 'ally', allow: 'any' }, effects: [{ type: 'heal', amount: 4 }, { type: 'draw', count: 1 }],
   },
-  { kind: 'spell', id: 'inspiration', name: '靈感', rarity: 'R', colors: ['blue'], cost: 2, target: NONE, effects: [{ type: 'draw', count: 2 }] },
+  // 抽牌的標準是 3 費抽 2（抽 1 張約 1.5 能量）。
+  { kind: 'spell', id: 'inspiration', name: '靈感', rarity: 'R', colors: ['blue'], cost: 3, target: NONE, effects: [{ type: 'draw', count: 2 }] },
   {
     kind: 'spell', id: 'shatter', name: '裂解', rarity: 'R', colors: ['black'], cost: 2,
     target: { kind: 'enemyItemOrField' }, effects: [{ type: 'destroy' }],
@@ -255,6 +256,15 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   {
     kind: 'spell', id: 'energy-crystal', name: '能量結晶', rarity: 'R', colors: ['green'], cost: 2,
     target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }],
+  },
+  // 跳費：能量上限 +1 約 2 能量，所以 4 費跳兩費，或 4 費跳一費再抽 1 張。
+  {
+    kind: 'spell', id: 'earth-pulse', name: '大地脈動', rarity: 'R', colors: ['green'], cost: 4,
+    target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 2 }],
+  },
+  {
+    kind: 'spell', id: 'harvest-rite', name: '豐收儀式', rarity: 'R', colors: ['green'], cost: 4,
+    target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }, { type: 'draw', count: 1 }],
   },
 
   // ── 道具與場地 ──
@@ -334,7 +344,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
         name: '麻痺電網', cost: 3, target: CREATURE,
         effects: [{ type: 'damage', amount: 3 }, { type: 'paralyze' }], instant: true,
       },
-      { name: '潮汐知識', cost: 2, target: NONE, effects: [{ type: 'draw', count: 2 }] },
+      { name: '潮汐知識', cost: 3, target: NONE, effects: [{ type: 'draw', count: 2 }] },
     ],
   },
   {
@@ -353,7 +363,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     stage: 0, cost: 6, hp: 15,
     skills: [
       hit('潮湧', 4, DIAGONAL, 15),
-      { name: '深海呼喚', cost: 2, target: NONE, effects: [{ type: 'draw', count: 2 }] },
+      { name: '深海呼喚', cost: 3, target: NONE, effects: [{ type: 'draw', count: 2 }] },
     ],
   },
   { kind: 'spell', id: 'ice-shard', name: '冰錐', rarity: 'N', colors: ['blue'], cost: 2, instant: true, target: ANY, effects: [{ type: 'damage', amount: 4 }] },

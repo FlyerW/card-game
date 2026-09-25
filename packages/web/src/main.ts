@@ -55,7 +55,8 @@ type Selection =
   | { kind: 'hand'; uid: number }
   /** 已經選好召喚或進化的格子，正在選進場效果的目標。 */
   | { kind: 'entry'; uid: number; zone: number }
-  | { kind: 'creature'; player: PlayerId; zone: number }
+  /** confirmDismiss：按了「退場」，等再按一次確認。 */
+  | { kind: 'creature'; player: PlayerId; zone: number; confirmDismiss?: boolean }
   | { kind: 'skill'; zone: number; skill: number }
   | { kind: 'heroPower' }
   | { kind: 'hero'; player: PlayerId }
@@ -563,6 +564,14 @@ function detail(view: PlayerView): string {
           ${reason ? `<span class="skill-why">${esc(reason)}</span>` : ''}</button>`;
       });
       body += '</div>';
+      const dismiss = app.legalActions.find((a) => a.type === 'dismiss' && a.zone === sel.zone);
+      if (dismiss && sel.confirmDismiss) {
+        const extra = cv.item === null && cv.evolutionChain.length === 1 ? '' : '（進化前的牌和道具也一起）';
+        body += `<p class="hint blocked">${esc(def.name)}會送進棄牌區${extra}，不能收回。</p>
+          <div class="respond"><button class="primary" data-do="dismiss-confirm">確定退場</button><button class="ghost" data-do="dismiss-cancel">留著</button></div>`;
+      } else if (dismiss) {
+        body += '<button class="ghost" data-do="dismiss">退場（空出這一格）</button>';
+      }
     }
     return toast + body + cancel;
   }
@@ -628,7 +637,6 @@ function zone(cv: CreatureView | null, player: PlayerId, index: number, picks: M
   // 左上角顯示這隻生物總共花了多少費用，進化過的顯示成 4+3，一眼看出對手在牠身上投資了多少。
   const invested = cv.evolutionChain.map((id) => card(id).cost).join('+');
   return `<button class="${classes.join(' ')} r-${def.rarity}" data-key="${key}" aria-label="${esc(def.name)}，費用 ${invested}，HP ${cv.hp}">
-    <span class="zone-num">${ZONE[index]}</span>
     <span class="z-top"><span class="z-cost">${invested}</span><span class="rarity">${def.rarity}</span>${pips(def.colors)}</span>
     <span class="z-name">${esc(def.name)}</span>
     <span class="z-hp${hurt}"><b>${cv.hp}</b><small>/${cv.maxHp}</small></span>
@@ -1083,6 +1091,11 @@ root.addEventListener('click', (event) => {
       (a) => a.type === 'playField' || a.type === 'evolveHero' || (a.type === 'castSpell' && !a.target),
     );
     if (act) perform(act);
+  } else if ((command === 'dismiss' || command === 'dismiss-cancel') && app.selection?.kind === 'creature') {
+    app.selection = { ...app.selection, confirmDismiss: command === 'dismiss' };
+    render();
+  } else if (command === 'dismiss-confirm' && app.selection?.kind === 'creature') {
+    perform({ type: 'dismiss', player: YOU, zone: app.selection.zone });
   } else if (command === 'cancel') {
     app.selection = null;
     render();

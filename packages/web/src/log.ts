@@ -78,6 +78,9 @@ export function describeEvents(
       case 'summoned':
         lines.push({ text: `${who(event.player)}在 ${ZONE[event.zone]} 召喚 ${name(event.cardId)}`, tone: tone(event.player) });
         break;
+      case 'dismissed':
+        lines.push({ text: `${who(event.player)}讓 ${ZONE[event.zone]} ${name(event.cardId)}退場`, tone: tone(event.player) });
+        break;
       case 'evolved':
         lines.push({
           text: `${who(event.player)}的 ${ZONE[event.zone]} ${name(event.from)} 進化為 ${name(event.to)}`,

@@ -147,25 +147,27 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .f-name { font: 700 12px/1.25 var(--display); color: #cde6b3; word-break: break-all; }
 
 .zone {
-  position: relative; display: grid; grid-template-rows: auto auto 1fr auto; gap: 2px; text-align: left;
+  /* 第一列費用，第二列左邊名字、右邊 HP，最下面狀態標籤 */
+  position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto 1fr auto;
+  gap: 2px 4px; text-align: left;
   aspect-ratio: 3 / 3.4; min-width: 0; max-width: 100%; padding: 6px 7px;
   background: var(--zone); border: 1.5px solid var(--zone-edge); border-radius: var(--radius);
 }
 .zone.empty { background: #22303b; border-color: #7f9bb055; border-style: dashed; place-items: center; }
-.zone.empty .zone-num { position: static; font-size: 20px; }
-.zone-num { position: absolute; right: 6px; bottom: 3px; color: var(--ink-faint); font-size: 12px; }
-.z-top { display: flex; align-items: center; gap: 5px; }
+.zone.empty { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+.zone-num { color: var(--ink-faint); font-size: 20px; }
+.z-top { grid-column: 1 / -1; display: flex; align-items: center; gap: 5px; }
 .z-top .pips { margin-left: auto; }
 .z-cost {
   font: 700 13px/1 var(--num); color: #0c2530; background: var(--energy); border-radius: 4px;
   padding: 2px 5px; font-variant-numeric: tabular-nums; letter-spacing: .02em;
 }
-.z-name { font: 700 14px/1.2 var(--display); word-break: break-all; }
-.z-hp { align-self: end; font-family: var(--num); }
+.z-name { align-self: start; font: 700 14px/1.2 var(--display); word-break: break-all; }
+.z-hp { align-self: start; text-align: right; white-space: nowrap; font-family: var(--num); }
 .z-hp b { font-size: 24px; font-weight: 700; line-height: 1; }
 .z-hp small { color: var(--ink-soft); font-size: 13px; }
 .z-hp.hurt b { color: var(--damage); }
-.badges { display: flex; flex-wrap: wrap; gap: 3px; min-height: 0; }
+.badges { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 3px; min-height: 0; }
 .badge { font-style: normal; font-size: 10.5px; line-height: 1.4; padding: 0 5px; border-radius: 3px; background: #0004; color: var(--ink-soft); }
 .badge.poison { color: #c9a0ff; } .badge.burn { color: #ff9a7a; } .badge.para { color: #ffe27a; } .badge.sleep { color: #9fc3ff; }
 .badge.atk { color: #ffb38a; } .badge.def { color: #9fdcea; } .badge.item { color: #d7c8f0; } .badge.taunt { color: #1d1408; background: var(--white); }
@@ -387,10 +389,12 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
   body { padding-inline: 10px; }
   .board { padding: 8px; gap: 6px; border-radius: 12px; }
   .row { grid-template-columns: 36px repeat(5, minmax(0, 1fr)) 36px; gap: 4px; }
-  .zone { padding: 4px; aspect-ratio: 3 / 4.2; }
+  /* 手機的格子太窄，HP 放回名字下面，不然名字會被擠成直的 */
+  .zone { padding: 4px; aspect-ratio: 3 / 4.2; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto 1fr auto; }
+  .z-hp { align-self: end; text-align: left; }
   .z-name { font-size: 11.5px; }
   .z-hp b { font-size: 18px; } .z-hp small { font-size: 11px; }
-  .z-top .pips, .zone-num, .badge.item, .zone .rarity { display: none; }
+  .z-top .pips, .badge.item, .zone .rarity { display: none; }
   .z-cost { font-size: 11px; padding: 1px 3px; }
   .f-label { display: none; } .f-name { font-size: 10px; }
   .pile { font-size: 9px; } .pile b { font-size: 14px; }

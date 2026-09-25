@@ -348,6 +348,8 @@ export type Action =
   | { type: 'castSpell'; player: PlayerId; card: number; target?: Target }
   | { type: 'attachItem'; player: PlayerId; card: number; zone: number }
   | { type: 'playField'; player: PlayerId; card: number }
+  /** 讓自己的生物退場：連同身上的道具送進棄牌區，空出格子。不花能量。 */
+  | { type: 'dismiss'; player: PlayerId; zone: number }
   | { type: 'endTurn'; player: PlayerId }
   /** 不回應：連鎖從最後加入的開始往回結算；在宣告回合結束時不回應，回合就結束。 */
   | { type: 'pass'; player: PlayerId }
@@ -378,6 +380,8 @@ export type GameEvent =
   | { type: 'taunting'; player: PlayerId; zone: number }
   | { type: 'discarded'; player: PlayerId; cardId: string }
   | { type: 'creatureDestroyed'; player: PlayerId; zone: number; cardId: string }
+  /** 玩家主動讓自己的生物退場。 */
+  | { type: 'dismissed'; player: PlayerId; zone: number; cardId: string }
   | { type: 'itemDestroyed'; player: PlayerId; zone: number; cardId: string }
   | { type: 'fieldDestroyed'; player: PlayerId; cardId: string }
   | { type: 'maxEnergyGained'; player: PlayerId; amount: number }

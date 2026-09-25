@@ -493,6 +493,17 @@ function playField(ctx: Ctx, a: ActionOf<'playField'>): void {
   declared(ctx, a.player, null);
 }
 
+/** 讓自己的生物退場，空出格子給新的生物。跟被擊倒一樣，進化堆疊與道具都進棄牌區。 */
+function dismiss(ctx: Ctx, a: ActionOf<'dismiss'>): void {
+  const p = ctx.state.players[a.player];
+  const creature = ownCreature(ctx.state, a.player, a.zone);
+  p.zones[a.zone] = null;
+  p.discard.push(...creature.cards);
+  if (creature.item !== null) p.discard.push(creature.item);
+  ctx.events.push({ type: 'dismissed', player: a.player, zone: a.zone, cardId: currentCardId(creature) });
+  declared(ctx, a.player, null);
+}
+
 function endTurn(ctx: Ctx): void {
   ctx.state.endingTurn = true;
   offerEndOfTurn(ctx);
@@ -543,6 +554,8 @@ function dispatch(ctx: Ctx, action: Action): void {
       return attachItem(ctx, action);
     case 'playField':
       return playField(ctx, action);
+    case 'dismiss':
+      return dismiss(ctx, action);
     case 'endTurn':
       return endTurn(ctx);
     case 'pass':
@@ -717,6 +730,9 @@ export function createEngine(db: CardDb) {
       }
     }
     skills(false);
+    p.zones.forEach((creature, zone) => {
+      if (creature !== null) candidates.push({ type: 'dismiss', player, zone });
+    });
     const power = currentHeroPower(db, state, player);
     if (power) withTargets({ type: 'heroPower', player }, power, targetsFor(state, player, { kind: 'heroPower' }));
     candidates.push({ type: 'endTurn', player });

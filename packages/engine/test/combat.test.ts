@@ -303,6 +303,25 @@ describe('手牌上限', () => {
   });
 });
 
+describe('退場', () => {
+  it('讓自己的生物退場：連同道具進棄牌區，空出的格子可以再召喚', () => {
+    let { state, a } = start();
+    place(state, a, 0, 'hitter', { item: { uid: 900, cardId: 'armor' } });
+    state = act(state, { type: 'dismiss', player: a, zone: 0 });
+    expect(at(state, a, 0)).toBeNull();
+    expect(state.players[a].discard.map((card) => card.cardId)).toEqual(['hitter', 'armor']);
+    expect(state.players[a].energy).toBe(1); // 不花能量
+    act(state, { type: 'summon', player: a, card: give(state, a, 'wolf'), zone: 0 });
+  });
+
+  it('只能在自己的回合讓自己的生物退場；空格不行', () => {
+    const { state, a, b } = start();
+    place(state, b, 0, 'hitter');
+    expect(reject(state, { type: 'dismiss', player: b, zone: 0 })).toBe('NOT_YOUR_TURN');
+    expect(reject(state, { type: 'dismiss', player: a, zone: 0 })).toBe('NO_CREATURE');
+  });
+});
+
 describe('英雄進化', () => {
   function pingerGame() {
     const started = start();
