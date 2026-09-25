@@ -1,4 +1,4 @@
-import type { CardDb, GameEvent, GameState, PlayerId, Target } from '@card-game/engine';
+import type { CardDb, GameEvent, PlayerId, PlayerView, Target } from '@card-game/engine';
 
 // 把引擎的事件翻成對戰紀錄裡的一句話。
 
@@ -10,23 +10,26 @@ export interface LogLine {
 }
 
 /** 事件發生時，目標生物可能已經被擊倒；先查動作前的局面，找不到再查動作後的。 */
-function creatureName(db: CardDb, states: GameState[], player: PlayerId, zone: number): string {
-  for (const state of states) {
-    const creature = state.players[player].zones[zone];
-    if (creature) return db.cards.get(creature.cards.at(-1)!.cardId)?.name ?? '生物';
+function creatureName(db: CardDb, views: PlayerView[], player: PlayerId, zone: number): string {
+  for (const view of views) {
+    const side = player === view.viewer ? view.you : view.opponent;
+    const creature = side.zones[zone];
+    if (creature) return db.cards.get(creature.cardId)?.name ?? '生物';
   }
   return '生物';
 }
 
+/** 把一個動作產生的事件翻成紀錄。`them` 是對手的稱呼：「電腦」或朋友的名字。 */
 export function describeEvents(
   db: CardDb,
   events: GameEvent[],
-  before: GameState,
-  after: GameState,
-  you: PlayerId,
+  before: PlayerView,
+  after: PlayerView,
+  them: string,
 ): LogLine[] {
+  const you = after.viewer;
   const name = (id: string) => db.cards.get(id)?.name ?? db.heroes.get(id)?.name ?? id;
-  const who = (player: PlayerId) => (player === you ? '你' : '電腦');
+  const who = (player: PlayerId) => (player === you ? '你' : them);
   /** 法術的效果名就是卡名，只寫一次。 */
   const ability = (cardId: string, abilityName: string) =>
     name(cardId) === abilityName ? name(cardId) : `${name(cardId)}「${abilityName}」`;
@@ -57,7 +60,7 @@ export function describeEvents(
         if (event.player === you) {
           lines.push({ text: `你抽到 ${event.cards.map((card) => name(card.cardId)).join('、')}`, tone: 'you' });
         } else {
-          lines.push({ text: `電腦抽了 ${event.cards.length} 張`, tone: 'bot' });
+          lines.push({ text: `${them}抽了 ${event.cards.length} 張`, tone: 'bot' });
         }
         break;
       case 'burned':
@@ -167,7 +170,7 @@ export function describeEvents(
       case 'gameOver': {
         const { winner, reason } = event.result;
         const why = { heroDefeated: '英雄被打倒', deckOut: '牌庫抽完', concede: '投降' }[reason];
-        const text = winner === 'draw' ? `平手（${why}）` : `${winner === you ? '你贏了' : '電腦贏了'}（${why}）`;
+        const text = winner === 'draw' ? `平手（${why}）` : `${winner === you ? '你贏了' : `${them}贏了`}（${why}）`;
         lines.push({ text, tone: 'end' });
         break;
       }

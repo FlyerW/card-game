@@ -290,6 +290,24 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .deck-bar .d-line.warn { color: #ffc9c2; }
 .primary:disabled { filter: grayscale(1) brightness(.6); cursor: default; }
 
+/* ─── 連線對戰 ─── */
+.online { display: grid; gap: 12px; background: var(--mat); border: 1px solid var(--mat-edge); border-radius: var(--radius); padding: 14px 16px; }
+.invite { margin: 0; padding: 8px 12px; border-radius: 6px; background: #f0b35a1f; color: var(--hero-ink); }
+.field-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--ink-soft); font-size: 13px; }
+.online input {
+  font: inherit; color: var(--ink); background: var(--page); border: 1px solid var(--mat-edge); border-radius: 6px; padding: 7px 10px;
+}
+.online input:focus-visible { outline: 2px solid var(--pick); outline-offset: 1px; }
+#player-name { width: min(220px, 100%); }
+#room-code { width: 5.5em; text-transform: uppercase; letter-spacing: .15em; font-family: var(--num); font-size: 17px; padding-block: 5px; }
+.online-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.online-actions .primary.big { justify-self: auto; }
+.join { display: inline-flex; gap: 6px; align-items: center; }
+.or { color: var(--ink-faint); font-size: 13px; }
+.lobby header h1 { font-family: var(--num); letter-spacing: .12em; }
+.lobby code { font-family: var(--num); font-size: 15px; color: var(--ink); word-break: break-all; }
+.lobby > .ghost { justify-self: start; }
+
 /* ─── 組牌 ─── */
 .builder { max-width: 1180px; margin: 0 auto; display: grid; gap: 14px; padding-bottom: 32px; }
 .b-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }

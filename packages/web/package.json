@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@card-game/engine": "*",
-    "@card-game/sim": "*"
+    "@card-game/sim": "*",
+    "@card-game/server": "*"
   }
 }

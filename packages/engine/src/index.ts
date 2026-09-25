@@ -22,6 +22,7 @@ export { DEFAULT_RULES, LEGACY_ENERGY_RULES } from './rules';
 export { RuleError } from './errors';
 export type { ErrorCode } from './errors';
 export * from './describe';
+export { eventsFor } from './view';
 export type { ChainLinkView, CreatureView, PlayerView, SideView } from './view';
 export { SAMPLE_CARDS, SAMPLE_HEROES, sampleDb } from './cards/sample';
 export * from './types';

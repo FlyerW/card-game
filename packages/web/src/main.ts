@@ -4,7 +4,7 @@ import {
   describeCard,
   describeColors,
   describeHero,
-  heroPower,
+  other,
   sampleDb,
   SAMPLE_CARDS,
   SAMPLE_HEROES,
@@ -13,6 +13,7 @@ import {
   type DeckCardDef,
   type GameEvent,
   type GameState,
+  type HeroDef,
   type PlayerId,
   type PlayerView,
   type SideView,
@@ -32,12 +33,17 @@ import {
   type Builder,
   type KindFilter,
 } from './deck-builder';
+import { ONLINE_AVAILABLE, OnlineClient } from './online';
 import { esc, kindLabel, pips } from './ui';
 import './style.css';
 
 const db = sampleDb();
 const engine = createEngine(db);
-const YOU: PlayerId = 0;
+/** 你的座位。跟電腦打時是 0；連線對戰時由伺服器決定。 */
+let YOU: PlayerId = 0;
+/** 對手的座位。 */
+const THEM = (): PlayerId => other(YOU);
+/** 跟電腦打時電腦的座位。 */
 const BOT: PlayerId = 1;
 const BOT_STEP_MS = 750;
 /** 輪到你回應但沒有瞬發牌可用時，停一下再自動跳過，紀錄才看得清楚。 */
@@ -56,7 +62,7 @@ type Selection =
   | { kind: 'field'; player: PlayerId };
 
 interface Saved {
-  screen: 'setup' | 'deck' | 'play';
+  screen: 'setup' | 'deck' | 'lobby' | 'play';
   heroId: string;
   /** 每個英雄的自訂牌組；沒有就每局自動組。 */
   decks: Record<string, string[]>;
@@ -66,6 +72,14 @@ interface Saved {
 }
 
 interface App extends Saved {
+  /** 跟電腦打，或連線對戰。 */
+  mode: 'bot' | 'online';
+  /** 畫面上的局面：你的視角。跟電腦打時由 state 算出來，連線時由伺服器送來。 */
+  view: PlayerView | null;
+  /** 你現在能做的動作。 */
+  legalActions: Action[];
+  /** 連線對戰：送出動作後、等伺服器回覆前，先不能再點。 */
+  pending: boolean;
   selection: Selection | null;
   busy: boolean;
   toast: string | null;
@@ -74,6 +88,10 @@ interface App extends Saved {
   builder: Builder;
   /** 卡牌大小：true 縮小、false 放大；null 表示照視窗高度自動決定。 */
   compactPref: boolean | null;
+  /** 連線對戰時顯示給對手看的名字。 */
+  playerName: string;
+  /** 開局畫面上輸入的房號；網址帶 ?room= 時預先填好。 */
+  roomCode: string;
 }
 
 const app: App = {
@@ -82,6 +100,10 @@ const app: App = {
   decks: loadDecks(db),
   builder: { heroId: SAMPLE_HEROES[1]!.id, filter: 'all', focus: null },
   state: null,
+  mode: 'bot',
+  view: null,
+  legalActions: [],
+  pending: false,
   log: [],
   redraw: [],
   selection: null,
@@ -89,7 +111,81 @@ const app: App = {
   toast: null,
   skipResponsesTurn: null,
   compactPref: loadDensity(),
+  playerName: loadName(),
+  roomCode: new URLSearchParams(location.search).get('room')?.toUpperCase() ?? '',
 };
+
+function loadName(): string {
+  try {
+    return localStorage.getItem('card-game.name') ?? '';
+  } catch {
+    return '';
+  }
+}
+
+// ─── 連線對戰 ────────────────────────────────────────────────────────────────
+
+const online = new OnlineClient();
+online.onStatus = () => render();
+online.onMessage = (message) => {
+  if (message.t === 'room') {
+    app.mode = 'online';
+    YOU = message.seat;
+    // 還沒開局（等朋友加入）就留在等候畫面；已經在打就只是更新對手的連線狀態。
+    if (app.screen !== 'play') app.screen = 'lobby';
+    render();
+  } else if (message.t === 'state') {
+    app.mode = 'online';
+    app.pending = false;
+    const fresh = message.view.phase === 'mulligan' && app.view?.phase !== 'mulligan';
+    if (fresh) Object.assign(app, { log: [], redraw: [], selection: null, skipResponsesTurn: null, view: null });
+    app.screen = 'play';
+    step(app.view ?? message.view, message.view, message.legal, message.events);
+    scheduleOnlinePass();
+  } else {
+    app.pending = false;
+    app.toast = message.message;
+    if (message.fatal) {
+      app.mode = 'bot';
+      app.screen = 'setup';
+      app.view = null;
+    }
+    render();
+  }
+};
+
+/**
+ * 連線時輪到你回應、但沒有能用的瞬發牌，就自動不回應。等一段不固定的時間再送，
+ * 對手才不能從回得多快猜出你手上有沒有瞬發牌。
+ */
+function scheduleOnlinePass(): void {
+  const view = app.view;
+  if (!view || !shouldAutoPass(view)) return;
+  setTimeout(() => {
+    if (app.view === view && app.mode === 'online' && !app.pending) perform({ type: 'pass', player: YOU });
+  }, 600 + Math.random() * 900);
+}
+
+function createRoom(): void {
+  online.send({ t: 'create', name: app.playerName, heroId: app.heroId, deck: myDeck() });
+}
+
+function joinRoom(): void {
+  const code = app.roomCode.trim().toUpperCase();
+  if (!code) {
+    app.toast = '先輸入朋友給你的房號';
+    render();
+    return;
+  }
+  online.send({ t: 'join', code, name: app.playerName, heroId: app.heroId, deck: myDeck() });
+}
+
+function leaveRoom(): void {
+  online.leave();
+  Object.assign(app, { mode: 'bot', screen: 'setup', view: null, state: null, selection: null, toast: null, pending: false });
+  history.replaceState(null, '', location.pathname);
+  render();
+}
 
 // ─── 卡牌大小：整個牌桌要放得進一個畫面 ────────────────────────────────────────
 
@@ -138,12 +234,10 @@ const targetKey = (t: Target) => (t.kind === 'hero' ? `h${t.player}` : t.kind ==
 //
 // 畫面上能點的東西全部由引擎的合法動作推出來，網頁不自己判斷規則。
 
-let legalCache: { state: GameState; actions: Action[] } | null = null;
 function legal(): Action[] {
-  const s = app.state;
-  if (s === null || app.busy || s.phase !== 'main' || engine.actor(s) !== YOU) return [];
-  if (legalCache?.state !== s) legalCache = { state: s, actions: engine.legalActions(s, YOU) };
-  return legalCache.actions;
+  const view = app.view;
+  if (view === null || app.busy || app.pending || view.phase !== 'main') return [];
+  return app.legalActions;
 }
 
 const actsForCard = (uid: number) => legal().filter((a) => 'card' in a && a.card === uid);
@@ -188,9 +282,11 @@ function floatsFrom(events: GameEvent[]): Float[] {
   return out;
 }
 
-function step(before: GameState, after: GameState, events: GameEvent[]): void {
-  app.state = after;
-  app.log.push(...describeEvents(db, events, before, after, YOU));
+/** 局面變了：更新畫面、寫紀錄、播飄字。兩種模式共用。 */
+function step(before: PlayerView, after: PlayerView, legalActions: Action[], events: GameEvent[]): void {
+  app.view = after;
+  app.legalActions = legalActions;
+  app.log.push(...describeEvents(db, events, before, after, themName()));
   if (app.log.length > 300) app.log.splice(0, app.log.length - 300);
   app.selection = null;
   app.toast = null;
@@ -198,7 +294,24 @@ function step(before: GameState, after: GameState, events: GameEvent[]): void {
   render();
 }
 
+// ─── 跟電腦打：完整的狀態在這個瀏覽器裡 ───────────────────────────────────────
+
+const localLegal = (state: GameState): Action[] =>
+  state.phase === 'main' && engine.actor(state) === YOU ? engine.legalActions(state, YOU) : [];
+
+function localStep(after: GameState, events: GameEvent[]): void {
+  const before = app.view ?? engine.viewFor(after, YOU);
+  app.state = after;
+  step(before, engine.viewFor(after, YOU), localLegal(after), events);
+}
+
 function perform(action: Action): void {
+  if (app.mode === 'online') {
+    app.pending = true;
+    online.send({ t: 'act', action });
+    render();
+    return;
+  }
   const before = app.state;
   if (before === null) return;
   const result = engine.apply(before, action);
@@ -207,38 +320,38 @@ function perform(action: Action): void {
     render();
     return;
   }
-  step(before, result.state, result.events);
+  localStep(result.state, result.events);
   void advance();
 }
 
 /** 輪到你回應，但手上沒有能用的瞬發牌，或你選了這回合都不回應，就自動跳過。 */
-function shouldAutoPass(s: GameState): boolean {
-  if (s.window !== YOU) return false;
-  if (app.skipResponsesTurn === s.turn) return true;
-  return engine.legalActions(s, YOU).every((a) => a.type === 'pass');
+function shouldAutoPass(view: PlayerView): boolean {
+  if (view.phase !== 'main' || view.window !== YOU) return false;
+  if (app.skipResponsesTurn === view.turn) return true;
+  return app.legalActions.every((a) => a.type === 'pass');
 }
 
 /**
- * 輪到電腦做決定（它的回合，或它要不要回應你）就讓它一步一步慢慢播，看得清楚它做了什麼；
+ * 跟電腦打：輪到電腦做決定（它的回合，或它要不要回應你）就讓它一步一步慢慢播，看得清楚它做了什麼；
  * 輪到你回應但沒得回應就自動跳過；輪到你真的要做決定時停下來。
  */
 async function advance(): Promise<void> {
-  if (app.busy) return;
+  if (app.mode !== 'bot' || app.busy) return;
   app.busy = true;
   render();
-  while (app.state !== null && app.state.phase === 'main' && app.screen === 'play') {
+  while (app.state !== null && app.state.phase === 'main' && app.screen === 'play' && app.mode === 'bot') {
     const before = app.state;
     if (engine.actor(before) === BOT) {
       await sleep(BOT_STEP_MS);
       if (app.state !== before) break;
       const pick = chooseAction(engine, before, BOT, STYLES.balanced);
-      step(before, pick.state, pick.events);
-    } else if (shouldAutoPass(before)) {
+      localStep(pick.state, pick.events);
+    } else if (app.view && shouldAutoPass(app.view)) {
       await sleep(AUTO_PASS_MS);
       if (app.state !== before) break;
       const passed = engine.apply(before, { type: 'pass', player: YOU });
       if (!passed.ok) break;
-      step(before, passed.state, passed.events);
+      localStep(passed.state, passed.events);
     } else {
       break;
     }
@@ -251,11 +364,12 @@ function startGame(): void {
   const seed = (Math.random() * 2 ** 32) >>> 0;
   const rivals = SAMPLE_HEROES.filter((h) => h.id !== app.heroId);
   const rival = rivals[seed % rivals.length]!.id;
+  YOU = 0;
   // 雙方都照正式規則組牌；你有自訂牌組就用你的，電腦每局自動組一副。
   const created = engine.createGame({
     seed,
     players: [
-      { heroId: app.heroId, deck: app.decks[app.heroId] ?? autoDeck(db, app.heroId, seed ^ 0x9e3779b9) },
+      { heroId: app.heroId, deck: myDeck() },
       { heroId: rival, deck: autoDeck(db, rival, seed + 1) },
     ],
   });
@@ -266,8 +380,23 @@ function startGame(): void {
   }
   const kept = engine.apply(created.state, { type: 'mulligan', player: BOT, cards: [] });
   if (!kept.ok) return;
-  Object.assign(app, { screen: 'play', state: kept.state, log: [], redraw: [], selection: null, toast: null, skipResponsesTurn: null });
-  render();
+  Object.assign(app, { mode: 'bot', screen: 'play', log: [], redraw: [], selection: null, toast: null, skipResponsesTurn: null, view: null });
+  localStep(kept.state, []);
+}
+
+/** 你這局要用的牌組：有自訂牌組就用，沒有就自動組一副。 */
+const myDeck = (): string[] => app.decks[app.heroId] ?? autoDeck(db, app.heroId, (Math.random() * 2 ** 32) >>> 0);
+
+/** 目前的天生技：英雄進化卡有新的就用新的。 */
+function powerOf(side: SideView) {
+  const evolution = side.heroEvolution ? card(side.heroEvolution) : null;
+  return (evolution?.kind === 'heroEvolution' ? evolution.power : undefined) ?? hero(side.heroId).power;
+}
+
+/** 對手的稱呼：電腦，或朋友取的名字。 */
+function themName(): string {
+  if (app.mode !== 'online') return '電腦';
+  return online.room?.seats[THEM()]?.name || '對手';
 }
 
 // ─── 說明欄的文字 ────────────────────────────────────────────────────────────
@@ -308,11 +437,12 @@ function lines(texts: string[]): string {
 }
 
 /** 現在輪到你做決定：你的回合，或輪到你決定要不要回應。 */
-const myMove = (view: PlayerView) => view.phase === 'main' && (view.window ?? view.activePlayer) === YOU && !app.busy;
+const myMove = (view: PlayerView) =>
+  view.phase === 'main' && (view.window ?? view.activePlayer) === YOU && !app.busy && !app.pending;
 
 function targetLabel(view: PlayerView, target: Target): string {
   const side = target.player === YOU ? view.you : view.opponent;
-  const owner = target.player === YOU ? '你的' : '電腦的';
+  const owner = target.player === YOU ? '你的' : `${themName()}的`;
   if (target.kind === 'hero') return `${owner}英雄`;
   if (target.kind === 'field') return `${owner}場地卡`;
   const cv = side.zones[target.zone];
@@ -325,7 +455,7 @@ function chainBox(view: PlayerView): string {
   const items = [...view.chain]
     .reverse()
     .map((l) => {
-      const who = l.player === YOU ? '你' : '電腦';
+      const who = l.player === YOU ? '你' : themName();
       const target = l.target ? ` → ${targetLabel(view, l.target)}` : '';
       const what = l.source === 'spell' ? nameOf(l.cardId) : `${nameOf(l.cardId)}「${l.ability}」`;
       return `<li class="${l.player === YOU ? 't-you' : 't-bot'}">${who}：${esc(what)}${esc(target)}</li>`;
@@ -338,10 +468,10 @@ function chainBox(view: PlayerView): string {
 function responsePrompt(view: PlayerView): string {
   const top = view.chain.at(-1);
   const what = top
-    ? `電腦${top.source === 'spell' ? '施放' : '發動'}「${top.ability}」${top.target ? `，目標是${targetLabel(view, top.target)}` : ''}`
+    ? `${themName()}${top.source === 'spell' ? '施放' : '發動'}「${top.ability}」${top.target ? `，目標是${targetLabel(view, top.target)}` : ''}`
     : view.endingTurn
-      ? '電腦宣告回合結束'
-      : '電腦剛做了一個動作';
+      ? `${themName()}宣告回合結束`
+      : `${themName()}剛做了一個動作`;
   return `<p class="d-head">要回應嗎？</p>
     <p class="d-line">${esc(what)}。你有 ${view.you.energy} 點能量，可以用瞬發法術或【瞬發】技能回應；發光的就是能用的。</p>
     ${view.endingTurn ? '<p class="d-line">這是這回合最後的機會，你的回合開始時能量會重置。</p>' : ''}
@@ -368,11 +498,22 @@ function detail(view: PlayerView): string {
   const cancel = '<button class="ghost" data-do="cancel">取消</button>';
   const myTurn = myMove(view);
 
+  const away =
+    app.mode === 'online' && online.room?.seats[THEM()]?.connected === false
+      ? `<p class="toast" role="status">${esc(themName())}斷線了，等他重新連上。</p>`
+      : app.mode === 'online' && !online.connected
+        ? '<p class="toast" role="status">你的連線中斷了，正在重新連線……</p>'
+        : '';
   if (sel === null) {
-    if (view.phase === 'over') return toast + '<p class="d-head">對局結束</p>';
+    if (view.phase === 'over') return away + toast + '<p class="d-head">對局結束</p>';
+    if (away) return away + toast;
     if (view.window === YOU && myTurn) return toast + responsePrompt(view);
-    if (view.window === BOT) return toast + '<p class="d-head">等電腦決定要不要回應</p><p class="d-line">電腦還有存下來的能量，可以用瞬發牌回應你。</p>';
-    if (!myTurn) return toast + '<p class="d-head">電腦的回合</p><p class="d-line">電腦正在行動，右邊的紀錄會一步一步列出它做了什麼。</p>';
+    if (view.window === THEM()) {
+      return toast + `<p class="d-head">等${esc(themName())}決定要不要回應</p><p class="d-line">對手還有存下來的能量，可以用瞬發牌回應你。</p>`;
+    }
+    if (!myTurn) {
+      return toast + `<p class="d-head">${esc(themName())}的回合</p><p class="d-line">右邊的紀錄會一步一步列出對手做了什麼。</p>`;
+    }
     return (
       toast +
       `<p class="d-head">你的回合</p>
@@ -443,7 +584,7 @@ function detail(view: PlayerView): string {
     const ability =
       sel.kind === 'skill'
         ? (card(view.you.zones[sel.zone]!.cardId) as Extract<DeckCardDef, { kind: 'creature' }>).skills[sel.skill]!
-        : heroPower(db, app.state!, YOU)!;
+        : powerOf(view.you)!;
     return toast + `<p class="d-head">選擇目標</p><p class="d-line">${esc(describeAbility(ability))}</p><p class="hint">發光的就是可以選的目標。</p>` + cancel;
   }
 
@@ -511,7 +652,7 @@ function heroPlate(side: SideView, player: PlayerId, picks: Map<string, Action>)
   const classes = ['hero'];
   if (picks.has(key)) classes.push('pick');
   if (app.selection?.kind === 'hero' && app.selection.player === player) classes.push('selected');
-  const extra = player === BOT ? `<span class="h-hand">手牌 ${side.handCount}</span>` : '';
+  const extra = player !== YOU ? `<span class="h-hand">手牌 ${side.handCount}</span>` : '';
   const name = side.heroEvolution ? nameOf(side.heroEvolution) : h.name;
   if (side.heroEvolution) classes.push('evolved');
   return `<button class="${classes.join(' ')}" data-key="${key}" aria-label="${esc(name)}，HP ${side.heroHp}">
@@ -536,7 +677,7 @@ function sideRows(side: SideView, player: PlayerId, picks: Map<string, Action>, 
 
   let heroRow = `<div class="row hero-row">${heroPlate(side, player, picks)}`;
   if (player === YOU) {
-    const power = heroPower(db, app.state!, YOU);
+    const power = powerOf(side);
     if (power) {
       const usable = actsForPower().length > 0;
       heroRow += `<button class="power${app.selection?.kind === 'heroPower' ? ' selected' : ''}" data-do="power" ${usable ? '' : 'disabled'}>
@@ -590,29 +731,40 @@ function overlay(view: PlayerView): string {
       <button class="primary" data-do="mulligan">${app.redraw.length ? `重抽 ${app.redraw.length} 張` : '保留這手牌'}</button>
     </div></div>`;
   }
+  if (view.phase === 'mulligan' && app.mode === 'online') {
+    return `<div class="overlay"><div class="dialog" role="dialog" aria-label="等對手"><h2>等${esc(themName())}決定起手</h2>
+      <p class="d-line">雙方都決定好要不要重抽，對局就會開始。</p></div></div>`;
+  }
   if (view.phase === 'over' && view.result) {
     const { winner, reason } = view.result;
     const why = { heroDefeated: '英雄被打倒', deckOut: '牌庫抽完', concede: '投降' }[reason];
     const title = winner === 'draw' ? '平手' : winner === YOU ? '勝利' : '落敗';
+    const asked = online.room?.rematch;
+    const actions =
+      app.mode === 'online'
+        ? asked?.[YOU]
+          ? `<p class="d-line">等${esc(themName())}也按「再來一局」……</p><button class="ghost" data-do="leave-room">離開房間</button>`
+          : `${asked?.[THEM()] ? `<p class="d-line">${esc(themName())}想再來一局</p>` : ''}
+             <div class="end-actions"><button class="primary" data-do="rematch">再來一局</button><button class="ghost" data-do="leave-room">離開房間</button></div>`
+        : '<div class="end-actions"><button class="primary" data-do="again">再來一局</button><button class="ghost" data-do="setup">換英雄</button></div>';
     return `<div class="overlay"><div class="dialog end ${winner === YOU ? 'won' : 'lost'}" role="dialog" aria-label="${title}">
-      <h2>${title}</h2><p class="d-line">${why}・共 ${view.turn} 回合</p>
-      <div class="end-actions"><button class="primary" data-do="again">再來一局</button><button class="ghost" data-do="setup">換英雄</button></div>
+      <h2>${title}</h2><p class="d-line">${why}・共 ${view.turn} 回合</p>${actions}
     </div></div>`;
   }
   return '';
 }
 
 function playScreen(): string {
-  const view = engine.viewFor(app.state!, YOU);
+  const view = app.view!;
   const picks = choices();
   const myTurn = myMove(view);
-  const waiting = view.window === YOU ? '・等你回應' : view.window === BOT ? '・電腦考慮回應' : '';
+  const waiting = view.window === YOU ? '・等你回應' : view.window === THEM() ? `・${themName()}考慮回應` : '';
   const banner =
     view.phase === 'mulligan'
       ? '起手'
       : view.phase === 'over'
         ? '對局結束'
-        : `第 ${view.turn} 回合・${view.activePlayer === YOU ? '你的回合' : '電腦的回合'}${waiting}`;
+        : `第 ${view.turn} 回合・${view.activePlayer === YOU ? '你的回合' : `${themName()}的回合`}${waiting}`;
   const turnButton =
     view.window === YOU
       ? `<button class="end-turn respond-btn" data-do="pass" ${myTurn ? '' : 'disabled'}>不回應</button>`
@@ -620,7 +772,7 @@ function playScreen(): string {
   const log = app.log.map((l) => `<li class="t-${l.tone}">${esc(l.text)}</li>`).join('');
   return `<div class="table">
     <section class="board${picks.size ? ' targeting' : ''}" aria-label="牌桌">
-      ${sideRows(view.opponent, BOT, picks, view)}
+      ${sideRows(view.opponent, THEM(), picks, view)}
       <div class="midline"><span class="turn">${banner}</span>
         ${turnButton}</div>
       ${sideRows(view.you, YOU, picks, view)}
@@ -658,13 +810,17 @@ function setupScreen(): string {
       ? `自訂牌組還不能用：${problems[0]}`
       : `用你的自訂牌組（${custom.length} 張）。`;
   return `<main class="setup">
-    <header><h1>卡牌試玩桌</h1><p>選一名英雄，跟電腦打一局。對手的英雄隨機，開局時會先告訴你是誰。</p></header>
+    <header><h1>卡牌試玩桌</h1><p>${
+      ONLINE_AVAILABLE
+        ? '選一名英雄，跟電腦打，或開一個房間跟朋友連線對戰。'
+        : '選一名英雄，跟電腦打一局。對手的英雄隨機，開局時會先告訴你是誰。'
+    }</p></header>
     <div class="heroes">${heroes}</div>
     <section class="deck-bar">
       <div><p class="d-head">牌組</p><p class="d-line${problems.length ? ' warn' : ''}">${esc(deckText)}</p></div>
       <button class="ghost" data-do="builder">${custom ? '編輯牌組' : '自己組牌'}</button>
     </section>
-    <button class="primary big" data-do="start" ${problems.length ? 'disabled' : ''}>開始對戰</button>
+    ${ONLINE_AVAILABLE ? onlineSetup(problems.length > 0) : `<button class="primary big" data-do="start" ${problems.length ? 'disabled' : ''}>開始對戰</button>`}
     ${app.toast ? `<p class="toast" role="alert">${esc(app.toast)}</p>` : ''}
     <section class="howto">
       <h2>怎麼玩</h2>
@@ -686,6 +842,47 @@ function setupScreen(): string {
   </main>`;
 }
 
+/** 開局畫面上連線對戰的部分：名字、跟電腦打、開房間、用房號加入。 */
+function onlineSetup(blocked: boolean): string {
+  const invited = new URLSearchParams(location.search).get('room');
+  return `<section class="online">
+    ${invited ? `<p class="invite">朋友邀請你加入房間 <b>${esc(invited.toUpperCase())}</b>：選好英雄和牌組，按「加入」。</p>` : ''}
+    <label class="field-row"><span>你的名字</span>
+      <input id="player-name" maxlength="16" placeholder="對手會看到這個名字" value="${esc(app.playerName)}" autocomplete="nickname"></label>
+    <div class="online-actions">
+      <button class="primary big" data-do="create-room" ${blocked ? 'disabled' : ''}>開房間跟朋友打</button>
+      <span class="or">或</span>
+      <label class="join"><input id="room-code" maxlength="4" placeholder="房號" value="${esc(app.roomCode)}" autocomplete="off">
+        <button class="primary" data-do="join-room" ${blocked ? 'disabled' : ''}>加入</button></label>
+      <span class="or">或</span>
+      <button class="ghost" data-do="start" ${blocked ? 'disabled' : ''}>跟電腦打</button>
+    </div>
+  </section>`;
+}
+
+/** 開好房間、等朋友加入的畫面。 */
+function lobbyScreen(): string {
+  const room = online.room;
+  if (!room) return '<main class="setup"><p class="d-line">連線中……</p></main>';
+  const link = `${location.origin}${location.pathname}?room=${room.code}`;
+  const friend = room.seats[THEM()];
+  return `<main class="setup lobby">
+    <header><h1>房間 ${esc(room.code)}</h1><p>把連結或房號傳給朋友，他打開、選好英雄按「加入」，對局就會開始。</p></header>
+    <section class="deck-bar">
+      <div><p class="d-head">邀請連結</p><p class="d-line"><code id="invite-link">${esc(link)}</code></p></div>
+      <button class="ghost" data-do="copy-link">複製連結</button>
+    </section>
+    ${
+      ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
+        ? '<p class="toast" role="note">你是用 localhost 開的，這個連結只有你自己的電腦打得開。把網址換成朋友連得到的位址（同一個網路用終端機印出的區網網址，不同地方用通道網址），或直接把房號給他。</p>'
+        : ''
+    }
+    <p class="d-line">${friend ? `${esc(friend.name)} 已經加入` : '等朋友加入……'}${online.connected ? '' : '（重新連線中）'}</p>
+    ${app.toast ? `<p class="toast" role="alert">${esc(app.toast)}</p>` : ''}
+    <button class="ghost" data-do="leave-room">離開房間</button>
+  </main>`;
+}
+
 // ─── 繪製與事件 ──────────────────────────────────────────────────────────────
 
 function render(): void {
@@ -696,7 +893,9 @@ function render(): void {
       ? setupScreen()
       : app.screen === 'deck'
         ? deckScreen(db, app.builder, custom ?? [], custom !== undefined)
-        : playScreen();
+        : app.screen === 'lobby'
+          ? lobbyScreen()
+          : playScreen();
   const handEl = root.querySelector('.hand');
   if (handEl) handEl.scrollLeft = handScroll;
   const log = root.querySelector('.log');
@@ -715,7 +914,7 @@ function render(): void {
 
 function inspect(key: string): void {
   const player = Number(key[1]) as PlayerId;
-  const view = engine.viewFor(app.state!, YOU);
+  const view = app.view!;
   if (key[0] === 'z') {
     const index = Number(key[2]);
     const side = player === YOU ? view.you : view.opponent;
@@ -814,17 +1013,40 @@ root.addEventListener('click', (event) => {
         render();
       } else perform(act);
     } else if (act) perform(act);
-    else if (app.state) inspect(key);
+    else if (app.view) inspect(key);
   } else if (command === 'builder') {
     app.builder = { heroId: app.heroId, filter: app.builder.filter, focus: null };
     app.screen = 'deck';
     app.toast = null;
     render();
     window.scrollTo(0, 0);
+  } else if (command === 'create-room') {
+    createRoom();
+  } else if (command === 'join-room') {
+    joinRoom();
+  } else if (command === 'leave-room') {
+    leaveRoom();
+  } else if (command === 'rematch') {
+    online.send({ t: 'rematch' });
+  } else if (command === 'copy-link') {
+    const text = document.getElementById('invite-link')?.textContent ?? '';
+    navigator.clipboard.writeText(text).then(
+      () => {
+        app.toast = '已複製邀請連結';
+        render();
+      },
+      () => {
+        const range = document.createRange();
+        const node = document.getElementById('invite-link');
+        if (node) range.selectNodeContents(node);
+        getSelection()?.removeAllRanges();
+        getSelection()?.addRange(range);
+      },
+    );
   } else if (command === 'start' || command === 'again') {
     startGame();
   } else if (command === 'setup') {
-    Object.assign(app, { screen: 'setup', state: null, selection: null, toast: null });
+    Object.assign(app, { screen: 'setup', state: null, view: null, selection: null, toast: null });
     render();
   } else if (command === 'mulligan') {
     const cards = app.redraw;
@@ -867,6 +1089,20 @@ root.addEventListener('click', (event) => {
   }
 });
 
+root.addEventListener('input', (event) => {
+  const input = event.target as HTMLInputElement;
+  if (input.id === 'player-name') {
+    app.playerName = input.value;
+    try {
+      localStorage.setItem('card-game.name', input.value);
+    } catch {
+      // 存不了就下次再輸入一次。
+    }
+  } else if (input.id === 'room-code') {
+    app.roomCode = input.value.toUpperCase();
+  }
+});
+
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && app.selection) {
     app.selection = null;
@@ -882,7 +1118,15 @@ interface Hot {
   data?: Partial<Saved>;
 }
 const hot = (window as unknown as { claude?: { hot?: Hot } }).claude?.hot;
-hot?.snapshot?.(() => ({ screen: app.screen, heroId: app.heroId, decks: app.decks, state: app.state, log: app.log, redraw: app.redraw }));
+// 只保留跟電腦打的對局；連線對戰的狀態在伺服器上，重新連線就回得去。
+hot?.snapshot?.(() => ({
+  screen: app.mode === 'online' ? 'setup' : app.screen,
+  heroId: app.heroId,
+  decks: app.decks,
+  state: app.mode === 'online' ? null : app.state,
+  log: app.mode === 'online' ? [] : app.log,
+  redraw: app.redraw,
+}));
 
 function start(data: Partial<Saved>): void {
   // 舊版存下來的對局沒有連鎖、回應這些欄位，新版的引擎接不下去，回到開局畫面重來。
@@ -891,6 +1135,18 @@ function start(data: Partial<Saved>): void {
   }
   Object.assign(app, data);
   if (!db.heroes.has(app.heroId)) app.heroId = SAMPLE_HEROES[1]!.id;
+  if (app.state && app.screen === 'play') {
+    YOU = 0;
+    app.view = engine.viewFor(app.state, YOU);
+    app.legalActions = localLegal(app.state);
+  } else if (app.screen === 'play' || app.screen === 'lobby') {
+    app.screen = 'setup';
+  }
+  // 上次在連線房間裡就自動回去；伺服器會把房間與局面送回來。
+  if (ONLINE_AVAILABLE && online.hasSession) {
+    app.screen = 'lobby';
+    online.connect();
+  }
   render();
   void advance();
 }

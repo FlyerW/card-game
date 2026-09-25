@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SAMPLE_CARDS, sampleDb } from '../src/cards/sample';
 import { createEngine, type GameConfig } from '../src/engine';
+import { eventsFor } from '../src/view';
 import { currentHp } from '../src/queries';
 import { nextRandom } from '../src/rng';
 import type { Action, GameState } from '../src/types';
@@ -110,5 +111,22 @@ describe('隨機對戰', () => {
     expect(view.opponent.handCount).toBe(final.players[1].hand.length);
     expect(view.you.hand).toEqual(final.players[0].hand);
     expect(json).not.toContain('rng');
+  });
+
+  it('事件：對手抽到的牌只給張數，自己抽到的照給', () => {
+    const { config, actions } = games[0]!;
+    const created = engine.createGame(config);
+    if (!created.ok) throw new Error(created.error.message);
+    let state = created.state;
+    for (const action of actions) {
+      const result = engine.apply(state, action);
+      if (!result.ok) throw new Error(result.error.message);
+      for (const event of eventsFor(result.events, 0)) {
+        if (event.type !== 'drew') continue;
+        if (event.player === 0) expect(event.cards.every((card) => card.cardId !== '')).toBe(true);
+        else expect(event.cards.every((card) => card.cardId === '' && card.uid === 0)).toBe(true);
+      }
+      state = result.state;
+    }
   });
 });
