@@ -838,7 +838,12 @@ const hot = (window as unknown as { claude?: { hot?: Hot } }).claude?.hot;
 hot?.snapshot?.(() => ({ screen: app.screen, heroId: app.heroId, decks: app.decks, state: app.state, log: app.log, redraw: app.redraw }));
 
 function start(data: Partial<Saved>): void {
+  // 舊版存下來的對局沒有連鎖、回應這些欄位，新版的引擎接不下去，回到開局畫面重來。
+  if (data.state && !Array.isArray((data.state as Partial<GameState>).chain)) {
+    data = { ...data, screen: 'setup', state: null, log: [], redraw: [] };
+  }
   Object.assign(app, data);
+  if (!db.heroes.has(app.heroId)) app.heroId = SAMPLE_HEROES[1]!.id;
   render();
   void advance();
 }
