@@ -13,6 +13,7 @@ import {
   isDisarmed,
   isSilenced,
   isParalyzed,
+  opponentTurnHp,
   other,
 } from './queries';
 import {
@@ -173,6 +174,11 @@ function startTurn(ctx: Ctx, player: PlayerId): void {
   state.turn += 1;
   state.activePlayer = player;
   ctx.events.push({ type: 'turnStarted', player, turn: state.turn });
+  // 只在對手回合才有的 HP 加成現在消失了：它先吸收過傷害，所以受到的傷害跟著減少，生物不會因此被擊倒。
+  const expired = opponentTurnHp(db, state, player);
+  if (expired > 0) {
+    for (const creature of state.players[player].zones) if (creature !== null) creature.damage = Math.max(0, creature.damage - expired);
+  }
 
   const p = state.players[player];
   if (p.deck.length === 0) {

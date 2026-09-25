@@ -176,6 +176,8 @@ export const TEST_HEROES: HeroDef[] = [
     passive: { name: 'guard', creatures: { damageReduction: 1 } },
   },
   { kind: 'hero', id: 'mender', name: 'mender', colors: ['green'], hp: 47, passive: { name: 'growth', creatures: { regenerate: 1 } } },
+  { kind: 'hero', id: 'duelist', name: 'duelist', colors: ['white'], hp: 47, passive: { name: 'edge', ownTurn: { attack: 1 } } },
+  { kind: 'hero', id: 'warder', name: 'warder', colors: ['green'], hp: 47, passive: { name: 'bark', opponentTurn: { hp: 2 } } },
 ];
 
 export const testDb = () => buildCardDb(TEST_CARDS, TEST_HEROES);

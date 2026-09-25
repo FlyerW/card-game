@@ -31,8 +31,8 @@ const hit = (name: string, cost: number, target: TargetSpec, amount: number): Ab
 export const SAMPLE_HEROES: HeroDef[] = [
   // 英雄 HP 的起點是 55 − 3 ×（顏色數 − 1）− 效果強度，再照模擬調整。
   {
-    kind: 'hero', id: 'nameless-swordsman', name: '無名劍士', colors: ['white'], hp: 45,
-    passive: { name: '劍士之道', creatures: { attack: 2 } },
+    kind: 'hero', id: 'nameless-swordsman', name: '無名劍士', colors: ['white'], hp: 53,
+    passive: { name: '劍士之道', ownTurn: { attack: 1 } },
   },
   {
     kind: 'hero',
@@ -40,22 +40,22 @@ export const SAMPLE_HEROES: HeroDef[] = [
     name: '烈焰領主',
     colors: ['red'],
     hp: 54,
-    power: hit('燃燼', 2, ANY, 2),
+    power: hit('燃燼', 2, ANY, 1),
   },
   {
     kind: 'hero',
     id: 'forest-king',
     name: '林海之王',
     colors: ['green'],
-    hp: 51,
-    passive: { name: '豐饒', creatures: { hp: 2 } },
+    hp: 49,
+    passive: { name: '豐饒', opponentTurn: { hp: 1 } },
   },
   {
     kind: 'hero',
     id: 'tide-shadow-twins',
     name: '潮影雙生',
     colors: ['blue', 'black'],
-    hp: 42,
+    hp: 39,
     power: { name: '低語', cost: 4, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
   },
   {
@@ -64,7 +64,7 @@ export const SAMPLE_HEROES: HeroDef[] = [
     name: '虹彩賢者',
     colors: ['white', 'blue', 'black', 'red', 'green'],
     hp: 44,
-    power: { name: '稜光', cost: 2, target: NONE, effects: [{ type: 'draw', count: 1 }] },
+    power: { name: '稜光', cost: 3, target: NONE, effects: [{ type: 'draw', count: 1 }] },
   },
 ];
 

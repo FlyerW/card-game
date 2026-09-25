@@ -118,6 +118,42 @@ describe('攻擊', () => {
   });
 });
 
+describe('只在某一方回合生效的被動', () => {
+  /** 開一局，先攻玩家 a 用 first 英雄、後攻玩家 b 用 second 英雄。 */
+  function withHeroes(first: string, second: string) {
+    const game = start();
+    game.state.players[game.a].heroId = first;
+    game.state.players[game.b].heroId = second;
+    return game;
+  }
+
+  it('我方回合攻擊 +1：自己攻擊時有，對手回合反擊時沒有', () => {
+    const game = withHeroes('duelist', 'duelist');
+    let { state } = game;
+    const { a, b } = game;
+    place(state, a, 0, 'brute'); // 攻擊 5
+    place(state, b, 0, 'hitter'); // 攻擊 2
+    state = act(state, { type: 'attack', player: a, zone: 0, target: hero(b) });
+    expect(state.players[b].heroDamage).toBe(6);
+    state = act(endTurn(state), { type: 'attack', player: b, zone: 0, target: creatureAt(a, 0) });
+    expect(at(state, a, 0)!.damage).toBe(3); // b 的回合：b 的生物 +1，a 的反擊不加
+    expect(at(state, b, 0)!.damage).toBe(5);
+  });
+
+  it('對方回合 HP 上限 +2：先吸收傷害，回到自己的回合加成消失，不會因此被擊倒', () => {
+    const game = withHeroes('duelist', 'warder');
+    let { state } = game;
+    const { a, b } = game;
+    place(state, a, 0, 'brute'); // 攻擊 5，a 的回合 +1 = 6
+    place(state, b, 0, 'wolf'); // HP 6，a 的回合是 b 的對方回合：8
+    state = act(state, { type: 'attack', player: a, zone: 0, target: creatureAt(b, 0) });
+    expect(at(state, b, 0)!.damage).toBe(6); // 8 − 6，還剩 2
+    state = endTurn(state); // b 的回合：加成消失，傷害少 2
+    expect(at(state, b, 0)).not.toBeNull();
+    expect(at(state, b, 0)!.damage).toBe(4);
+  });
+});
+
 describe('道具給的技能', () => {
   it('排在生物自己的技能後面，一樣算這隻生物這回合的行動', () => {
     let { state, a, b } = start();

@@ -111,10 +111,16 @@ function describeModifier(modifier: CreatureModifier | undefined): string[] {
   return parts;
 }
 
+/** 「我方生物攻擊 +1」；英文開頭的（HP）前面空一格。 */
+const ourCreatures = (parts: string[]) => {
+  const text = parts.join('、');
+  return `我方生物${/^[A-Za-z]/.test(text) ? ' ' : ''}${text}`;
+};
+
 function describeOwnEffects(creatures: CreatureModifier | undefined, ceilingBonus: number | undefined): string {
   const parts: string[] = [];
   const modifier = describeModifier(creatures);
-  if (modifier.length > 0) parts.push(`我方生物${modifier.join('、')}`);
+  if (modifier.length > 0) parts.push(ourCreatures(modifier));
   if (ceilingBonus) parts.push(`我方最高上限 +${ceilingBonus}`);
   return parts.join('；');
 }
@@ -169,8 +175,14 @@ export function describeCard(card: DeckCardDef, names: (id: string) => string = 
   }
 }
 
-const describePassive = (passive: HeroPassive): string =>
-  `被動「${passive.name}」：${describeOwnEffects(passive.creatures, passive.ceilingBonus)}`;
+function describePassive(passive: HeroPassive): string {
+  const parts = [describeOwnEffects(passive.creatures, passive.ceilingBonus)];
+  const own = describeModifier(passive.ownTurn);
+  if (own.length > 0) parts.push(`我方回合，${ourCreatures(own)}`);
+  const theirs = describeModifier(passive.opponentTurn);
+  if (theirs.length > 0) parts.push(`對方回合，${ourCreatures(theirs)}`);
+  return `被動「${passive.name}」：${parts.filter((part) => part).join('；')}`;
+}
 
 export function describeHero(hero: HeroDef): string[] {
   const lines = [`${hero.name}　${describeColors(hero.colors)}｜HP ${hero.hp}`];

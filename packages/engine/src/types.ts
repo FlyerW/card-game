@@ -185,6 +185,13 @@ export interface HeroPassive {
   name: string;
   /** 強化自己的生物。 */
   creatures?: CreatureModifier;
+  /** 只在自己的回合生效的強化，例如只加在自己回合的攻擊上。 */
+  ownTurn?: CreatureModifier;
+  /**
+   * 只在對手的回合生效的強化，例如只在被攻擊時多 HP。
+   * 多出來的 HP 先吸收傷害：到自己的回合加成消失時，受到的傷害跟著減少同樣多，不會因此被擊倒。
+   */
+  opponentTurn?: CreatureModifier;
   /** 提高自己的最高上限。突破型，目前範例卡不使用。 */
   ceilingBonus?: number;
 }

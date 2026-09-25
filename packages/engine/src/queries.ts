@@ -67,7 +67,11 @@ function itemDef(db: CardDb, creature: Creature): ItemDef | null {
 
 /** 英雄被動加上自己場地卡，給自己每隻生物的加成。 */
 export function aura(db: CardDb, state: GameState, player: PlayerId): Required<CreatureModifier> {
-  const sources: (CreatureModifier | undefined)[] = heroPassives(db, state, player).map((passive) => passive.creatures);
+  const ownTurn = state.activePlayer === player;
+  const sources: (CreatureModifier | undefined)[] = heroPassives(db, state, player).flatMap((passive) => [
+    passive.creatures,
+    ownTurn ? passive.ownTurn : passive.opponentTurn,
+  ]);
   const { field } = state.players[player];
   if (field !== null) {
     const def = cardDef(db, field.cardId);
@@ -123,6 +127,10 @@ export const regeneration = (db: CardDb, state: GameState, creature: Creature): 
 
 export const hasKeyword = (db: CardDb, creature: Creature, keyword: Keyword): boolean =>
   creatureDef(db, creature).keywords?.includes(keyword) ?? false;
+
+/** 只在對手回合生效的 HP 加成；自己的回合開始時消失。 */
+export const opponentTurnHp = (db: CardDb, state: GameState, player: PlayerId): number =>
+  heroPassives(db, state, player).reduce((sum, passive) => sum + (passive.opponentTurn?.hp ?? 0), 0);
 
 export const heroMaxHp = (db: CardDb, state: GameState, player: PlayerId): number =>
   heroDef(db, state, player).hp + (heroEvolution(db, state, player)?.hpBonus ?? 0);

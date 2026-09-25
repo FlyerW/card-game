@@ -142,7 +142,7 @@ function checkCard(
       if (!Number.isInteger(card.hpBonus) || card.hpBonus < 0) problems.push(`${where}：hpBonus 必須是非負整數`);
       if (card.power) problems.push(...checkAbility(card.power, where, false));
       if (card.entry) problems.push(...checkAbility({ ...card.entry, cost: 0 }, `${where}的進場效果`, false));
-      problems.push(...checkModifier(card.passive?.creatures, where));
+      for (const part of [card.passive?.creatures, card.passive?.ownTurn, card.passive?.opponentTurn]) problems.push(...checkModifier(part, where));
       break;
     }
     case 'field':
@@ -170,7 +170,7 @@ function checkHero(hero: HeroDef): string[] {
   if (hero.colors.length === 0) problems.push(`${where}：英雄至少要有一個顏色`);
   if (!Number.isInteger(hero.hp) || hero.hp <= 0) problems.push(`${where}：HP 必須是正整數`);
   if (hero.power) problems.push(...checkAbility(hero.power, where, false));
-  problems.push(...checkModifier(hero.passive?.creatures, where));
+  for (const part of [hero.passive?.creatures, hero.passive?.ownTurn, hero.passive?.opponentTurn]) problems.push(...checkModifier(part, where));
   return problems;
 }
 
