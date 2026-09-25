@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SAMPLE_HEROES, sampleDb } from '../src/cards/sample';
 import { buildCardDb, CardDataError } from '../src/db';
-import { deckPool, validateDeck } from '../src/deck';
+import { copyLimit, deckPool, validateDeck } from '../src/deck';
 import { describeCard } from '../src/describe';
 import { DEFAULT_RULES } from '../src/rules';
 import type { Ability, DeckCardDef, HeroDef } from '../src/types';
@@ -63,9 +63,10 @@ describe('範例卡池', () => {
     expect(regular.filter((card) => card.colors.length === 0).length).toBeGreaterThanOrEqual(8);
   });
 
-  it('每個英雄能用的卡都夠組 40 張', () => {
+  it('每個英雄能用的卡都夠組一副正式的牌組', () => {
     for (const hero of SAMPLE_HEROES) {
-      expect(deckPool(sample, hero.id).length * DEFAULT_RULES.maxCopies, hero.name).toBeGreaterThanOrEqual(DEFAULT_RULES.deckSize);
+      const most = deckPool(sample, hero.id).reduce((sum, card) => sum + copyLimit(DEFAULT_RULES, card), 0);
+      expect(most, hero.name).toBeGreaterThanOrEqual(DEFAULT_RULES.deckSize);
     }
   });
 
@@ -203,8 +204,14 @@ describe('牌組驗證', () => {
     expect(validateDeck(db, rules, 'blank', ['wolf', 'wolf', 'hitter'])).toContain('牌組必須是 4 張，目前 3 張');
   });
 
-  it('同名卡有上限', () => {
+  it('同名卡有上限，UR 更少', () => {
     expect(validateDeck(db, rules, 'blank', ['wolf', 'wolf', 'wolf', 'hitter'])).toContain('wolf 最多 2 張，目前 3 張');
+    expect(validateDeck(db, rules, 'blank', ['relic', 'relic', 'wolf', 'hitter'])).toContain('relic 最多 1 張（UR），目前 2 張');
+    expect(validateDeck(db, rules, 'blank', ['relic', 'wolf', 'wolf', 'hitter'])).toEqual([]);
+  });
+
+  it('預設規則：30 張、同名最多 2 張、UR 最多 1 張', () => {
+    expect([DEFAULT_RULES.deckSize, DEFAULT_RULES.maxCopies, DEFAULT_RULES.maxUrCopies]).toEqual([30, 2, 1]);
   });
 
   it('卡的顏色必須在英雄的顏色內；多色卡要英雄具備每一個顏色', () => {

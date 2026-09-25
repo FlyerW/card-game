@@ -22,7 +22,7 @@ export {
   isTaunting,
   other,
 } from './queries';
-export { deckPool, validateDeck } from './deck';
+export { copyLimit, deckPool, validateDeck } from './deck';
 export { DEFAULT_RULES, LEGACY_ENERGY_RULES } from './rules';
 export { RuleError } from './errors';
 export type { ErrorCode } from './errors';

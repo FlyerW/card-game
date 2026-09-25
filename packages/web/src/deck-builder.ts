@@ -1,4 +1,5 @@
 import {
+  copyLimit,
   DEFAULT_RULES,
   deckPool,
   describeCard,
@@ -11,11 +12,17 @@ import {
 import { buildDeck } from '@card-game/sim/deck';
 import { esc, kindLabel, pips } from './ui';
 
-// 組牌：照正式規則，40 張、同名最多 3 張、只能放英雄顏色內的卡與無色卡。
+// 組牌：照正式規則，30 張、同名最多 2 張、UR 最多 1 張、只能放英雄顏色內的卡與無色卡。
 // 牌組每個英雄各存一副，存在這個瀏覽器裡；沒有自訂牌組就每局自動組一副。
 
-const { deckSize, maxCopies } = DEFAULT_RULES;
-const STORAGE_KEY = 'card-game.decks.v1';
+const { deckSize, maxCopies, maxUrCopies } = DEFAULT_RULES;
+/** 牌組規則從 40 張改成 30 張時換了 key，舊的 40 張牌組就不讀了。 */
+const STORAGE_KEY = 'card-game.decks.v2';
+/** 這張卡最多能放幾張。 */
+const limitOf = (db: CardDb, id: string) => {
+  const card = db.cards.get(id);
+  return card ? copyLimit(DEFAULT_RULES, card) : maxCopies;
+};
 
 export type KindFilter = 'all' | 'creature' | 'spell' | 'other';
 const FILTERS: [KindFilter, string][] = [
@@ -58,9 +65,10 @@ export function saveDecks(decks: Record<string, string[]>): void {
 const count = (deck: readonly string[], id: string) => deck.filter((each) => each === id).length;
 
 /** 能不能再加一張；不能的話回傳原因。 */
-export function addProblem(deck: readonly string[], id: string): string | null {
+export function addProblem(db: CardDb, deck: readonly string[], id: string): string | null {
   if (deck.length >= deckSize) return `牌組已經 ${deckSize} 張了`;
-  if (count(deck, id) >= maxCopies) return `同名卡最多 ${maxCopies} 張`;
+  const limit = limitOf(db, id);
+  if (count(deck, id) >= limit) return limit < maxCopies ? `UR 最多 ${limit} 張` : `同名卡最多 ${limit} 張`;
   return null;
 }
 
@@ -69,14 +77,16 @@ export function removeOne(deck: readonly string[], id: string): string[] {
   return index === -1 ? [...deck] : [...deck.slice(0, index), ...deck.slice(index + 1)];
 }
 
-/** 9 費以上算高費卡；帶超過 3 張，前幾回合手上容易都是打不出來的牌。 */
+/** 9 費以上算高費卡；30 張的牌組帶超過 2 張，前幾回合手上容易都是打不出來的牌。 */
 const HIGH_COST = 9;
-const MAX_HIGH_COST = 3;
+const MAX_HIGH_COST = 2;
 const highCostCount = (db: CardDb, deck: readonly string[]) => deck.filter((id) => (db.cards.get(id)?.cost ?? 0) >= HIGH_COST).length;
 
-/** 用英雄能用的卡隨機補到 40 張，已經放的不動。高費卡補到 3 張為止。 */
+/** 用英雄能用的卡隨機補滿，已經放的不動。高費卡補到上限為止。 */
 export function fillRandom(db: CardDb, heroId: string, deck: readonly string[]): string[] {
-  const spare = deckPool(db, heroId).flatMap((card) => Array<string>(maxCopies - count(deck, card.id)).fill(card.id));
+  const spare = deckPool(db, heroId).flatMap((card) =>
+    Array<string>(Math.max(0, copyLimit(DEFAULT_RULES, card) - count(deck, card.id))).fill(card.id),
+  );
   for (let i = spare.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [spare[i], spare[j]] = [spare[j]!, spare[i]!];
@@ -91,7 +101,7 @@ export function fillRandom(db: CardDb, heroId: string, deck: readonly string[]):
   return filled;
 }
 
-/** 跟電腦的牌組一樣自動組一副：進化線照 3/2/1 帶，其餘隨機。 */
+/** 跟電腦的牌組一樣自動組一副：進化線照 2/1/1 帶，其餘隨機。 */
 export const autoDeck = (db: CardDb, heroId: string, seed: number): string[] => buildDeck(seed, heroId, deckPool(db, heroId));
 
 /** 規則上的問題（有就不能開始），以及組牌建議（可以不理）。 */
@@ -104,7 +114,7 @@ export function deckIssues(db: CardDb, heroId: string, deck: readonly string[]):
     if (def?.kind !== 'creature' || def.evolvesFrom === undefined) continue;
     const base = def.evolvesFrom;
     if (!deck.includes(base)) tips.push(`${def.name} 要由 ${name(base)} 進化，牌組裡沒有 ${name(base)}`);
-    else if (count(deck, id) > count(deck, base)) tips.push(`${def.name} 比 ${name(base)} 多，容易卡在手上用不了（建議照 3/2/1 帶）`);
+    else if (count(deck, id) > count(deck, base)) tips.push(`${def.name} 比 ${name(base)} 多，容易卡在手上用不了（建議照 2/1/1 帶）`);
   }
   const highCost = highCostCount(db, deck);
   if (highCost > MAX_HIGH_COST) tips.push(`9 費以上的卡有 ${highCost} 張，前幾回合容易卡手（建議 ${MAX_HIGH_COST} 張以內）`);
@@ -127,11 +137,11 @@ const KIND_NAMES: Record<DeckCardDef['kind'], string> = {
 const byCost = (x: DeckCardDef, y: DeckCardDef) =>
   x.cost - y.cost || RARITIES.indexOf(x.rarity) - RARITIES.indexOf(y.rarity) || x.name.localeCompare(y.name, 'zh-Hant');
 
-function poolCard(card: DeckCardDef, deck: readonly string[], focus: string | null): string {
+function poolCard(db: CardDb, card: DeckCardDef, deck: readonly string[], focus: string | null): string {
   const n = count(deck, card.id);
   const hp = card.kind === 'creature' ? `<span class="c-hp"><span class="c-atk">⚔${card.attack}</span> HP ${card.hp}</span>` : '';
   const evo = card.kind === 'creature' && card.stage > 0;
-  const addWhy = addProblem(deck, card.id);
+  const addWhy = addProblem(db, deck, card.id);
   return `<div class="pool-card${n ? ' in-deck' : ''}${focus === card.id ? ' focused' : ''}">
     <button class="card k-${card.kind} r-${card.rarity}" data-focus="${card.id}" aria-label="${esc(card.name)}，看說明">
       <span class="c-cost${evo ? ' evo' : ''}">${evo ? '+' : ''}${card.cost}</span>
@@ -141,7 +151,7 @@ function poolCard(card: DeckCardDef, deck: readonly string[], focus: string | nu
     </button>
     <div class="pc-count">
       <button data-remove="${card.id}" ${n === 0 ? 'disabled' : ''} aria-label="拿掉一張${esc(card.name)}">−</button>
-      <span><b>${n}</b>/${maxCopies}</span>
+      <span><b>${n}</b>/${copyLimit(DEFAULT_RULES, card)}</span>
       <button data-add="${card.id}" ${addWhy ? `disabled title="${esc(addWhy)}"` : ''} aria-label="加一張${esc(card.name)}">+</button>
     </div>
   </div>`;
@@ -189,7 +199,7 @@ export function deckScreen(db: CardDb, b: Builder, deck: readonly string[], cust
         .map((line, i) => (i === 0 ? `<p class="d-head">${esc(line)}</p>` : `<p class="d-line">${esc(line)}</p>`))
         .join('')}
         <div class="respond"><button class="ghost" data-remove="${focus.id}" ${count(deck, focus.id) === 0 ? 'disabled' : ''}>拿掉一張</button>
-        <button class="primary" data-add="${focus.id}" ${addProblem(deck, focus.id) ? 'disabled' : ''}>加一張（${count(deck, focus.id)}/${maxCopies}）</button></div></div>`
+        <button class="primary" data-add="${focus.id}" ${addProblem(db, deck, focus.id) ? 'disabled' : ''}>加一張（${count(deck, focus.id)}/${copyLimit(DEFAULT_RULES, focus)}）</button></div></div>`
     : '<p class="d-line">點卡片看說明；卡片下面的 − ＋ 調整張數。</p>';
   const status =
     problems.length === 0
@@ -203,14 +213,14 @@ export function deckScreen(db: CardDb, b: Builder, deck: readonly string[], cust
   return `<main class="builder">
     <header class="b-head">
       <div><h1>組牌・${esc(hero.name)}</h1>
-        <p>${pips(hero.colors)} ${describeColors(hero.colors)}的卡加上無色卡；${deckSize} 張，同名最多 ${maxCopies} 張。
+        <p>${pips(hero.colors)} ${describeColors(hero.colors)}的卡加上無色卡；${deckSize} 張，同名最多 ${maxCopies} 張，UR 最多 ${maxUrCopies} 張。
         ${custom ? '牌組存在這個瀏覽器裡。' : '還沒有自訂牌組，開始對戰時會自動組一副。'}</p></div>
       <div class="b-count${deck.length === deckSize ? ' full' : ''}"><b>${deck.length}</b>/${deckSize}</div>
     </header>
     <div class="b-body">
       <section class="b-pool" aria-label="可以放的卡">
         <div class="chips">${filters}</div>
-        <div class="pool">${pool.map((card) => poolCard(card, deck, b.focus)).join('')}</div>
+        <div class="pool">${pool.map((card) => poolCard(db, card, deck, b.focus)).join('')}</div>
       </section>
       <aside class="b-side">
         <div class="detail">${focusBox}</div>

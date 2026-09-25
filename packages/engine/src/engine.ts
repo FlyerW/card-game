@@ -63,7 +63,7 @@ export interface GameConfig {
   players: [PlayerConfig, PlayerConfig];
   rules?: Partial<Rules>;
   /**
-   * 不檢查牌組是否合法。只給試玩用：範例卡太少，單色組不成 40 張。
+   * 不檢查牌組是否合法。只給試玩與測試用。
    * 正式對戰（伺服器）一律要檢查。
    */
   skipDeckValidation?: boolean;

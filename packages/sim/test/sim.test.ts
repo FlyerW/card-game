@@ -6,7 +6,7 @@ import { EXPERIMENTS, engine, gameConfig, mirrorDeck } from '../src/experiments'
 import { playMatch } from '../src/match';
 
 describe('模擬環境', () => {
-  it('進化線照 3/2/1 帶：一階不會比基礎多、二階不會比一階多', () => {
+  it('進化線照 2/1/1 帶：一階不會比基礎多、二階不會比一階多', () => {
     for (let seed = 0; seed < 50; seed++) {
       const deck = mirrorDeck(seed);
       const count = (id: string) => deck.filter((card) => card === id).length;
@@ -26,23 +26,23 @@ describe('模擬環境', () => {
     }
   });
 
-  it('9 費以上的卡最多帶 3 張', () => {
+  it('9 費以上的卡最多帶 2 張', () => {
     for (const hero of SAMPLE_HEROES) {
       for (let seed = 0; seed < 30; seed++) {
         const deck = buildDeck(seed, hero.id, deckPool(engine.db, hero.id));
-        expect(deck, hero.name).toHaveLength(40);
-        expect(deck.filter((id) => engine.db.cards.get(id)!.cost >= 9).length, hero.name).toBeLessThanOrEqual(3);
+        expect(deck, hero.name).toHaveLength(30);
+        expect(deck.filter((id) => engine.db.cards.get(id)!.cost >= 9).length, hero.name).toBeLessThanOrEqual(2);
       }
     }
   });
 
-  it('同一個種子組出同一副牌，而且每種卡最多 3 張', () => {
+  it('同一個種子組出同一副牌，而且每種卡最多 2 張、UR 最多 1 張', () => {
     const deck = mirrorDeck(123);
     expect(mirrorDeck(123)).toEqual(deck);
-    expect(deck).toHaveLength(40);
+    expect(deck).toHaveLength(30);
     const counts = new Map<string, number>();
     for (const id of deck) counts.set(id, (counts.get(id) ?? 0) + 1);
-    expect(Math.max(...counts.values())).toBeLessThanOrEqual(3);
+    for (const [id, n] of counts) expect(n, id).toBeLessThanOrEqual(engine.db.cards.get(id)!.rarity === 'UR' ? 1 : 2);
   });
 
   it('每個實驗的第 i 局用同一副牌、同一個種子，只有規則不同', () => {

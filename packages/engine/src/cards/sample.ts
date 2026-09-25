@@ -326,7 +326,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     effects: [{ type: 'halveHp', all: true }, { type: 'damageEnemyCreatures', amount: 1 }, { type: 'opponentDiscardRandom', count: 1 }],
   },
   { kind: 'item', id: 'bone-armor', name: '骨甲', rarity: 'N', colors: ['black'], cost: 1, attack: 1, hp: 1 },
-  { kind: 'field', id: 'rot-marsh', name: '腐沼', rarity: 'R', colors: ['black'], cost: 5, enemyDecay: 1 },
+  { kind: 'field', id: 'rot-marsh', name: '腐沼', rarity: 'R', colors: ['black'], cost: 5, enemyDecay: 1, lifesteal: true },
 
   // ── 紅：速度、爆發。直接傷害、只打英雄、範圍傷害、速攻；異常狀態是灼燒 ──
   { kind: 'creature', id: 'ember-fox', name: '焰尾狐', rarity: 'N', colors: ['red'], stage: 0, cost: 2, attack: 2, hp: 2, skills: [] },

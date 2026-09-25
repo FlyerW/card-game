@@ -177,6 +177,8 @@ export interface FieldDef extends CardBase {
   heroRegenerate?: number;
   /** 自己的回合開始時，對手每隻生物失去多少 HP（不算傷害）。 */
   enemyDecay?: number;
+  /** 吸血：上面讓對手生物失去的 HP，自己的英雄回復等量。 */
+  lifesteal?: boolean;
 }
 
 export interface HeroPassive {
@@ -227,7 +229,10 @@ export interface CardDb {
 
 export interface Rules {
   deckSize: number;
+  /** 同名卡最多幾張。 */
   maxCopies: number;
+  /** UR 同名卡最多幾張，比 maxCopies 更嚴。 */
+  maxUrCopies: number;
   startingHand: number;
   /** 手牌上限。滿手時抽到的牌直接進棄牌區。 */
   handLimit: number;

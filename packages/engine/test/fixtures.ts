@@ -141,12 +141,14 @@ export const TEST_CARDS: DeckCardDef[] = [
 
   // 攻擊：數值各不相同的生物
   creature('brute', [hit('smash', ANY, 4)], { attack: 5, hp: 6 }),
+  creature('relic', [hit('x', ANY, 1), hit('y', ANY, 1)], { rarity: 'UR' }),
   creature('wall', [], { rarity: 'N', attack: 0, hp: 8 }),
   // 道具給的技能；場地卡在回合開始時的效果
   { kind: 'item', id: 'wand', name: 'wand', rarity: 'R', colors: [], cost: 1, attack: 1, skills: [hit('zap', ANY, 3)] },
   { kind: 'field', id: 'library', name: 'library', rarity: 'R', colors: [], cost: 1, extraDraw: 1 },
   { kind: 'field', id: 'chapel', name: 'chapel', rarity: 'R', colors: [], cost: 1, heroRegenerate: 2 },
   { kind: 'field', id: 'bog', name: 'bog', rarity: 'R', colors: [], cost: 1, enemyDecay: 1 },
+  { kind: 'field', id: 'leech-bog', name: 'leech-bog', rarity: 'R', colors: [], cost: 1, enemyDecay: 1, lifesteal: true },
 
   // 吸血、再生、全體回復、消滅
   creature('leech', [hit('drain4', ANY, 4), { name: 'drainAll', cost: 1, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }], {

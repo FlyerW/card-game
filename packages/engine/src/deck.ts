@@ -15,6 +15,10 @@ export function deckPool(db: CardDb, heroId: string): DeckCardDef[] {
   );
 }
 
+/** 這張卡一副牌最多放幾張：UR 另有更嚴的上限。 */
+export const copyLimit = (rules: Rules, card: DeckCardDef): number =>
+  card.rarity === 'UR' ? Math.min(rules.maxCopies, rules.maxUrCopies) : rules.maxCopies;
+
 /** 檢查牌組是否合法，回傳所有問題；空陣列表示合法。 */
 export function validateDeck(db: CardDb, rules: Rules, heroId: string, deck: readonly string[]): string[] {
   const hero = db.heroes.get(heroId);
@@ -39,8 +43,9 @@ export function validateDeck(db: CardDb, rules: Rules, heroId: string, deck: rea
       const owner = db.heroes.get(card.evolvesFrom)?.name ?? card.evolvesFrom;
       problems.push(`${card.name} 是${owner}的進化卡，不能放進${hero.name}的牌組`);
     }
-    if (count > rules.maxCopies) {
-      problems.push(`${card.name} 最多 ${rules.maxCopies} 張，目前 ${count} 張`);
+    const limit = copyLimit(rules, card);
+    if (count > limit) {
+      problems.push(`${card.name} 最多 ${limit} 張${card.rarity === 'UR' ? '（UR）' : ''}，目前 ${count} 張`);
     }
     const missing = card.colors.filter((color) => !heroColors.has(color));
     if (missing.length > 0) {

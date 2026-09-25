@@ -1,5 +1,6 @@
 import {
   createEngine,
+  DEFAULT_RULES,
   describeAbility,
   describeCard,
   describeColors,
@@ -774,7 +775,7 @@ function setupScreen(): string {
   const problems = custom ? deckIssues(db, app.heroId, custom).problems : [];
   const colors = describeColors(hero(app.heroId).colors);
   const deckText = !custom
-    ? `還沒有自訂牌組：每局從${colors}與無色的卡自動組一副（進化線照 3/2/1 帶）。`
+    ? `還沒有自訂牌組：每局從${colors}與無色的卡自動組一副（進化線照 2/1/1 帶）。`
     : problems.length
       ? `自訂牌組還不能用：${problems[0]}`
       : `用你的自訂牌組（${custom.length} 張）。`;
@@ -805,7 +806,7 @@ function setupScreen(): string {
         <li>異常狀態只會中在生物身上：中毒（回合開始時失去 HP）、灼燒（回合結束時受到傷害）、麻痺（不能攻擊也不能發動技能）、沉默（不能發動技能）、繳械（不能攻擊）、虛弱（攻擊傷害減半）、詛咒（技能傷害減半）。後面五種都到牠的下個回合結束，進化會解除全部。</li>
         <li>把對手英雄的 HP 打到 0 就贏了。</li>
       </ul>
-      <p class="note">試玩說明：範例卡有 ${SAMPLE_CARDS.length} 張，牌組照正式規則：40 張、同名最多 3 張、只能放英雄顏色內的卡與無色卡。
+      <p class="note">試玩說明：範例卡有 ${SAMPLE_CARDS.length} 張，牌組照正式規則：${DEFAULT_RULES.deckSize} 張、同名最多 ${DEFAULT_RULES.maxCopies} 張、UR 最多 ${DEFAULT_RULES.maxUrCopies} 張、只能放英雄顏色內的卡與無色卡。
         你可以自己組牌；電腦每局自動組一副。電腦用的是模擬平衡時的均衡打法。</p>
     </section>
   </main>`;
@@ -915,7 +916,7 @@ function builderClick(el: HTMLElement, command: string | undefined): boolean {
     saveDecks(app.decks);
   };
   if (add) {
-    if (addProblem(deck, add) === null) edit([...deck, add]);
+    if (addProblem(db, deck, add) === null) edit([...deck, add]);
     app.builder.focus = add;
   } else if (remove) {
     edit(removeOne(deck, remove));

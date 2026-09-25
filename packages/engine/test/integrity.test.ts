@@ -1,6 +1,8 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SAMPLE_CARDS, sampleDb } from '../src/cards/sample';
+import { copyLimit } from '../src/deck';
 import { createEngine, type GameConfig } from '../src/engine';
+import { DEFAULT_RULES } from '../src/rules';
 import { eventsFor } from '../src/view';
 import { currentHp } from '../src/queries';
 import { nextRandom } from '../src/rng';
@@ -11,12 +13,14 @@ import type { Action, GameState } from '../src/types';
 
 const db = sampleDb();
 const engine = createEngine(db);
-const DECK_SIZE = 40;
+const DECK_SIZE = DEFAULT_RULES.deckSize;
 
-/** 從範例卡池隨機組 40 張（每種最多 3 張）。虹彩賢者是五色，全部卡都能放。 */
+/** 從範例卡池隨機組一副正式張數的牌（同名與 UR 照上限）。虹彩賢者是五色，全部卡都能放。 */
 function randomDeck(seed: number): string[] {
   // 虹彩賢者沒有英雄進化卡，別的英雄的進化卡不能放進牌組。
-  const pool = SAMPLE_CARDS.filter((card) => card.kind !== 'heroEvolution').flatMap((card) => [card.id, card.id, card.id]);
+  const pool = SAMPLE_CARDS.filter((card) => card.kind !== 'heroEvolution').flatMap((card) =>
+    Array<string>(copyLimit(DEFAULT_RULES, card)).fill(card.id),
+  );
   let rng = seed;
   for (let i = pool.length - 1; i > 0; i--) {
     const [value, next] = nextRandom(rng);

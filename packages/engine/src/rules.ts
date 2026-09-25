@@ -7,8 +7,9 @@ import type { Rules } from './types';
  * 等於能量上限跟著全局回合數走，每位玩家的能量都比對手上一回合多 1。
  */
 export const DEFAULT_RULES: Rules = {
-  deckSize: 40,
-  maxCopies: 3,
+  deckSize: 30,
+  maxCopies: 2,
+  maxUrCopies: 1,
   startingHand: 4,
   handLimit: 10,
   zones: 5,

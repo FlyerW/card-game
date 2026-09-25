@@ -155,4 +155,15 @@ describe('場地卡的回合開始效果', () => {
     expect(at(state, a, 0)).toBeNull();
     expect(at(state, a, 1)!.damage).toBe(1);
   });
+
+  it('吸血的場地：對手生物失去多少 HP，自己的英雄就回復多少', () => {
+    let { state, a, b } = start();
+    state.players[b].field = { uid: 901, cardId: 'leech-bog' };
+    state.players[b].heroDamage = 10;
+    place(state, a, 0, 'wolf', { damage: 5 }); // 剩 1
+    place(state, a, 1, 'hitter');
+    place(state, a, 2, 'brute');
+    state = endTurn(state);
+    expect(state.players[b].heroDamage).toBe(7);
+  });
 });

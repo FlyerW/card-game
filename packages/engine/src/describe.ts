@@ -124,7 +124,10 @@ function describeFieldTriggers(field: Extract<DeckCardDef, { kind: 'field' }>): 
   const lines: string[] = [];
   if (field.extraDraw) lines.push(`你的回合開始時多抽 ${field.extraDraw} 張`);
   if (field.heroRegenerate) lines.push(`你的回合開始時，你的英雄回復 ${field.heroRegenerate} HP`);
-  if (field.enemyDecay) lines.push(`你的回合開始時，對手每隻生物失去 ${field.enemyDecay} HP`);
+  if (field.enemyDecay) {
+    const drain = field.lifesteal ? '，你的英雄回復等量的 HP（吸血）' : '';
+    lines.push(`你的回合開始時，對手每隻生物失去 ${field.enemyDecay} HP${drain}`);
+  }
   return lines;
 }
 

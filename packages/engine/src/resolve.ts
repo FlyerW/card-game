@@ -236,12 +236,15 @@ export function tickField(ctx: Ctx, player: PlayerId): void {
   if (field?.heroRegenerate) healHero(ctx, player, field.heroRegenerate);
   if (field?.enemyDecay) {
     const enemy = other(player);
+    let drained = 0;
     state.players[enemy].zones.forEach((creature, zone) => {
       if (creature === null) return;
       const lost = Math.min(field.enemyDecay!, currentHp(db, state, creature));
       creature.damage += lost;
+      drained += lost;
       ctx.events.push({ type: 'hpLost', target: { kind: 'creature', player: enemy, zone }, amount: lost });
     });
+    if (field.lifesteal && drained > 0) healHero(ctx, player, drained);
     cleanup(ctx);
   }
 }
