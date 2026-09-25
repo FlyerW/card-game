@@ -72,6 +72,7 @@ export function place(
   const uid = state.nextUid++;
   const creature: Creature = {
     uid,
+    owner: player,
     cards: [{ uid, cardId }],
     damage: 0,
     attackCounters: 0,

@@ -1,4 +1,4 @@
-import type { Ability, Color, DeckCardDef, Effect, HeroDef, TargetSpec } from './types';
+import type { Ability, Color, CreatureModifier, DeckCardDef, Effect, HeroDef, TargetSpec } from './types';
 
 // 卡面文字由資料產生，不另外手寫，資料和說明才不會對不上。
 
@@ -54,6 +54,10 @@ export function describeEffect(effect: Effect): string {
       return `最高上限 +${effect.amount}`;
     case 'destroy':
       return '破壞';
+    case 'searchEvolution':
+      return '從牌庫把自己的進化卡加入手牌';
+    case 'evolveFromDeck':
+      return '用牌庫裡自己的進化卡直接進化';
   }
 }
 
@@ -61,6 +65,23 @@ export function describeAbility(ability: Ability): string {
   const target = describeTarget(ability.target);
   const effects = ability.effects.map(describeEffect).join('，');
   return `${ability.name}（${ability.cost}）：${target === null ? '' : `〔${target}〕`}${effects}`;
+}
+
+/** 「我方生物 HP 上限 +2、技能傷害 +1」這類持續加成的說明。 */
+function describeModifier(modifier: CreatureModifier | undefined): string[] {
+  const parts: string[] = [];
+  if (modifier?.attack) parts.push(`技能傷害 +${modifier.attack}`);
+  if (modifier?.hp) parts.push(`HP 上限 +${modifier.hp}`);
+  if (modifier?.damageReduction) parts.push(`受到傷害 −${modifier.damageReduction}`);
+  return parts;
+}
+
+function describeOwnEffects(creatures: CreatureModifier | undefined, ceilingBonus: number | undefined): string {
+  const parts: string[] = [];
+  const modifier = describeModifier(creatures);
+  if (modifier.length > 0) parts.push(`我方生物${modifier.join('、')}`);
+  if (ceilingBonus) parts.push(`我方最高上限 +${ceilingBonus}`);
+  return parts.join('；');
 }
 
 const STAGE_NAMES = ['基礎', '一階', '二階'] as const;
@@ -73,26 +94,23 @@ export function describeCard(card: DeckCardDef, names: (id: string) => string = 
       const stage = STAGE_NAMES[card.stage];
       const from = card.evolvesFrom === undefined ? '' : `，由${names(card.evolvesFrom)}進化`;
       const cost = card.stage === 0 ? `召喚 ${card.cost}` : `進化 ${card.cost}`;
-      const keywords = card.keywords?.includes('haste') ? '｜突襲' : '';
+      const keywords = card.keywords?.includes('haste') ? '｜速攻' : '';
       return [`${card.name}　${tag}・${stage}${from}｜${cost}｜HP ${card.hp}${keywords}`, ...card.skills.map(describeAbility)];
     }
     case 'spell':
       return [`${card.name}　${tag}・法術`, describeAbility({ ...card })];
-    case 'item': {
-      const parts: string[] = [];
-      if (card.attack) parts.push(`技能傷害 +${card.attack}`);
-      if (card.damageReduction) parts.push(`受到傷害 −${card.damageReduction}`);
-      if (card.hp) parts.push(`HP 上限 +${card.hp}`);
-      return [`${card.name}　${tag}・道具（${card.cost}）`, `這隻生物${parts.join('、')}`];
-    }
+    case 'item':
+      return [`${card.name}　${tag}・道具（${card.cost}）`, `這隻生物${describeModifier(card).join('、')}`];
     case 'field':
-      return [`${card.name}　${tag}・場地（${card.cost}）`, `雙方的最高上限 +${card.ceilingBonus ?? 0}`];
+      return [`${card.name}　${tag}・場地（${card.cost}）`, describeOwnEffects(card.creatures, card.ceilingBonus)];
   }
 }
 
 export function describeHero(hero: HeroDef): string[] {
   const lines = [`${hero.name}　${describeColors(hero.colors)}｜HP ${hero.hp}`];
-  if (hero.passive) lines.push(`被動「${hero.passive.name}」：最高上限 +${hero.passive.ceilingBonus ?? 0}`);
+  if (hero.passive) {
+    lines.push(`被動「${hero.passive.name}」：${describeOwnEffects(hero.passive.creatures, hero.passive.ceilingBonus)}`);
+  }
   if (hero.power) lines.push(`天生技 ${describeAbility(hero.power)}`);
   if (!hero.passive && !hero.power) lines.push('沒有效果');
   return lines;

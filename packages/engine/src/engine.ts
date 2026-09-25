@@ -31,6 +31,18 @@ export interface GameConfig {
   seed: number;
   players: [PlayerConfig, PlayerConfig];
   rules?: Partial<Rules>;
+  /**
+   * 不檢查牌組是否合法。只給試玩用：範例卡太少，單色組不成 40 張。
+   * 正式對戰（伺服器）一律要檢查。
+   */
+  skipDeckValidation?: boolean;
+}
+
+/** 一個合法動作，以及執行它之後的狀態。 */
+export interface Successor {
+  action: Action;
+  state: GameState;
+  events: GameEvent[];
 }
 
 /** 指定要查哪個技能的合法目標。 */
@@ -108,7 +120,7 @@ function startTurn(ctx: Ctx, player: PlayerId): void {
   }
   drawCards(ctx, player, 1);
 
-  // 第一個回合用起始值，之後每回合成長，再補滿。
+  // 能量在這裡重置：第一個回合用起始值，之後每回合成長，再補滿。
   // 場地卡被破壞後最高上限可能比能量上限低，這裡會一併壓回去。
   const { rules } = state;
   const isFirstPlayer = player === state.firstPlayer;
@@ -158,6 +170,7 @@ function summon(ctx: Ctx, a: ActionOf<'summon'>): void {
   removeFromHand(p, card.uid);
   p.zones[a.zone] = {
     uid: card.uid,
+    owner: a.player,
     cards: [card],
     damage: 0,
     attackCounters: 0,
@@ -269,18 +282,19 @@ function playField(ctx: Ctx, a: ActionOf<'playField'>): void {
 
   pay(p, def.cost);
   removeFromHand(p, card.uid);
-  if (state.field !== null) {
-    const replaced = state.field;
-    state.players[replaced.owner].discard.push(replaced.card);
-    ctx.events.push({ type: 'fieldDestroyed', owner: replaced.owner, cardId: replaced.card.cardId });
+  // 每人有自己的場地區；放新的就把自己舊的那張送進棄牌區。
+  if (p.field !== null) {
+    p.discard.push(p.field);
+    ctx.events.push({ type: 'fieldDestroyed', player: a.player, cardId: p.field.cardId });
   }
-  state.field = { card, owner: a.player };
+  p.field = card;
   p.fieldPlayedTurn = state.turn;
   ctx.events.push({ type: 'fieldPlayed', player: a.player, cardId: card.cardId });
+  cleanup(ctx); // 換掉場地卡可能讓生物失去 HP 加成
 }
 
+// 沒花完的能量留到對手的回合，之後可以用在對手回合的互動；自己的回合開始時才重置。
 function endTurn(ctx: Ctx, a: ActionOf<'endTurn'>): void {
-  ctx.state.players[a.player].energy = 0; // 沒花完的能量清空
   startTurn(ctx, other(a.player));
 }
 
@@ -334,9 +348,14 @@ export function createEngine(db: CardDb) {
 
   function createGame(config: GameConfig): ApplyResult {
     const rules: Rules = { ...DEFAULT_RULES, ...config.rules };
-    const problems = config.players.flatMap((p, i) =>
-      validateDeck(db, rules, p.heroId, p.deck).map((problem) => `玩家 ${i + 1}：${problem}`),
-    );
+    const problems = config.players.flatMap((p, i) => {
+      if (!db.heroes.has(p.heroId)) return [`玩家 ${i + 1}：找不到英雄 ${p.heroId}`];
+      if (config.skipDeckValidation) {
+        const unknown = p.deck.filter((id) => !db.cards.has(id));
+        return unknown.length === 0 ? [] : [`玩家 ${i + 1}：找不到卡牌 ${unknown.join('、')}`];
+      }
+      return validateDeck(db, rules, p.heroId, p.deck).map((problem) => `玩家 ${i + 1}：${problem}`);
+    });
     if (problems.length > 0) return { ok: false, error: { code: 'INVALID_CONFIG', message: problems.join('\n') } };
 
     const newPlayer = (heroId: string): PlayerState => ({
@@ -350,6 +369,7 @@ export function createEngine(db: CardDb) {
       energy: 0,
       maxEnergy: 0,
       ceilingBonus: 0,
+      field: null,
       fieldPlayedTurn: null,
       mulliganDone: false,
     });
@@ -361,7 +381,6 @@ export function createEngine(db: CardDb) {
       activePlayer: 0,
       phase: 'mulligan',
       players: [newPlayer(config.players[0].heroId), newPlayer(config.players[1].heroId)],
-      field: null,
       result: null,
       nextUid: 1,
     };
@@ -404,22 +423,23 @@ export function createEngine(db: CardDb) {
   }
 
   /**
-   * 列出這位玩家現在所有合法的動作。
+   * 列出這位玩家現在所有合法的動作，以及每個動作執行後的狀態。
    * 先列出候選，再逐一實際執行驗證，所以結果一定跟 apply 的判斷一致。
+   * 電腦對手評估每一步時直接用執行後的狀態，不必再執行一次。
    */
-  function legalActions(state: GameState, player: PlayerId): Action[] {
+  function successors(state: GameState, player: PlayerId): Successor[] {
     if (state.phase === 'over') return [];
     const p = state.players[player];
+    const candidates: Action[] = [];
     if (state.phase === 'mulligan') {
-      if (p.mulliganDone) return [];
-      return [
-        { type: 'mulligan', player, cards: [] },
-        { type: 'mulligan', player, cards: p.hand.map((c) => c.uid) },
-      ];
+      if (!p.mulliganDone) {
+        candidates.push({ type: 'mulligan', player, cards: [] });
+        candidates.push({ type: 'mulligan', player, cards: p.hand.map((c) => c.uid) });
+      }
+      return expand(state, candidates);
     }
     if (state.activePlayer !== player) return [];
 
-    const candidates: Action[] = [];
     const zones = Array.from({ length: state.rules.zones }, (_, zone) => zone);
     const withTargets = (base: TargetedAction, ability: Ability, targets: Target[]) => {
       if (ability.target.kind === 'none') candidates.push(base);
@@ -451,8 +471,21 @@ export function createEngine(db: CardDb) {
     const power = heroDef(db, state, player).power;
     if (power) withTargets({ type: 'heroPower', player }, power, targetsFor(state, player, { kind: 'heroPower' }));
     candidates.push({ type: 'endTurn', player });
+    return expand(state, candidates);
+  }
 
-    return candidates.filter((action) => apply(state, action).ok);
+  function expand(state: GameState, candidates: Action[]): Successor[] {
+    const out: Successor[] = [];
+    for (const action of candidates) {
+      const result = apply(state, action);
+      if (result.ok) out.push({ action, state: result.state, events: result.events });
+    }
+    return out;
+  }
+
+  /** 列出這位玩家現在所有合法的動作。 */
+  function legalActions(state: GameState, player: PlayerId): Action[] {
+    return successors(state, player).map((successor) => successor.action);
   }
 
   /** 從設定與動作序列重建一局。伺服器存檔、回放、除錯都靠這個。 */
@@ -471,6 +504,7 @@ export function createEngine(db: CardDb) {
     apply,
     targetsFor,
     legalActions,
+    successors,
     replay,
     viewFor: (state: GameState, player: PlayerId) => viewFor(db, state, player),
   };

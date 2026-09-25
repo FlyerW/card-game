@@ -1,4 +1,14 @@
-import type { CardDb, Creature, CreatureDef, DeckCardDef, GameState, HeroDef, ItemDef, PlayerId } from './types';
+import type {
+  CardDb,
+  Creature,
+  CreatureDef,
+  CreatureModifier,
+  DeckCardDef,
+  GameState,
+  HeroDef,
+  ItemDef,
+  PlayerId,
+} from './types';
 
 export const other = (player: PlayerId): PlayerId => (player === 0 ? 1 : 0);
 
@@ -31,17 +41,38 @@ function itemDef(db: CardDb, creature: Creature): ItemDef | null {
   return def;
 }
 
-export const maxHp = (db: CardDb, creature: Creature): number =>
-  creatureDef(db, creature).hp + creature.hpCounters + (itemDef(db, creature)?.hp ?? 0);
+/** 英雄被動加上自己場地卡，給自己每隻生物的加成。 */
+export function aura(db: CardDb, state: GameState, player: PlayerId): Required<CreatureModifier> {
+  const sources: (CreatureModifier | undefined)[] = [heroDef(db, state, player).passive?.creatures];
+  const { field } = state.players[player];
+  if (field !== null) {
+    const def = cardDef(db, field.cardId);
+    if (def.kind === 'field') sources.push(def.creatures);
+  }
+  const total = { attack: 0, hp: 0, damageReduction: 0 };
+  for (const modifier of sources) {
+    total.attack += modifier?.attack ?? 0;
+    total.hp += modifier?.hp ?? 0;
+    total.damageReduction += modifier?.damageReduction ?? 0;
+  }
+  return total;
+}
 
-export const currentHp = (db: CardDb, creature: Creature): number => maxHp(db, creature) - creature.damage;
+export const maxHp = (db: CardDb, state: GameState, creature: Creature): number =>
+  creatureDef(db, creature).hp +
+  creature.hpCounters +
+  (itemDef(db, creature)?.hp ?? 0) +
+  aura(db, state, creature.owner).hp;
 
-/** 技能傷害加成：攻擊指示物加上道具。 */
-export const attackBonus = (db: CardDb, creature: Creature): number =>
-  creature.attackCounters + (itemDef(db, creature)?.attack ?? 0);
+export const currentHp = (db: CardDb, state: GameState, creature: Creature): number =>
+  maxHp(db, state, creature) - creature.damage;
 
-export const damageReduction = (db: CardDb, creature: Creature): number =>
-  itemDef(db, creature)?.damageReduction ?? 0;
+/** 技能傷害加成：攻擊指示物、道具、場地卡與英雄被動。 */
+export const attackBonus = (db: CardDb, state: GameState, creature: Creature): number =>
+  creature.attackCounters + (itemDef(db, creature)?.attack ?? 0) + aura(db, state, creature.owner).attack;
+
+export const damageReduction = (db: CardDb, state: GameState, creature: Creature): number =>
+  (itemDef(db, creature)?.damageReduction ?? 0) + aura(db, state, creature.owner).damageReduction;
 
 export const heroMaxHp = (db: CardDb, state: GameState, player: PlayerId): number =>
   heroDef(db, state, player).hp;
@@ -49,13 +80,14 @@ export const heroMaxHp = (db: CardDb, state: GameState, player: PlayerId): numbe
 export const heroHp = (db: CardDb, state: GameState, player: PlayerId): number =>
   heroMaxHp(db, state, player) - state.players[player].heroDamage;
 
-/** 最高上限 = 基本值 + 突破型卡牌 + 英雄被動 + 場地卡（雙方共享）。 */
+/** 最高上限 = 基本值 + 突破型卡牌 + 英雄被動 + 自己的場地卡。 */
 export function ceiling(db: CardDb, state: GameState, player: PlayerId): number {
-  const fieldDef = state.field === null ? null : cardDef(db, state.field.card.cardId);
+  const p = state.players[player];
+  const fieldDef = p.field === null ? null : cardDef(db, p.field.cardId);
   const fieldBonus = fieldDef?.kind === 'field' ? (fieldDef.ceilingBonus ?? 0) : 0;
   return (
     state.rules.baseCeiling +
-    state.players[player].ceilingBonus +
+    p.ceilingBonus +
     (heroDef(db, state, player).passive?.ceilingBonus ?? 0) +
     fieldBonus
   );

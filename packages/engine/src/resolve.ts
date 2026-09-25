@@ -1,6 +1,7 @@
 import { nextRandom } from './rng';
 import {
   attackBonus,
+  cardDef,
   ceiling,
   currentCardId,
   currentHp,
@@ -43,11 +44,26 @@ export function shuffle(ctx: Ctx, cards: CardRef[]): void {
   }
 }
 
+/** 把一張卡加入手牌；手牌滿了就直接進棄牌區。 */
+function toHand(ctx: Ctx, player: PlayerId, card: CardRef): boolean {
+  const p = ctx.state.players[player];
+  if (p.hand.length >= ctx.state.rules.handLimit) {
+    p.discard.push(card);
+    ctx.events.push({ type: 'burned', player, cardId: card.cardId });
+    return false;
+  }
+  p.hand.push(card);
+  return true;
+}
+
 /** 抽到牌庫空為止。只有「回合開始時」抽不到牌才會落敗，那個判斷在 startTurn。 */
 export function drawCards(ctx: Ctx, player: PlayerId, count: number): void {
   const p = ctx.state.players[player];
-  const drawn = p.deck.splice(0, Math.min(count, p.deck.length));
-  p.hand.push(...drawn);
+  const drawn: CardRef[] = [];
+  for (let i = 0; i < count && p.deck.length > 0; i++) {
+    const card = p.deck.shift()!;
+    if (toHand(ctx, player, card)) drawn.push(card);
+  }
   if (drawn.length > 0) ctx.events.push({ type: 'drew', player, cards: drawn });
 }
 
@@ -63,7 +79,7 @@ export function cleanup(ctx: Ctx): void {
   for (const player of [0, 1] as const) {
     const p = state.players[player];
     p.zones.forEach((creature, zone) => {
-      if (creature === null || currentHp(db, creature) > 0) return;
+      if (creature === null || currentHp(db, state, creature) > 0) return;
       p.zones[zone] = null;
       p.discard.push(...creature.cards);
       if (creature.item !== null) p.discard.push(creature.item);
@@ -88,7 +104,7 @@ function dealDamage(ctx: Ctx, target: Target, creature: Creature | null, amount:
     ctx.state.players[target.player].heroDamage += amount;
     ctx.events.push({ type: 'damaged', target, amount });
   } else if (creature !== null) {
-    const dealt = Math.max(0, amount - damageReduction(ctx.db, creature));
+    const dealt = Math.max(0, amount - damageReduction(ctx.db, ctx.state, creature));
     creature.damage += dealt;
     ctx.events.push({ type: 'damaged', target, amount: dealt });
   }
@@ -105,7 +121,7 @@ function applyEffect(
   const { db, state } = ctx;
   const me = source.player;
   const player = state.players[me];
-  const bonus = sourceCreature === null ? 0 : attackBonus(db, sourceCreature);
+  const bonus = sourceCreature === null ? 0 : attackBonus(db, state, sourceCreature);
   const creature = liveCreature(state, target, targetUid);
 
   switch (effect.type) {
@@ -153,7 +169,7 @@ function applyEffect(
 
     case 'halveHp':
       if (creature !== null) {
-        const hp = currentHp(db, creature);
+        const hp = currentHp(db, state, creature);
         const lost = hp - Math.floor(hp / 2);
         creature.damage += lost;
         ctx.events.push({ type: 'hpLost', target: target!, amount: lost });
@@ -198,11 +214,13 @@ function applyEffect(
       return;
 
     case 'destroy':
-      if (target?.kind === 'field' && state.field !== null) {
-        const { card, owner } = state.field;
-        state.players[owner].discard.push(card);
-        state.field = null;
-        ctx.events.push({ type: 'fieldDestroyed', owner, cardId: card.cardId });
+      if (target?.kind === 'field') {
+        const owner = state.players[target.player];
+        if (owner.field !== null) {
+          owner.discard.push(owner.field);
+          ctx.events.push({ type: 'fieldDestroyed', player: target.player, cardId: owner.field.cardId });
+          owner.field = null;
+        }
       } else if (creature?.item != null && target?.kind === 'creature') {
         const item = creature.item;
         state.players[target.player].discard.push(item);
@@ -210,6 +228,30 @@ function applyEffect(
         ctx.events.push({ type: 'itemDestroyed', player: target.player, zone: target.zone, cardId: item.cardId });
       }
       return;
+
+    case 'searchEvolution':
+    case 'evolveFromDeck': {
+      if (sourceCreature === null || source.kind !== 'creature') return;
+      const from = currentCardId(sourceCreature);
+      const index = player.deck.findIndex((card) => {
+        const def = cardDef(db, card.cardId);
+        return def.kind === 'creature' && def.evolvesFrom === from;
+      });
+      // 牌庫裡沒有對應的進化卡，或這回合已經進化過，就沒有效果。
+      if (index === -1) return;
+      if (effect.type === 'evolveFromDeck' && sourceCreature.evolvedTurn === state.turn) return;
+      const [card] = player.deck.splice(index, 1);
+      if (effect.type === 'searchEvolution') {
+        ctx.events.push({ type: 'searched', player: me, cardId: card!.cardId });
+        toHand(ctx, me, card!);
+      } else {
+        sourceCreature.cards.push(card!);
+        sourceCreature.evolvedTurn = state.turn;
+        ctx.events.push({ type: 'evolved', player: me, zone: source.zone, from, to: card!.cardId });
+      }
+      shuffle(ctx, player.deck);
+      return;
+    }
   }
 }
 

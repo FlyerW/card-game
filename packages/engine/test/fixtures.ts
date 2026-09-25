@@ -56,6 +56,13 @@ export const TEST_CARDS: DeckCardDef[] = [
   }),
   creature('warg', [hit('maul', ANY, 3), hit('howl', ANY, 3)], { rarity: 'SR', stage: 2, evolvesFrom: 'hound', cost: 3, hp: 14 }),
 
+  // 找進化卡、直接進化
+  creature('seed', [
+    { name: 'search', cost: 1, target: NONE, effects: [{ type: 'searchEvolution' }] },
+    { name: 'bloom', cost: 1, target: NONE, effects: [{ type: 'evolveFromDeck' }] },
+  ], { hp: 6 }),
+  creature('sprout', [hit('x', ANY, 1), hit('y', ANY, 1)], { rarity: 'SR', stage: 1, evolvesFrom: 'seed', cost: 5, hp: 12 }),
+
   { kind: 'spell', id: 'zap', name: 'zap', rarity: 'N', colors: [], cost: 1, target: ANY, effects: [{ type: 'damage', amount: 3 }] },
   {
     kind: 'spell', id: 'mend', name: 'mend', rarity: 'N', colors: [], cost: 1,
@@ -70,6 +77,7 @@ export const TEST_CARDS: DeckCardDef[] = [
   { kind: 'item', id: 'amulet', name: 'amulet', rarity: 'N', colors: [], cost: 1, hp: 3 },
   { kind: 'field', id: 'altar', name: 'altar', rarity: 'R', colors: [], cost: 1, ceilingBonus: 2 },
   { kind: 'field', id: 'shrine', name: 'shrine', rarity: 'R', colors: [], cost: 1, ceilingBonus: 1 },
+  { kind: 'field', id: 'camp', name: 'camp', rarity: 'R', colors: [], cost: 1, creatures: { attack: 1, hp: 2 } },
 
   // 顏色測試
   creature('red-imp', [hit('x', ANY, 1), hit('y', ANY, 1)], { colors: ['red'] }),
@@ -81,6 +89,10 @@ export const TEST_HEROES: HeroDef[] = [
   { kind: 'hero', id: 'pinger', name: 'pinger', colors: ['red'], hp: 46, power: hit('ping', ANY, 2, 2) },
   { kind: 'hero', id: 'forester', name: 'forester', colors: ['green'], hp: 47, passive: { name: 'plenty', ceilingBonus: 1 } },
   { kind: 'hero', id: 'red-green', name: 'red-green', colors: ['red', 'green'], hp: 45 },
+  {
+    kind: 'hero', id: 'warden', name: 'warden', colors: ['white'], hp: 48,
+    passive: { name: 'guard', creatures: { damageReduction: 1 } },
+  },
 ];
 
 export const testDb = () => buildCardDb(TEST_CARDS, TEST_HEROES);

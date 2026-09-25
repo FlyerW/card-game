@@ -26,8 +26,8 @@ describe('開局', () => {
   it('雙方各抽起手牌；同樣的種子得到同樣的局面', () => {
     const state = created(99);
     expect(state.phase).toBe('mulligan');
-    expect(state.players[0].hand).toHaveLength(5);
-    expect(state.players[1].hand).toHaveLength(5);
+    expect(state.players[0].hand).toHaveLength(4);
+    expect(state.players[1].hand).toHaveLength(4);
     expect(created(99)).toEqual(state);
   });
 
@@ -35,8 +35,8 @@ describe('開局', () => {
     let state = created(3);
     const two = state.players[0].hand.slice(0, 2).map((card) => card.uid);
     state = act(state, { type: 'mulligan', player: 0, cards: two });
-    expect(state.players[0].hand).toHaveLength(5);
-    expect(state.players[0].deck).toHaveLength(25);
+    expect(state.players[0].hand).toHaveLength(4);
+    expect(state.players[0].deck).toHaveLength(26);
     expect(reject(state, { type: 'mulligan', player: 0, cards: [] })).toBe('ALREADY_MULLIGANED');
     expect(state.phase).toBe('mulligan');
   });
@@ -49,7 +49,7 @@ describe('開局', () => {
     const { state, a } = start();
     expect(state.phase).toBe('main');
     expect(state.turn).toBe(1);
-    expect(state.players[a].hand).toHaveLength(6);
+    expect(state.players[a].hand).toHaveLength(5);
     expect(state.players[a]).toMatchObject({ energy: 1, maxEnergy: 1 });
   });
 });
@@ -101,10 +101,19 @@ describe('能量', () => {
     expect(state.players[state.activePlayer].maxEnergy).toBe(10);
   });
 
-  it('沒花完的能量在回合結束時清空', () => {
+  it('沒花完的能量留到對手的回合；自己的回合開始時才重置，不會累加', () => {
     let { state, a } = start();
     state = endTurn(state);
-    expect(state.players[a].energy).toBe(0);
+    expect(state.players[a].energy).toBe(1); // 對手回合時還留著，之後可用於對手回合的互動
+    state = endTurn(state);
+    expect(state.players[a].energy).toBe(3); // 重置成新的上限 3，不是 1 + 3
+  });
+
+  it('雙方看得到對手的英雄之後才決定要不要重抽', () => {
+    const state = created(5);
+    state.players[1].heroId = 'pinger';
+    expect(state.phase).toBe('mulligan');
+    expect(engine.viewFor(state, 0).opponent.heroId).toBe('pinger');
   });
 
   it('英雄被動可以提高最高上限', () => {
@@ -127,6 +136,7 @@ describe('能量', () => {
     expect(state.players[a].maxEnergy).toBe(12);
   });
 
+  // 突破型目前先不出（維持上限 12），但引擎保留這個能力，所以繼續測。
   it('突破型：最高上限永久提高', () => {
     let { state, a } = start({ deckSize: 60 });
     place(state, a, 0, 'grower');
@@ -136,16 +146,16 @@ describe('能量', () => {
     expect(state.players[a].maxEnergy).toBe(14);
   });
 
-  it('場地卡在場時雙方最高上限都提高；被破壞後，能量上限在下個回合開始時壓回', () => {
+  it('場地卡只影響擁有者的最高上限；被破壞後，能量上限在下個回合開始時壓回', () => {
     let { state, a, b } = start({ deckSize: 60 });
     state = act(state, { type: 'playField', player: a, card: give(state, a, 'altar') });
-    expect([ceiling(db, state, a), ceiling(db, state, b)]).toEqual([14, 14]);
+    expect([ceiling(db, state, a), ceiling(db, state, b)]).toEqual([14, 12]);
     for (let i = 0; i < 30; i++) state = endTurn(state);
     expect(state.players[a].maxEnergy).toBe(14);
 
     state = endTurn(state);
-    state = act(state, { type: 'castSpell', player: b, card: give(state, b, 'shatter'), target: { kind: 'field' } });
-    expect(state.field).toBeNull();
+    state = act(state, { type: 'castSpell', player: b, card: give(state, b, 'shatter'), target: { kind: 'field', player: a } });
+    expect(state.players[a].field).toBeNull();
     expect(state.players[a].maxEnergy).toBe(14);
     state = endTurn(state);
     expect(state.players[a].maxEnergy).toBe(12);

@@ -9,7 +9,8 @@ import type { Rules } from './types';
 export const DEFAULT_RULES: Rules = {
   deckSize: 40,
   maxCopies: 3,
-  startingHand: 5,
+  startingHand: 4,
+  handLimit: 10,
   zones: 5,
   startingMaxEnergy: [1, 2],
   energyGrowth: 2,

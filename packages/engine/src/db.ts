@@ -1,5 +1,5 @@
 import { RARITIES } from './types';
-import type { Ability, CardDb, Color, DeckCardDef, Effect, HeroDef, TargetSpec } from './types';
+import type { Ability, CardDb, Color, CreatureModifier, DeckCardDef, Effect, HeroDef, TargetSpec } from './types';
 
 const COLORS: ReadonlySet<Color> = new Set(['white', 'blue', 'black', 'red', 'green']);
 
@@ -38,6 +38,9 @@ function checkAbility(ability: Ability, where: string, isCreatureSkill: boolean)
   if (!Number.isInteger(ability.cost) || ability.cost < 0) problems.push(`${at}：費用必須是非負整數`);
   if (ability.effects.length === 0) problems.push(`${at}：沒有任何效果`);
   if (ability.target.kind === 'lane' && !isCreatureSkill) problems.push(`${at}：位置技能只能用在生物身上`);
+  if (!isCreatureSkill && ability.effects.some((e) => e.type === 'searchEvolution' || e.type === 'evolveFromDeck')) {
+    problems.push(`${at}：找進化卡、直接進化只能用在生物技能上`);
+  }
 
   const targeted = ability.effects.filter(usesTarget);
   if (ability.target.kind === 'none' && targeted.length > 0) {
@@ -106,7 +109,19 @@ function checkCard(card: DeckCardDef, cards: ReadonlyMap<string, DeckCardDef>): 
       }
       break;
     case 'field':
+      problems.push(...checkModifier(card.creatures, where));
+      if (card.ceilingBonus !== undefined && (!Number.isInteger(card.ceilingBonus) || card.ceilingBonus < 0)) {
+        problems.push(`${where}：ceilingBonus 必須是非負整數`);
+      }
       break;
+  }
+  return problems;
+}
+
+function checkModifier(modifier: CreatureModifier | undefined, where: string): string[] {
+  const problems: string[] = [];
+  for (const [key, value] of Object.entries(modifier ?? {})) {
+    if (!Number.isInteger(value) || value < 0) problems.push(`${where}：${key} 必須是非負整數`);
   }
   return problems;
 }
@@ -117,6 +132,7 @@ function checkHero(hero: HeroDef): string[] {
   if (hero.colors.length === 0) problems.push(`${where}：英雄至少要有一個顏色`);
   if (!Number.isInteger(hero.hp) || hero.hp <= 0) problems.push(`${where}：HP 必須是正整數`);
   if (hero.power) problems.push(...checkAbility(hero.power, where, false));
+  problems.push(...checkModifier(hero.passive?.creatures, where));
   return problems;
 }
 

@@ -51,7 +51,7 @@ describe('增益指示物', () => {
     place(state, a, 0, 'bruiser', { damage: 4 });
     state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0 });
     const bruiser = at(state, a, 0)!;
-    expect([maxHp(db, bruiser), currentHp(db, bruiser), attackBonus(db, bruiser)]).toEqual([13, 9, 3]);
+    expect([maxHp(db, state, bruiser), currentHp(db, state, bruiser), attackBonus(db, state, bruiser)]).toEqual([13, 9, 3]);
 
     state = endTurn(endTurn(state));
     state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 2, target: hero(b) });
@@ -63,7 +63,7 @@ describe('增益指示物', () => {
     place(state, a, 0, 'bruiser');
     state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 1 });
     const bruiser = at(state, a, 0)!;
-    expect([attackBonus(db, bruiser), maxHp(db, bruiser)]).toEqual([2, 10]);
+    expect([attackBonus(db, state, bruiser), maxHp(db, state, bruiser)]).toEqual([2, 10]);
   });
 
   it('指示物可以疊加', () => {
@@ -91,7 +91,7 @@ describe('HP 減半與回復', () => {
     place(state, a, 0, 'witch');
     place(state, b, 0, 'taunter', { damage: 1, item: { uid: 900, cardId: 'armor' } }); // 剩 11
     state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0, target: creatureAt(b, 0) });
-    expect(currentHp(db, at(state, b, 0)!)).toBe(5);
+    expect(currentHp(db, state, at(state, b, 0)!)).toBe(5);
   });
 
   it('回復不超過 HP 上限', () => {
@@ -114,7 +114,7 @@ describe('進化', () => {
     state = act(state, { type: 'evolve', player: a, card: give(state, a, 'hound'), zone: 0 });
     const hound = at(state, a, 0)!;
     expect(hound.cards.map((card) => card.cardId)).toEqual(['pup', 'hound']);
-    expect([maxHp(db, hound), currentHp(db, hound)]).toEqual([10, 6]);
+    expect([maxHp(db, state, hound), currentHp(db, state, hound)]).toEqual([10, 6]);
     expect(creatureDef(db, hound).skills.map((skill) => skill.name)).toEqual(['bite2', 'sniff']);
     expect(state.players[a].energy).toBe(8);
   });
@@ -168,7 +168,7 @@ describe('進化', () => {
     state.players[a].energy = 10;
     state = act(state, { type: 'evolve', player: a, card: give(state, a, 'hound'), zone: 0 });
     const hound = at(state, a, 0)!;
-    expect(attackBonus(db, hound)).toBe(4);
+    expect(attackBonus(db, state, hound)).toBe(4);
     expect(hound.item?.cardId).toBe('blade');
   });
 
@@ -176,6 +176,53 @@ describe('進化', () => {
     const { state, a } = start();
     place(state, a, 0, 'pup');
     expect(reject(state, { type: 'evolve', player: a, card: give(state, a, 'wolf'), zone: 0 })).toBe('WRONG_CARD_KIND');
+  });
+});
+
+describe('從牌庫進化', () => {
+  it('找進化卡：從牌庫把自己的進化卡加入手牌', () => {
+    let { state, a } = start();
+    place(state, a, 0, 'seed');
+    state.players[a].deck.push({ uid: 900, cardId: 'sprout' });
+    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0 });
+    expect(state.players[a].hand).toContainEqual({ uid: 900, cardId: 'sprout' });
+    expect(state.players[a].deck.some((card) => card.uid === 900)).toBe(false);
+  });
+
+  it('直接進化：用牌庫裡的進化卡進化，不另付進化費用，已受的傷害保留', () => {
+    let { state, a } = start();
+    place(state, a, 0, 'seed', { damage: 2 });
+    state.players[a].deck.push({ uid: 900, cardId: 'sprout' });
+    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 1 });
+    const sprout = at(state, a, 0)!;
+    expect(sprout.cards.map((card) => card.cardId)).toEqual(['seed', 'sprout']);
+    expect(currentHp(db, state, sprout)).toBe(10);
+    expect(state.players[a].energy).toBe(0); // 只付了技能的 1 點，沒付進化費用 5
+  });
+
+  it('這回合已經進化過，或牌庫沒有對應的進化卡，就沒有效果', () => {
+    let { state, a } = start();
+    place(state, a, 0, 'seed', { evolvedTurn: 1 });
+    state.players[a].deck.push({ uid: 900, cardId: 'sprout' });
+    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 1 });
+    expect(at(state, a, 0)?.cards).toHaveLength(1);
+
+    let other = start().state;
+    const a2 = other.activePlayer;
+    place(other, a2, 0, 'seed');
+    other = act(other, { type: 'useSkill', player: a2, zone: 0, skill: 0 });
+    expect(other.players[a2].hand.some((card) => card.cardId === 'sprout')).toBe(false);
+  });
+});
+
+describe('手牌上限', () => {
+  it('手牌滿 10 張時，抽到的牌直接進棄牌區', () => {
+    let { state, a, b } = start();
+    while (state.players[b].hand.length < 10) give(state, b, 'wolf');
+    const top = state.players[b].deck[0]!;
+    state = act(state, { type: 'endTurn', player: a });
+    expect(state.players[b].hand).toHaveLength(10);
+    expect(state.players[b].discard).toContainEqual(top);
   });
 });
 
@@ -219,27 +266,62 @@ describe('法術、道具、場地', () => {
     let { state, a } = start();
     place(state, a, 0, 'wolf', { damage: 5 });
     state = act(state, { type: 'attachItem', player: a, card: give(state, a, 'amulet'), zone: 0 });
-    expect(currentHp(db, at(state, a, 0)!)).toBe(4);
+    expect(currentHp(db, state, at(state, a, 0)!)).toBe(4);
   });
 
-  it('新的場地卡取代舊的，舊的回到擁有者的棄牌區；每回合限放一張', () => {
+  it('每人有自己的場地區：放新的只會取代自己的舊場地卡；每回合限放一張', () => {
     let { state, a, b } = start();
     state = act(state, { type: 'playField', player: a, card: give(state, a, 'altar') });
     state.players[a].energy = 5;
     expect(reject(state, { type: 'playField', player: a, card: give(state, a, 'shrine') })).toBe('FIELD_ALREADY_PLAYED');
     state = endTurn(state);
     state = act(state, { type: 'playField', player: b, card: give(state, b, 'shrine') });
-    expect(state.field).toMatchObject({ owner: b, card: { cardId: 'shrine' } });
+    expect([state.players[a].field?.cardId, state.players[b].field?.cardId]).toEqual(['altar', 'shrine']);
+    state = endTurn(state);
+    state = act(state, { type: 'playField', player: a, card: give(state, a, 'shrine') });
+    expect(state.players[a].field?.cardId).toBe('shrine');
     expect(state.players[a].discard.map((card) => card.cardId)).toContain('altar');
   });
 
-  it('破壞：可以選對手的道具或場地卡', () => {
+  it('場地卡只強化自己的生物', () => {
+    let { state, a, b } = start();
+    place(state, a, 0, 'wolf');
+    place(state, b, 0, 'wolf');
+    state = act(state, { type: 'playField', player: a, card: give(state, a, 'camp') });
+    expect([maxHp(db, state, at(state, a, 0)!), attackBonus(db, state, at(state, a, 0)!)]).toEqual([8, 1]);
+    expect([maxHp(db, state, at(state, b, 0)!), attackBonus(db, state, at(state, b, 0)!)]).toEqual([6, 0]);
+  });
+
+  it('英雄被動也只強化自己的生物', () => {
+    let { state, a, b } = start();
+    state.players[b].heroId = 'warden';
+    place(state, a, 0, 'hitter');
+    place(state, b, 0, 'taunter');
+    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0, target: creatureAt(b, 0) });
+    expect(at(state, b, 0)?.damage).toBe(4); // 5 − 1
+  });
+
+  it('場地卡被拆掉，靠它撐著 HP 的生物會倒下', () => {
+    let { state, a, b } = start();
+    state.players[b].field = { uid: 900, cardId: 'camp' };
+    place(state, b, 0, 'wolf', { damage: 7 }); // 6 + 2 − 7 = 1
+    state = act(state, { type: 'castSpell', player: a, card: give(state, a, 'shatter'), target: { kind: 'field', player: b } });
+    expect(state.players[b].field).toBeNull();
+    expect(at(state, b, 0)).toBeNull();
+    expect(state.players[b].discard.map((card) => card.cardId)).toEqual(['camp', 'wolf']);
+  });
+
+  it('破壞：可以選對手的道具或對手的場地卡，不能選自己的', () => {
     let { state, a, b } = start();
     place(state, b, 0, 'wolf', { item: { uid: 900, cardId: 'armor' } });
     place(state, b, 1, 'wolf');
-    state.field = { card: { uid: 901, cardId: 'altar' }, owner: b };
+    state.players[b].field = { uid: 901, cardId: 'altar' };
+    state.players[a].field = { uid: 902, cardId: 'shrine' };
     const shatter = give(state, a, 'shatter');
-    expect(engine.targetsFor(state, a, { kind: 'spell', card: shatter })).toEqual([creatureAt(b, 0), { kind: 'field' }]);
+    expect(engine.targetsFor(state, a, { kind: 'spell', card: shatter })).toEqual([
+      creatureAt(b, 0),
+      { kind: 'field', player: b },
+    ]);
     state = act(state, { type: 'castSpell', player: a, card: shatter, target: creatureAt(b, 0) });
     expect(at(state, b, 0)?.item).toBeNull();
     expect(state.players[b].discard).toContainEqual({ uid: 900, cardId: 'armor' });

@@ -41,6 +41,8 @@ export interface SideView {
   energy: number;
   maxEnergy: number;
   ceiling: number;
+  /** 自己場地區的場地卡。 */
+  field: string | null;
   mulliganDone: boolean;
 }
 
@@ -55,7 +57,7 @@ export interface PlayerView {
   activePlayer: PlayerId;
   firstPlayer: PlayerId;
   result: GameResult | null;
-  field: { cardId: string; owner: PlayerId } | null;
+  /** 對手的英雄從重抽階段就看得到，可以先看對手是誰再決定要不要重抽。 */
   you: SideView & { hand: CardRef[] };
   opponent: SideView;
 }
@@ -65,10 +67,10 @@ function creatureView(db: CardDb, state: GameState, creature: Creature): Creatur
     uid: creature.uid,
     cardId: currentCardId(creature),
     evolutionChain: creature.cards.map((card) => card.cardId),
-    hp: currentHp(db, creature),
-    maxHp: maxHp(db, creature),
-    attackBonus: attackBonus(db, creature),
-    damageReduction: damageReduction(db, creature),
+    hp: currentHp(db, state, creature),
+    maxHp: maxHp(db, state, creature),
+    attackBonus: attackBonus(db, state, creature),
+    damageReduction: damageReduction(db, state, creature),
     attackCounters: creature.attackCounters,
     hpCounters: creature.hpCounters,
     item: creature.item?.cardId ?? null,
@@ -92,6 +94,7 @@ function sideView(db: CardDb, state: GameState, player: PlayerId): SideView {
     energy: p.energy,
     maxEnergy: p.maxEnergy,
     ceiling: ceiling(db, state, player),
+    field: p.field?.cardId ?? null,
     mulliganDone: p.mulliganDone,
   };
 }
@@ -104,7 +107,6 @@ export function viewFor(db: CardDb, state: GameState, player: PlayerId): PlayerV
     activePlayer: state.activePlayer,
     firstPlayer: state.firstPlayer,
     result: state.result,
-    field: state.field === null ? null : { cardId: state.field.card.cardId, owner: state.field.owner },
     you: { ...sideView(db, state, player), hand: state.players[player].hand.map((card) => ({ ...card })) },
     opponent: sideView(db, state, other(player)),
   };

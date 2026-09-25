@@ -2,7 +2,8 @@ import { buildCardDb } from '../db';
 import type { Ability, DeckCardDef, HeroDef, TargetSpec } from '../types';
 
 // 設計文件「範例卡牌」一節的卡，名字與數值都是暫定。
-// 數值參照「數值基準」：HP ≈ 4 + 2 × 召喚費用；單體傷害 ≈ 任意 2.5、單類 3、位置 3.5 倍費用。
+// 數值參照「數值基準」：HP ≈ 4 + 2 × 召喚費用；單體傷害 ≈ 任意 2.5、只打英雄 2.5 + 1、
+// 只打生物 3、位置 3.5 倍費用。稀有度預算：N 基準、R 基準加一個機制、SR +10%、UR +20%。
 
 const ANY: TargetSpec = { kind: 'enemy', allow: 'any' };
 const CREATURE: TargetSpec = { kind: 'enemy', allow: 'creature' };
@@ -34,7 +35,7 @@ export const SAMPLE_HEROES: HeroDef[] = [
     name: '林海之王',
     colors: ['green'],
     hp: 47,
-    passive: { name: '豐饒', ceilingBonus: 1 },
+    passive: { name: '豐饒', creatures: { hp: 1 } },
   },
   {
     kind: 'hero',
@@ -65,6 +66,12 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     stage: 0, cost: 2, hp: 8,
     skills: [hit('火花', 2, DIAGONAL, 7)],
   },
+  {
+    // 血量和傷害互換：HP 比基準高一截，傷害就只有 2。
+    kind: 'creature', id: 'rock-turtle', name: '岩殼龜', rarity: 'N', colors: [],
+    stage: 0, cost: 2, hp: 12,
+    skills: [hit('撞擊', 1, ANY, 1)],
+  },
 
   // ── 紅色進化線：N → R → SR ──
   {
@@ -72,18 +79,18 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     stage: 1, evolvesFrom: 'ember-fox', cost: 3, hp: 15,
     skills: [
       { name: '狐火', cost: 2, target: DIAGONAL, effects: [{ type: 'damage', amount: 7 }, { type: 'draw', count: 1 }] },
-      hit('燃魂', 3, HERO, 9),
+      hit('燃魂', 3, HERO, 8),
     ],
   },
   {
     kind: 'creature', id: 'nine-tailed-fox', name: '九尾天狐', rarity: 'SR', colors: ['red'],
-    stage: 2, evolvesFrom: 'ember-fox-king', cost: 4, hp: 24,
+    stage: 2, evolvesFrom: 'ember-fox-king', cost: 4, hp: 26,
     skills: [
       {
         name: '燎天', cost: 4, target: NONE,
         effects: [{ type: 'damageEnemyCreatures', amount: 4 }, { type: 'buff', attack: 1, hp: 1, on: 'self' }],
       },
-      hit('天焰', 5, DIAGONAL, 17),
+      hit('天焰', 5, DIAGONAL, 19),
     ],
   },
 
@@ -93,7 +100,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     stage: 0, cost: 3, hp: 12,
     skills: [
       { name: '挑釁', cost: 1, target: NONE, effects: [{ type: 'taunt' }] },
-      hit('正面衝鋒', 2, OPPOSITE, 7),
+      hit('正面衝鋒', 2, OPPOSITE, 6),
     ],
   },
   {
@@ -118,34 +125,45 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     skills: [
       { name: '蓄力', cost: 3, target: NONE, effects: [{ type: 'buff', attack: 3, hp: 3, on: 'self' }] },
       hit('熊掌', 3, CREATURE, 9),
+      { name: '呼喚熊王', cost: 1, target: NONE, effects: [{ type: 'searchEvolution' }] },
     ],
   },
 
   // ── 綠色進化線：R → SR → UR（較強的進化鏈）──
   {
     kind: 'creature', id: 'grove-bear-king', name: '森林熊王', rarity: 'SR', colors: ['green'],
-    stage: 1, evolvesFrom: 'grove-bear', cost: 3, hp: 20,
+    stage: 1, evolvesFrom: 'grove-bear', cost: 3, hp: 22,
     skills: [
       { name: '蓄力', cost: 3, target: NONE, effects: [{ type: 'buff', attack: 3, hp: 3, on: 'self' }] },
-      hit('重擊', 4, CREATURE, 12),
+      hit('重擊', 4, CREATURE, 13),
+      { name: '古樹之召', cost: 4, target: NONE, effects: [{ type: 'evolveFromDeck' }] },
     ],
   },
   {
     kind: 'creature', id: 'ancient-bear-god', name: '古樹熊神', rarity: 'UR', colors: ['green'],
-    stage: 2, evolvesFrom: 'grove-bear-king', cost: 4, hp: 28,
+    stage: 2, evolvesFrom: 'grove-bear-king', cost: 4, hp: 30,
     skills: [
       {
         name: '森之怒', cost: 5, target: CREATURE,
-        effects: [{ type: 'damage', amount: 15 }, { type: 'buff', attack: 2, hp: 2, on: 'self' }],
+        effects: [{ type: 'damage', amount: 16 }, { type: 'buff', attack: 2, hp: 2, on: 'self' }],
       },
-      { name: '大地震', cost: 6, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 6 }] },
+      { name: '大地震', cost: 6, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 7 }] },
+    ],
+  },
+
+  {
+    kind: 'creature', id: 'rust-mite', name: '腐蝕蟲', rarity: 'R', colors: ['black'],
+    stage: 0, cost: 2, hp: 7,
+    skills: [
+      { name: '腐蝕', cost: 1, target: { kind: 'enemyItemOrField' }, effects: [{ type: 'destroy' }] },
+      hit('毒牙', 2, CREATURE, 5),
     ],
   },
 
   // ── SR ──
   {
     kind: 'creature', id: 'soul-eater', name: '影噬魔', rarity: 'SR', colors: ['black'],
-    stage: 0, cost: 5, hp: 13,
+    stage: 0, cost: 5, hp: 15,
     skills: [
       { name: '蝕魂', cost: 3, target: CREATURE, effects: [{ type: 'halveHp' }] },
       { name: '竊念', cost: 2, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
@@ -156,16 +174,16 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     stage: 0, cost: 6, hp: 18,
     skills: [
       { name: '扎根', cost: 2, target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }] },
-      hit('碾壓', 4, CREATURE, 12),
+      hit('碾壓', 4, CREATURE, 13),
     ],
   },
 
   // ── UR ──
   {
     kind: 'creature', id: 'ancient-dragon', name: '遠古巨龍', rarity: 'UR', colors: ['red', 'green'],
-    stage: 0, cost: 8, hp: 22,
+    stage: 0, cost: 8, hp: 24,
     skills: [
-      { name: '龍息', cost: 3, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] },
+      { name: '龍息', cost: 3, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 4 }] },
       hit('焚天', 6, OPPOSITE, 20),
     ],
   },
@@ -189,7 +207,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   // ── 道具與場地 ──
   { kind: 'item', id: 'iron-armor', name: '鐵甲', rarity: 'N', colors: ['white'], cost: 2, damageReduction: 2 },
   { kind: 'item', id: 'claws', name: '利爪', rarity: 'N', colors: ['red'], cost: 1, attack: 2 },
-  { kind: 'field', id: 'star-altar', name: '星脈祭壇', rarity: 'SR', colors: [], cost: 3, ceilingBonus: 2 },
+  { kind: 'field', id: 'guardian-shrine', name: '守護聖壇', rarity: 'SR', colors: [], cost: 3, creatures: { hp: 2 } },
 ];
 
 export const sampleDb = () => buildCardDb(SAMPLE_CARDS, SAMPLE_HEROES);

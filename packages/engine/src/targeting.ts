@@ -9,7 +9,7 @@ export type AbilitySource =
 export function sameTarget(a: Target, b: Target): boolean {
   switch (a.kind) {
     case 'field':
-      return b.kind === 'field';
+      return b.kind === 'field' && a.player === b.player;
     case 'hero':
       return b.kind === 'hero' && a.player === b.player;
     case 'creature':
@@ -64,7 +64,7 @@ export function baseTargets(state: GameState, ability: Ability, source: AbilityS
       return creatureTargets(state, enemy, true);
     case 'enemyItemOrField': {
       const targets = creatureTargets(state, enemy, true);
-      return state.field === null ? targets : [...targets, { kind: 'field' }];
+      return state.players[enemy].field === null ? targets : [...targets, { kind: 'field', player: enemy }];
     }
   }
 }

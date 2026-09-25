@@ -34,9 +34,9 @@ function checkInvariants(state: GameState): void {
       if (creature === null) continue;
       cards.push(...creature.cards);
       if (creature.item !== null) cards.push(creature.item);
-      expect(currentHp(db, creature)).toBeGreaterThan(0);
+      expect(currentHp(db, state, creature)).toBeGreaterThan(0);
     }
-    if (state.field?.owner === player) cards.push(state.field.card);
+    if (p.field !== null) cards.push(p.field);
     expect(cards).toHaveLength(DECK_SIZE); // 卡片不會憑空出現或消失
     uids.push(...cards.map((card) => card.uid));
     expect(p.energy).toBeGreaterThanOrEqual(0);

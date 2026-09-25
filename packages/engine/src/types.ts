@@ -8,7 +8,7 @@ export type Color = 'white' | 'blue' | 'black' | 'red' | 'green';
 
 export type PlayerId = 0 | 1;
 
-/** 突襲：召喚當回合就能發動技能。 */
+/** 速攻：召喚當回合就能發動技能。 */
 export type Keyword = 'haste';
 
 /**
@@ -17,6 +17,16 @@ export type Keyword = 'haste';
  */
 export type Rarity = 'N' | 'R' | 'SR' | 'UR';
 export const RARITIES: readonly Rarity[] = ['N', 'R', 'SR', 'UR'];
+
+/** 對生物的持續加成，來自道具、場地卡或英雄被動。 */
+export interface CreatureModifier {
+  /** 技能傷害加成。 */
+  attack?: number;
+  /** HP 上限加成。 */
+  hp?: number;
+  /** 受到的傷害減少。 */
+  damageReduction?: number;
+}
 
 /** 技能、天生技、法術選目標的方式。 */
 export type TargetSpec =
@@ -30,7 +40,7 @@ export type TargetSpec =
   | { kind: 'ally'; allow: 'any' | 'creature' }
   /** 對手身上掛著道具的生物。 */
   | { kind: 'enemyItem' }
-  /** 對手身上掛著道具的生物，或場上的場地卡。 */
+  /** 對手身上掛著道具的生物，或對手場地區的場地卡。 */
   | { kind: 'enemyItemOrField' };
 
 export type Effect =
@@ -53,10 +63,14 @@ export type Effect =
   | { type: 'buff'; attack: number; hp: number; on: 'self' | 'target' }
   /** 加速型：能量上限 +N，不超過最高上限，當回合不補能量。 */
   | { type: 'gainMaxEnergy'; amount: number }
-  /** 突破型：最高上限永久 +N。 */
+  /** 突破型：最高上限永久 +N。目前先維持上限 12，範例卡不使用。 */
   | { type: 'raiseCeiling'; amount: number }
   /** 破壞目標生物身上的道具，或目標場地卡。 */
-  | { type: 'destroy' };
+  | { type: 'destroy' }
+  /** 從牌庫把發動者的進化卡加入手牌，然後洗牌。只能用在生物技能上。 */
+  | { type: 'searchEvolution' }
+  /** 用牌庫裡發動者的進化卡直接進化，不另付進化費用；一回合仍只能進化一次。只能用在生物技能上。 */
+  | { type: 'evolveFromDeck' };
 
 /** 生物技能、英雄天生技，以及法術的效果部分，都是 Ability。 */
 export interface Ability {
@@ -104,10 +118,13 @@ export interface ItemDef extends CardBase {
   hp?: number;
 }
 
+/** 場地卡放在自己的場地區，效果只作用在自己身上。 */
 export interface FieldDef extends CardBase {
   kind: 'field';
   cost: number;
-  /** 在場時，雙方的最高上限加成。 */
+  /** 強化自己的生物。 */
+  creatures?: CreatureModifier;
+  /** 提高自己的最高上限。突破型，目前範例卡不使用。 */
   ceilingBonus?: number;
 }
 
@@ -120,7 +137,13 @@ export interface HeroDef {
   colors: Color[];
   hp: number;
   power?: Ability;
-  passive?: { name: string; ceilingBonus?: number };
+  passive?: {
+    name: string;
+    /** 強化自己的生物。 */
+    creatures?: CreatureModifier;
+    /** 提高自己的最高上限。突破型，目前範例卡不使用。 */
+    ceilingBonus?: number;
+  };
 }
 
 export interface CardDb {
@@ -134,6 +157,8 @@ export interface Rules {
   deckSize: number;
   maxCopies: number;
   startingHand: number;
+  /** 手牌上限。滿手時抽到的牌直接進棄牌區。 */
+  handLimit: number;
   zones: number;
   /** 雙方第一個回合的能量上限：[先攻, 後攻]。 */
   startingMaxEnergy: [number, number];
@@ -158,6 +183,8 @@ export interface CardRef {
 export interface Creature {
   /** 沿用基礎卡的 uid，進化後不變。 */
   uid: number;
+  /** 擁有者。場地卡與英雄被動只強化自己的生物，所以要知道這隻是誰的。 */
+  owner: PlayerId;
   /** 進化堆疊：[0] 是基礎形態，最後一張是目前形態。 */
   cards: CardRef[];
   /**
@@ -188,6 +215,8 @@ export interface PlayerState {
   maxEnergy: number;
   /** 突破型卡牌永久提高的最高上限。 */
   ceilingBonus: number;
+  /** 自己的場地區，最多 1 張。 */
+  field: CardRef | null;
   fieldPlayedTurn: number | null;
   mulliganDone: boolean;
 }
@@ -209,8 +238,6 @@ export interface GameState {
   activePlayer: PlayerId;
   phase: 'mulligan' | 'main' | 'over';
   players: [PlayerState, PlayerState];
-  /** 場地卡區雙方共用。 */
-  field: { card: CardRef; owner: PlayerId } | null;
   result: GameResult | null;
   nextUid: number;
 }
@@ -221,7 +248,7 @@ export interface GameState {
 export type Target =
   | { kind: 'hero'; player: PlayerId }
   | { kind: 'creature'; player: PlayerId; zone: number }
-  | { kind: 'field' };
+  | { kind: 'field'; player: PlayerId };
 
 /** 卡牌以手牌中的 uid 指定。target 只有一個合法目標時可以省略。 */
 export type Action =
@@ -244,6 +271,9 @@ export type Action =
 export type GameEvent =
   | { type: 'turnStarted'; player: PlayerId; turn: number }
   | { type: 'drew'; player: PlayerId; cards: CardRef[] }
+  /** 手牌滿了，抽到的牌直接進棄牌區。 */
+  | { type: 'burned'; player: PlayerId; cardId: string }
+  | { type: 'searched'; player: PlayerId; cardId: string }
   | { type: 'mulliganed'; player: PlayerId; count: number }
   | { type: 'summoned'; player: PlayerId; zone: number; cardId: string }
   | { type: 'evolved'; player: PlayerId; zone: number; from: string; to: string }
@@ -258,7 +288,7 @@ export type GameEvent =
   | { type: 'discarded'; player: PlayerId; cardId: string }
   | { type: 'creatureDestroyed'; player: PlayerId; zone: number; cardId: string }
   | { type: 'itemDestroyed'; player: PlayerId; zone: number; cardId: string }
-  | { type: 'fieldDestroyed'; owner: PlayerId; cardId: string }
+  | { type: 'fieldDestroyed'; player: PlayerId; cardId: string }
   | { type: 'maxEnergyGained'; player: PlayerId; amount: number }
   | { type: 'ceilingRaised'; player: PlayerId; amount: number }
   | { type: 'gameOver'; result: GameResult };
