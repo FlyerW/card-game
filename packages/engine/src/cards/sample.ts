@@ -7,8 +7,8 @@ import type { Ability, DeckCardDef, HeroDef, TargetSpec } from '../types';
 // 只打生物的法術 = 同費用生物的 HP，而且至少比任意目標多 1，一張就能解掉同費用的生物；
 // 範圍法術能清掉便宜 3 費以上的生物。
 //
-// 每個顏色 14–16 張、無色 8 張（英雄進化卡另計），單色英雄有 22–24 種卡可以用，組得出 40 張的正式牌組。
-// 每個顏色各有一條進化線，也各有自己的異常狀態：白沉睡、藍麻痺、黑中毒、紅灼燒。
+// 每個顏色 14–20 張、無色 9 張（英雄進化卡另計），單色英雄有 23–29 種卡可以用，組得出 40 張的正式牌組。
+// 每個顏色各有一條進化線，也各有自己的異常狀態：白沉睡、藍麻痺、黑中毒、紅灼燒；綠色另有吸血、再生與回復。
 
 const ANY: TargetSpec = { kind: 'enemy', allow: 'any' };
 const CREATURE: TargetSpec = { kind: 'enemy', allow: 'creature' };
@@ -27,7 +27,8 @@ const hit = (name: string, cost: number, target: TargetSpec, amount: number): Ab
 });
 
 export const SAMPLE_HEROES: HeroDef[] = [
-  // 英雄 HP = 35 − 3 ×（顏色數 − 1）− 效果強度。基準從 50 降到 35，一局才會在 5–10 分鐘。
+  // 英雄 HP 的起點是 35 − 3 ×（顏色數 − 1）− 效果強度，再照英雄對戰的模擬調整：
+  // 潮影雙生、虹彩賢者原本對其他英雄只贏三成多，各加了 HP 與效果，現在五個英雄都在 47–54%。
   { kind: 'hero', id: 'nameless-swordsman', name: '無名劍士', colors: ['white'], hp: 35 },
   {
     kind: 'hero',
@@ -43,22 +44,24 @@ export const SAMPLE_HEROES: HeroDef[] = [
     name: '林海之王',
     colors: ['green'],
     hp: 33,
-    passive: { name: '豐饒', creatures: { hp: 1 } },
+    passive: { name: '豐饒', creatures: { hp: 1, regenerate: 1 } },
   },
   {
     kind: 'hero',
     id: 'tide-shadow-twins',
     name: '潮影雙生',
     colors: ['blue', 'black'],
-    hp: 28,
+    hp: 32,
     power: { name: '低語', cost: 2, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
+    passive: { name: '暗流', creatures: { attack: 1 } },
   },
   {
     kind: 'hero',
     id: 'prism-sage',
     name: '虹彩賢者',
     colors: ['white', 'blue', 'black', 'red', 'green'],
-    hp: 23,
+    hp: 29,
+    power: { name: '稜光', cost: 2, target: NONE, effects: [{ type: 'draw', count: 1 }] },
   },
 ];
 
@@ -152,7 +155,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'ancient-bear-god', name: '古樹熊神', rarity: 'UR', colors: ['green'],
-    stage: 2, evolvesFrom: 'grove-bear-king', cost: 4, hp: 28,
+    stage: 2, evolvesFrom: 'grove-bear-king', cost: 4, hp: 28, keywords: ['lifesteal'],
     skills: [
       {
         name: '森之怒', cost: 5, target: CREATURE,
@@ -442,7 +445,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'elder-treant', name: '萬年樹人', rarity: 'SR', colors: ['green'],
-    stage: 0, cost: 7, hp: 18,
+    stage: 0, cost: 7, hp: 18, regenerate: 3,
     skills: [
       hit('巨根', 4, OPPOSITE, 15),
       { name: '年輪', cost: 2, target: NONE, effects: [{ type: 'buff', attack: 0, hp: 4, on: 'self' }] },
@@ -519,6 +522,46 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   },
   { kind: 'item', id: 'bark-armor', name: '樹皮護甲', rarity: 'N', colors: ['green'], cost: 2, hp: 6, damageReduction: 1 },
 
+  // ── 綠色的回血：吸血、再生、全體回復 ──
+  // 吸血與再生是 R 的特殊機制，本體照基準。全體回復 5 約 2 能量。
+  {
+    kind: 'creature', id: 'blood-vine', name: '吸血藤', rarity: 'R', colors: ['green'],
+    stage: 0, cost: 3, hp: 8, keywords: ['lifesteal'],
+    skills: [
+      hit('汲取', 2, ANY, 5),
+      { name: '纏根', cost: 2, target: NONE, effects: [{ type: 'buff', attack: 0, hp: 3, on: 'self' }] },
+    ],
+  },
+  {
+    kind: 'creature', id: 'moss-sprite', name: '苔蘚精靈', rarity: 'R', colors: ['green'],
+    stage: 0, cost: 2, hp: 6, regenerate: 2,
+    skills: [hit('藤鞭', 2, ANY, 4), { name: '滋養', cost: 1, target: ALLY, effects: [{ type: 'heal', amount: 4 }] }],
+  },
+  {
+    kind: 'spell', id: 'forest-breath', name: '森林之息', rarity: 'N', colors: ['green'], cost: 2,
+    target: NONE, effects: [{ type: 'healAll', amount: 5 }],
+  },
+
+  // ── 解場：直接處理掉一隻生物 ──
+  // 消滅不看 HP，連 UR 都解得掉，所以比同費用的傷害法術貴；只打生物的傷害法術照法術表。
+  {
+    kind: 'spell', id: 'assassinate', name: '暗殺', rarity: 'R', colors: ['black'], cost: 6,
+    target: CREATURE, effects: [{ type: 'destroyCreature' }],
+  },
+  {
+    kind: 'spell', id: 'banish', name: '放逐', rarity: 'R', colors: ['white'], cost: 7,
+    target: CREATURE, effects: [{ type: 'destroyCreature' }],
+  },
+  {
+    kind: 'spell', id: 'glacial-rift', name: '冰川裂縫', rarity: 'R', colors: ['blue'], cost: 5,
+    target: CREATURE, effects: [{ type: 'damage', amount: 13 }],
+  },
+  {
+    kind: 'spell', id: 'hunt', name: '獵殺', rarity: 'N', colors: ['green'], cost: 4,
+    target: CREATURE, effects: [{ type: 'damage', amount: 11 }],
+  },
+  { kind: 'spell', id: 'snare', name: '捕獸夾', rarity: 'N', colors: [], cost: 2, target: CREATURE, effects: [{ type: 'damage', amount: 6 }] },
+
   // ── 高費（9–12）：每個顏色 2 張、無色 2 張 ──
   // 9 費以上的生物一張佔一格、一回合只能發一個技能，比兩隻便宜的生物吃虧，
   // 所以進場效果給得大方：每 1 能量的效果只扣 1 HP（一般是 2）。HP 照 2 + 2 × 費用：9 費 20、12 費 26。
@@ -562,9 +605,10 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     ],
   },
   {
+    // 原本進場是能量上限 +1，但打得出 10 費時下回合就到上限 12 了，沒有用；改成全體回復。
     kind: 'creature', id: 'mountain-giant', name: '山嶺巨人', rarity: 'SR', colors: ['green'],
-    stage: 0, cost: 10, hp: 26,
-    entry: { name: '大地之息', target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }] },
+    stage: 0, cost: 10, hp: 24,
+    entry: { name: '大地之息', target: NONE, effects: [{ type: 'healAll', amount: 8 }] },
     skills: [
       hit('巨石投擲', 4, ANY, 9),
       { name: '山崩', cost: 6, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 6 }] },
@@ -625,8 +669,8 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   {
     kind: 'heroEvolution', id: 'flame-sovereign', name: '烈焰君王', rarity: 'SR', colors: ['red'],
     cost: 6, evolvesFrom: 'flame-lord', hpBonus: 6,
-    entry: { name: '焚城', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] },
-    power: hit('煉獄', 2, ANY, 4),
+    entry: { name: '焚城', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] },
+    power: hit('煉獄', 2, ANY, 3),
   },
   {
     kind: 'heroEvolution', id: 'world-tree-king', name: '萬木之王', rarity: 'SR', colors: ['green'],
@@ -645,7 +689,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   },
   {
     kind: 'heroEvolution', id: 'tide-shadow-sovereign', name: '潮影君主', rarity: 'SR', colors: ['blue', 'black'],
-    cost: 6, evolvesFrom: 'tide-shadow-twins', hpBonus: 6,
+    cost: 6, evolvesFrom: 'tide-shadow-twins', hpBonus: 8,
     entry: { name: '潮汐吞噬', target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 2 }] },
     power: {
       name: '深淵低語', cost: 2, target: NONE,
