@@ -28,8 +28,9 @@ const hit = (name: string, cost: number, target: TargetSpec, amount: number): Ab
 
 export const SAMPLE_HEROES: HeroDef[] = [
   // 英雄 HP 的起點是 35 − 3 ×（顏色數 − 1）− 效果強度，再照英雄對戰的模擬調整：
-  // 潮影雙生、虹彩賢者原本對其他英雄只贏三成多，各加了 HP 與效果，現在五個英雄都在 47–54%。
-  { kind: 'hero', id: 'nameless-swordsman', name: '無名劍士', colors: ['white'], hp: 35 },
+  // 潮影雙生、虹彩賢者原本對其他英雄只贏三成多，各加了 HP 與效果；沉睡縮短後白色偏弱，無名劍士加到 38。
+  // 現在五個英雄都在 47–55%。
+  { kind: 'hero', id: 'nameless-swordsman', name: '無名劍士', colors: ['white'], hp: 38 },
   {
     kind: 'hero',
     id: 'flame-lord',
@@ -316,7 +317,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     kind: 'creature', id: 'lullaby-priest', name: '安眠祭司', rarity: 'R', colors: ['white'],
     stage: 0, cost: 3, hp: 7,
     skills: [
-      { name: '安眠', cost: 2, target: CREATURE, effects: [{ type: 'sleep' }] },
+      { name: '安眠', cost: 1, target: CREATURE, effects: [{ type: 'sleep' }] },
       hit('杖擊', 2, ANY, 4),
     ],
   },
@@ -504,10 +505,10 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     kind: 'creature', id: 'dream-herald', name: '夢境使者', rarity: 'R', colors: ['white'],
     stage: 0, cost: 3, hp: 4,
     entry: { name: '入夢', target: CREATURE, effects: [{ type: 'sleep' }] },
-    skills: [hit('夢擊', 2, ANY, 4), { name: '催眠', cost: 3, target: CREATURE, effects: [{ type: 'sleep' }] }],
+    skills: [hit('夢擊', 2, ANY, 4), { name: '催眠', cost: 2, target: CREATURE, effects: [{ type: 'sleep' }] }],
   },
   {
-    kind: 'spell', id: 'lullaby-light', name: '催眠之光', rarity: 'R', colors: ['white'], cost: 3,
+    kind: 'spell', id: 'lullaby-light', name: '催眠之光', rarity: 'R', colors: ['white'], cost: 2,
     target: NONE, effects: [{ type: 'sleep', all: true }],
   },
   {
