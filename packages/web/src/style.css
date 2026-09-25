@@ -167,6 +167,7 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .z-hp.hurt b { color: var(--damage); }
 .badges { display: flex; flex-wrap: wrap; gap: 3px; min-height: 0; }
 .badge { font-style: normal; font-size: 10.5px; line-height: 1.4; padding: 0 5px; border-radius: 3px; background: #0004; color: var(--ink-soft); }
+.badge.poison { color: #c9a0ff; } .badge.burn { color: #ff9a7a; } .badge.para { color: #ffe27a; } .badge.sleep { color: #9fc3ff; }
 .badge.atk { color: #ffb38a; } .badge.def { color: #9fdcea; } .badge.item { color: #d7c8f0; } .badge.taunt { color: #1d1408; background: var(--white); }
 .r-R.zone { border-top: 3px solid var(--r-r); } .r-SR.zone { border-top: 3px solid var(--r-sr); } .r-UR.zone { border-top: 3px solid var(--r-ur); }
 .zone.taunt { box-shadow: 0 0 0 2px var(--white) inset; }

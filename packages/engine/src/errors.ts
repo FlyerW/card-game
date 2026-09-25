@@ -18,6 +18,8 @@ export type ErrorCode =
   | 'ALREADY_EVOLVED'
   | 'INVALID_SKILL'
   | 'SKILL_ALREADY_USED'
+  | 'PARALYZED'
+  | 'ASLEEP'
   | 'NO_HERO_POWER'
   | 'HERO_POWER_USED'
   | 'TARGET_REQUIRED'

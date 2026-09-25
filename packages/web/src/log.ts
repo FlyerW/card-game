@@ -129,6 +129,23 @@ export function describeEvents(
       case 'ceilingRaised':
         lines.push({ text: `　${who(event.player)}的最高上限 +${event.amount}`, tone: 'turn' });
         break;
+      case 'statusApplied': {
+        const label = { poison: `中毒 ${event.amount ?? ''}`, burn: `灼燒 ${event.amount ?? ''}`, paralysis: '麻痺', sleep: '沉睡' }[event.status];
+        lines.push({ text: `　${targetText({ kind: 'creature', player: event.player, zone: event.zone })}${label.trim()}`, tone: 'turn' });
+        break;
+      }
+      case 'statusTriggered':
+        lines.push({
+          text: `　${targetText({ kind: 'creature', player: event.player, zone: event.zone })}${event.status === 'poison' ? '毒發' : '灼燒發作'}`,
+          tone: 'turn',
+        });
+        break;
+      case 'statusesCleared':
+        lines.push({ text: `　${ZONE[event.zone]} 進化，異常狀態全部解除`, tone: 'turn' });
+        break;
+      case 'wokeUp':
+        lines.push({ text: `　${targetText({ kind: 'creature', player: event.player, zone: event.zone })}醒了`, tone: 'turn' });
+        break;
       case 'gameOver': {
         const { winner, reason } = event.result;
         const why = { heroDefeated: '英雄被打倒', deckOut: '牌庫抽完', concede: '投降' }[reason];

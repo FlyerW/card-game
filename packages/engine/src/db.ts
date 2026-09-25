@@ -22,6 +22,13 @@ function targetProblem(effect: Effect, spec: TargetSpec): string | null {
     case 'buff':
       if (effect.on === 'self') return null;
       return spec.kind === 'ally' && spec.allow === 'creature' ? null : '對目標增益只能指定我方生物';
+    case 'poison':
+    case 'burn':
+    case 'paralyze':
+    case 'sleep':
+      return (spec.kind === 'enemy' && spec.allow !== 'hero') || spec.kind === 'lane'
+        ? null
+        : '異常狀態只能指定對手的生物（任意目標、只打生物或位置）';
     default:
       return null;
   }
@@ -29,7 +36,7 @@ function targetProblem(effect: Effect, spec: TargetSpec): string | null {
 
 function usesTarget(effect: Effect): boolean {
   if (effect.type === 'buff') return effect.on === 'target';
-  return ['damage', 'heal', 'halveHp', 'destroy'].includes(effect.type);
+  return ['damage', 'heal', 'halveHp', 'destroy', 'poison', 'burn', 'paralyze', 'sleep'].includes(effect.type);
 }
 
 function checkAbility(ability: Ability, where: string, isCreatureSkill: boolean): string[] {

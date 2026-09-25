@@ -7,7 +7,9 @@ import {
   currentHp,
   damageReduction,
   heroHp,
+  isAsleep,
   other,
+  ownersTurn,
 } from './queries';
 import type { AbilitySource } from './targeting';
 import type {
@@ -20,6 +22,7 @@ import type {
   GameResult,
   GameState,
   PlayerId,
+  StatusKind,
   Target,
 } from './types';
 
@@ -107,7 +110,73 @@ function dealDamage(ctx: Ctx, target: Target, creature: Creature | null, amount:
     const dealt = Math.max(0, amount - damageReduction(ctx.db, ctx.state, creature));
     creature.damage += dealt;
     ctx.events.push({ type: 'damaged', target, amount: dealt });
+    // 沉睡的生物受到傷害就醒來；減傷擋到 0 不算受到傷害。
+    if (dealt > 0 && target.kind === 'creature' && isAsleep(ctx.state, creature)) {
+      creature.asleepUntilTurn = null;
+      ctx.events.push({ type: 'wokeUp', player: target.player, zone: target.zone });
+    }
   }
+}
+
+/** 對一隻生物施加異常狀態。 */
+function inflict(ctx: Ctx, creature: Creature, player: PlayerId, zone: number, effect: Extract<Effect, { type: 'poison' | 'burn' | 'paralyze' | 'sleep' }>): void {
+  const { state } = ctx;
+  let status: StatusKind;
+  let amount: number | undefined;
+  switch (effect.type) {
+    case 'poison':
+      creature.poison += effect.amount;
+      [status, amount] = ['poison', creature.poison];
+      break;
+    case 'burn':
+      creature.burn = Math.max(creature.burn, effect.amount);
+      [status, amount] = ['burn', creature.burn];
+      break;
+    case 'paralyze':
+      creature.paralyzedUntilTurn = ownersTurn(state, creature.owner, 1);
+      status = 'paralysis';
+      break;
+    case 'sleep':
+      creature.asleepUntilTurn = ownersTurn(state, creature.owner, 2);
+      status = 'sleep';
+      break;
+  }
+  ctx.events.push({ type: 'statusApplied', player, zone, status, ...(amount === undefined ? {} : { amount }) });
+}
+
+/** 進化會解除全部異常狀態。 */
+export function clearStatuses(ctx: Ctx, creature: Creature, player: PlayerId, zone: number): void {
+  const had =
+    creature.poison > 0 || creature.burn > 0 || creature.paralyzedUntilTurn !== null || creature.asleepUntilTurn !== null;
+  creature.poison = 0;
+  creature.burn = 0;
+  creature.paralyzedUntilTurn = null;
+  creature.asleepUntilTurn = null;
+  if (had) ctx.events.push({ type: 'statusesCleared', player, zone });
+}
+
+/** 回合開始：這位玩家中毒的生物失去 HP。失去 HP 不算傷害，所以減傷擋不住、也不會叫醒沉睡的生物。 */
+export function tickPoison(ctx: Ctx, player: PlayerId): void {
+  const { db, state } = ctx;
+  state.players[player].zones.forEach((creature, zone) => {
+    if (creature === null || creature.poison === 0) return;
+    const target: Target = { kind: 'creature', player, zone };
+    const lost = Math.min(creature.poison, currentHp(db, state, creature));
+    ctx.events.push({ type: 'statusTriggered', player, zone, status: 'poison', amount: creature.poison });
+    creature.damage += lost;
+    ctx.events.push({ type: 'hpLost', target, amount: lost });
+  });
+  cleanup(ctx);
+}
+
+/** 回合結束：這位玩家灼燒的生物受到傷害。算傷害，減傷擋得住。 */
+export function tickBurn(ctx: Ctx, player: PlayerId): void {
+  ctx.state.players[player].zones.forEach((creature, zone) => {
+    if (creature === null || creature.burn === 0) return;
+    ctx.events.push({ type: 'statusTriggered', player, zone, status: 'burn', amount: creature.burn });
+    dealDamage(ctx, { kind: 'creature', player, zone }, creature, creature.burn);
+  });
+  cleanup(ctx);
 }
 
 function applyEffect(
@@ -248,10 +317,19 @@ function applyEffect(
         sourceCreature.cards.push(card!);
         sourceCreature.evolvedTurn = state.turn;
         ctx.events.push({ type: 'evolved', player: me, zone: source.zone, from, to: card!.cardId });
+        clearStatuses(ctx, sourceCreature, me, source.zone);
       }
       shuffle(ctx, player.deck);
       return;
     }
+
+    case 'poison':
+    case 'burn':
+    case 'paralyze':
+    case 'sleep':
+      // 只作用在生物身上：目標是英雄，或生物已經不在了，就沒有效果。
+      if (creature !== null && target?.kind === 'creature') inflict(ctx, creature, target.player, target.zone, effect);
+      return;
   }
 }
 

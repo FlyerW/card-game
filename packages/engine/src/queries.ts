@@ -118,3 +118,20 @@ export function ceiling(db: CardDb, state: GameState, player: PlayerId): number 
 /** 挑釁在發動者下一個回合開始時結束，也就是持續到對手的回合結束。 */
 export const isTaunting = (state: GameState, creature: Creature): boolean =>
   creature.tauntUntilTurn !== null && state.turn <= creature.tauntUntilTurn;
+
+/** 麻痺：到擁有者的下一個回合結束前都不能發動技能。 */
+export const isParalyzed = (state: GameState, creature: Creature): boolean =>
+  creature.paralyzedUntilTurn !== null && state.turn <= creature.paralyzedUntilTurn;
+
+/** 沉睡：不能發動技能，受到傷害就醒來。 */
+export const isAsleep = (state: GameState, creature: Creature): boolean =>
+  creature.asleepUntilTurn !== null && state.turn <= creature.asleepUntilTurn;
+
+/**
+ * 擁有者往後數第 n 個回合的回合編號。回合雙方輪流，所以現在是擁有者的回合時，
+ * 下一個是 turn + 2；是對手的回合時，下一個是 turn + 1。
+ */
+export function ownersTurn(state: GameState, owner: PlayerId, n: number): number {
+  const next = state.activePlayer === owner ? state.turn + 2 : state.turn + 1;
+  return next + 2 * (n - 1);
+}

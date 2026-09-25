@@ -245,6 +245,8 @@ function handReason(def: DeckCardDef, you: SideView): string {
 function skillReason(cv: CreatureView, cost: number, energy: number): string {
   const def = card(cv.cardId);
   const haste = def.kind === 'creature' && def.keywords?.includes('haste');
+  if (cv.paralyzed) return '麻痺中，不能發動技能';
+  if (cv.asleep) return '沉睡中，不能發動技能';
   if (cv.skillUsedThisTurn) return '這回合已經發動過技能';
   if (cv.summonedThisTurn && !haste) return '召喚當回合不能發動技能';
   if (cost > energy) return `能量不足：需要 ${cost}`;
@@ -262,6 +264,10 @@ function creatureStatus(cv: CreatureView): string {
   if (cv.damageReduction) tags.push(`受到傷害 −${cv.damageReduction}`);
   if (cv.item) tags.push(`道具：${nameOf(cv.item)}`);
   if (cv.taunting) tags.push('挑釁中');
+  if (cv.poison) tags.push(`中毒 ${cv.poison}：牠的回合開始時失去 ${cv.poison} HP`);
+  if (cv.burn) tags.push(`灼燒 ${cv.burn}：牠的回合結束時受到 ${cv.burn} 傷害`);
+  if (cv.paralyzed) tags.push('麻痺：不能發動技能');
+  if (cv.asleep) tags.push('沉睡：不能發動技能，受到傷害就醒');
   if (cv.evolutionChain.length > 1) tags.push(`進化：${cv.evolutionChain.map(nameOf).join(' → ')}`);
   return `<ul class="tags">${tags.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>`;
 }
@@ -374,6 +380,10 @@ function zone(cv: CreatureView | null, player: PlayerId, index: number, picks: M
   if (cv.damageReduction) badges.push(`<i class="badge def">減${cv.damageReduction}</i>`);
   if (cv.item) badges.push(`<i class="badge item">${esc(nameOf(cv.item))}</i>`);
   if (cv.taunting) badges.push('<i class="badge taunt">挑釁</i>');
+  if (cv.poison) badges.push(`<i class="badge poison">毒${cv.poison}</i>`);
+  if (cv.burn) badges.push(`<i class="badge burn">燒${cv.burn}</i>`);
+  if (cv.paralyzed) badges.push('<i class="badge para">麻痺</i>');
+  if (cv.asleep) badges.push('<i class="badge sleep">沉睡</i>');
   const hurt = cv.hp < cv.maxHp ? ' hurt' : '';
   // 左上角顯示這隻生物總共花了多少費用，進化過的顯示成 4+3，一眼看出對手在牠身上投資了多少。
   const invested = cv.evolutionChain.map((id) => card(id).cost).join('+');
@@ -542,6 +552,7 @@ function setupScreen(): string {
         <li>對手的生物在挑釁時，選得到牠的技能都必須打牠；只打英雄的技能不受影響。</li>
         <li>手牌上限 10 張，滿手時抽到的牌直接進棄牌區。場地卡放在自己的場地區，只強化自己的生物。</li>
         <li>有些英雄有英雄進化卡：HP 上限增加、天生技變強，每局只能進化一次。</li>
+        <li>異常狀態只會中在生物身上：中毒（回合開始時失去 HP）、灼燒（回合結束時受到傷害）、麻痺、沉睡（都不能發動技能，沉睡被打就醒）。進化會解除全部。</li>
         <li>把對手英雄的 HP 打到 0 就贏了。</li>
       </ul>
       <p class="note">試玩說明：範例卡只有 ${SAMPLE_CARDS.length} 張，單色組不成 40 張，所以雙方的牌組都從全部範例卡隨機組成，不限顏色。電腦用的是模擬平衡時的均衡打法。</p>

@@ -101,6 +101,20 @@ export const TEST_CARDS: DeckCardDef[] = [
     entry: { name: 'hatch', target: NONE, effects: [{ type: 'draw', count: 1 }] },
   }),
 
+  // 異常狀態
+  creature('venom', [
+    { name: 'poison2', cost: 1, target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'poison', amount: 2 }] },
+    { name: 'burn3', cost: 1, target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'burn', amount: 3 }] },
+  ]),
+  creature('mesmer', [
+    { name: 'stun', cost: 1, target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'paralyze' }] },
+    { name: 'lull', cost: 1, target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'sleep' }] },
+  ]),
+  {
+    kind: 'spell', id: 'dart', name: 'dart', rarity: 'N', colors: [], cost: 1,
+    target: ANY, effects: [{ type: 'damage', amount: 1 }, { type: 'poison', amount: 2 }],
+  },
+
   // 英雄進化：只有 pinger 能用
   {
     kind: 'heroEvolution', id: 'pinger-plus', name: 'pinger-plus', rarity: 'SR', colors: ['red'],

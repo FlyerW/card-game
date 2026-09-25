@@ -1,7 +1,28 @@
 import { validateDeck } from './deck';
 import { fail, RuleError, type ErrorCode } from './errors';
-import { cardDef, ceiling, creatureDef, currentCardId, heroDef, heroPower as currentHeroPower, other } from './queries';
-import { cleanup, drawCards, endGame, resolveAbility, shuffle, randomInt, type Ctx } from './resolve';
+import {
+  cardDef,
+  ceiling,
+  creatureDef,
+  currentCardId,
+  heroDef,
+  heroPower as currentHeroPower,
+  isAsleep,
+  isParalyzed,
+  other,
+} from './queries';
+import {
+  cleanup,
+  clearStatuses,
+  drawCards,
+  endGame,
+  randomInt,
+  resolveAbility,
+  shuffle,
+  tickBurn,
+  tickPoison,
+  type Ctx,
+} from './resolve';
 import { DEFAULT_RULES } from './rules';
 import { baseTargets, legalTargets, sameTarget, type AbilitySource } from './targeting';
 import { viewFor } from './view';
@@ -158,6 +179,7 @@ function startTurn(ctx: Ctx, player: PlayerId): void {
   const grown = isFirstTurn ? rules.startingMaxEnergy[isFirstPlayer ? 0 : 1] : p.maxEnergy + rules.energyGrowth;
   p.maxEnergy = Math.min(grown, ceiling(db, state, player));
   p.energy = p.maxEnergy + (isFirstTurn && !isFirstPlayer ? rules.secondPlayerBonusEnergy : 0);
+  tickPoison(ctx, player);
 }
 
 // ─── 各個動作 ────────────────────────────────────────────────────────────────
@@ -210,6 +232,10 @@ function summon(ctx: Ctx, a: ActionOf<'summon'>): void {
     evolvedTurn: null,
     skillUsedTurn: null,
     tauntUntilTurn: null,
+    poison: 0,
+    burn: 0,
+    paralyzedUntilTurn: null,
+    asleepUntilTurn: null,
   };
   ctx.events.push({ type: 'summoned', player: a.player, zone: a.zone, cardId: card.cardId });
   triggerEntry(ctx, def, a.player, a.zone, a.target);
@@ -236,6 +262,7 @@ function evolve(ctx: Ctx, a: ActionOf<'evolve'>): void {
   creature.cards.push(card);
   creature.evolvedTurn = state.turn;
   ctx.events.push({ type: 'evolved', player: a.player, zone: a.zone, from, to: card.cardId });
+  clearStatuses(ctx, creature, a.player, a.zone);
   triggerEntry(ctx, def, a.player, a.zone, a.target);
 }
 
@@ -249,6 +276,8 @@ function useSkill(ctx: Ctx, a: ActionOf<'useSkill'>): void {
   if (creature.summonedTurn === state.turn && !def.keywords?.includes('haste')) {
     fail('SUMMONED_THIS_TURN', '召喚當回合不能發動技能');
   }
+  if (isParalyzed(state, creature)) fail('PARALYZED', `${def.name} 麻痺中，不能發動技能`);
+  if (isAsleep(state, creature)) fail('ASLEEP', `${def.name} 沉睡中，不能發動技能`);
 
   const source: AbilitySource = { kind: 'creature', player: a.player, zone: a.zone };
   const target = chooseTarget(ctx, skill, source, a.target);
@@ -347,6 +376,7 @@ function playField(ctx: Ctx, a: ActionOf<'playField'>): void {
 
 // 沒花完的能量留到對手的回合，之後可以用在對手回合的互動；自己的回合開始時才重置。
 function endTurn(ctx: Ctx, a: ActionOf<'endTurn'>): void {
+  tickBurn(ctx, a.player);
   startTurn(ctx, other(a.player));
 }
 

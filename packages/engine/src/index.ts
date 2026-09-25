@@ -12,6 +12,8 @@ export {
   ceiling,
   creatureDef,
   cardDef,
+  isAsleep,
+  isParalyzed,
   isTaunting,
   other,
 } from './queries';

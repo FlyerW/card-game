@@ -105,6 +105,8 @@ describe('資料驗證', () => {
     expect(bad({ kind: 'enemy', allow: 'any' }, [{ type: 'draw', count: 1 }])).toContain('沒有效果用到它');
     expect(bad({ kind: 'enemy', allow: 'any' }, [{ type: 'heal', amount: 1 }])).toContain('回復只能指定我方目標');
     expect(bad({ kind: 'enemy', allow: 'any' }, [{ type: 'halveHp' }])).toContain('HP 減半只能指定對手的生物');
+    expect(bad({ kind: 'enemy', allow: 'hero' }, [{ type: 'poison', amount: 1 }])).toContain('異常狀態只能指定對手的生物');
+    expect(bad({ kind: 'lane', lane: 'opposite' }, [{ type: 'sleep' }])).toBe('');
   });
 
   it('id 不能重複；一次列出所有問題', () => {

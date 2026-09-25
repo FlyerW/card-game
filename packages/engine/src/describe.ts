@@ -58,6 +58,14 @@ export function describeEffect(effect: Effect): string {
       return '從牌庫把自己的進化卡加入手牌';
     case 'evolveFromDeck':
       return '用牌庫裡自己的進化卡直接進化';
+    case 'poison':
+      return `中毒 ${effect.amount}（牠的回合開始時失去 ${effect.amount} HP）`;
+    case 'burn':
+      return `灼燒 ${effect.amount}（牠的回合結束時受到 ${effect.amount} 傷害）`;
+    case 'paralyze':
+      return '麻痺（到牠的下個回合結束前不能發動技能）';
+    case 'sleep':
+      return '沉睡（不能發動技能，受到傷害就醒；最多 2 個回合）';
   }
 }
 

@@ -6,6 +6,8 @@ import {
   damageReduction,
   heroHp,
   heroMaxHp,
+  isAsleep,
+  isParalyzed,
   isTaunting,
   maxHp,
   other,
@@ -25,6 +27,12 @@ export interface CreatureView {
   hpCounters: number;
   item: string | null;
   taunting: boolean;
+  /** 中毒的數字，0 表示沒有。 */
+  poison: number;
+  /** 灼燒的數字，0 表示沒有。 */
+  burn: number;
+  paralyzed: boolean;
+  asleep: boolean;
   skillUsedThisTurn: boolean;
   summonedThisTurn: boolean;
 }
@@ -77,6 +85,10 @@ function creatureView(db: CardDb, state: GameState, creature: Creature): Creatur
     hpCounters: creature.hpCounters,
     item: creature.item?.cardId ?? null,
     taunting: isTaunting(state, creature),
+    poison: creature.poison,
+    burn: creature.burn,
+    paralyzed: isParalyzed(state, creature),
+    asleep: isAsleep(state, creature),
     skillUsedThisTurn: creature.skillUsedTurn === state.turn,
     summonedThisTurn: creature.summonedTurn === state.turn,
   };

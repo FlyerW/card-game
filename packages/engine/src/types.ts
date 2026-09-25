@@ -70,7 +70,19 @@ export type Effect =
   /** 從牌庫把發動者的進化卡加入手牌，然後洗牌。只能用在生物技能上。 */
   | { type: 'searchEvolution' }
   /** 用牌庫裡發動者的進化卡直接進化，不另付進化費用；一回合仍只能進化一次。只能用在生物技能上。 */
-  | { type: 'evolveFromDeck' };
+  | { type: 'evolveFromDeck' }
+  // 異常狀態：只作用在生物身上，打到英雄沒有效果；進化會解除全部。
+  /** 中毒 N：牠的擁有者回合開始時失去 N HP（不算傷害）。再中一次數字相加。 */
+  | { type: 'poison'; amount: number }
+  /** 灼燒 N：牠的擁有者回合結束時受到 N 傷害（算傷害，減傷擋得住）。再中一次取大的。 */
+  | { type: 'burn'; amount: number }
+  /** 麻痺：不能發動技能，直到擁有者的下一個回合結束。 */
+  | { type: 'paralyze' }
+  /** 沉睡：不能發動技能；受到傷害就醒來，最多持續擁有者的 2 個回合。 */
+  | { type: 'sleep' };
+
+/** 異常狀態的種類。 */
+export type StatusKind = 'poison' | 'burn' | 'paralysis' | 'sleep';
 
 /** 生物技能、英雄天生技，以及法術的效果部分，都是 Ability。 */
 export interface Ability {
@@ -227,6 +239,14 @@ export interface Creature {
   skillUsedTurn: number | null;
   /** 挑釁持續到這個回合結束（含）。 */
   tauntUntilTurn: number | null;
+  /** 中毒的數字，0 表示沒有中毒。 */
+  poison: number;
+  /** 灼燒的數字，0 表示沒有灼燒。 */
+  burn: number;
+  /** 麻痺到這個回合結束（含）。 */
+  paralyzedUntilTurn: number | null;
+  /** 沉睡到這個回合結束（含）；受到傷害就提早清掉。 */
+  asleepUntilTurn: number | null;
 }
 
 export interface PlayerState {
@@ -322,4 +342,10 @@ export type GameEvent =
   | { type: 'fieldDestroyed'; player: PlayerId; cardId: string }
   | { type: 'maxEnergyGained'; player: PlayerId; amount: number }
   | { type: 'ceilingRaised'; player: PlayerId; amount: number }
+  | { type: 'statusApplied'; player: PlayerId; zone: number; status: StatusKind; amount?: number }
+  /** 中毒或灼燒發作，接著會有 hpLost 或 damaged 事件。 */
+  | { type: 'statusTriggered'; player: PlayerId; zone: number; status: 'poison' | 'burn'; amount: number }
+  /** 進化解除了全部異常狀態。 */
+  | { type: 'statusesCleared'; player: PlayerId; zone: number }
+  | { type: 'wokeUp'; player: PlayerId; zone: number }
   | { type: 'gameOver'; result: GameResult };

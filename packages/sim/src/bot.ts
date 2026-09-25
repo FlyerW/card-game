@@ -3,6 +3,8 @@ import {
   creatureDef,
   currentHp,
   heroHp,
+  isAsleep,
+  isParalyzed,
   isTaunting,
   other,
   type CardDb,
@@ -58,7 +60,10 @@ function boardValue(db: CardDb, state: GameState, player: PlayerId, style: BotSt
   let value = 0;
   for (const creature of state.players[player].zones) {
     if (creature === null) continue;
-    value += style.creatureHp * currentHp(db, state, creature) + style.creatureThreat * threat(db, state, creature);
+    // 中毒、灼燒每回合都扣，粗估再撐兩回合；麻痺、沉睡的生物暫時打不了人。
+    const hp = Math.max(1, currentHp(db, state, creature) - 2 * (creature.poison + creature.burn));
+    const disabled = isParalyzed(state, creature) || isAsleep(state, creature);
+    value += style.creatureHp * hp + style.creatureThreat * threat(db, state, creature) * (disabled ? 0.4 : 1);
     if (isTaunting(state, creature)) value += style.taunt;
   }
   return value;
