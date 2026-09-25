@@ -240,14 +240,21 @@ function applyEffect(
       }
       return;
 
-    case 'halveHp':
-      if (creature !== null) {
-        const hp = currentHp(db, state, creature);
+    case 'halveHp': {
+      const halve = (each: Creature, at: Target) => {
+        const hp = currentHp(db, state, each);
         const lost = hp - Math.floor(hp / 2);
-        creature.damage += lost;
-        ctx.events.push({ type: 'hpLost', target: target!, amount: lost });
-      }
+        each.damage += lost;
+        ctx.events.push({ type: 'hpLost', target: at, amount: lost });
+      };
+      if (effect.all) {
+        const enemy = other(me);
+        state.players[enemy].zones.forEach((each, zone) => {
+          if (each !== null) halve(each, { kind: 'creature', player: enemy, zone });
+        });
+      } else if (creature !== null) halve(creature, target!);
       return;
+    }
 
     case 'taunt':
       if (sourceCreature !== null && source.kind === 'creature') {

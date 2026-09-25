@@ -340,7 +340,7 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .ok { margin: 0; color: var(--heal); font-weight: 700; }
 .problems, .tips { margin: 0; padding-left: 1.2em; font-size: 12.5px; display: grid; gap: 2px; }
 .problems { color: #ffc9c2; } .tips { color: var(--ink-faint); }
-.curve { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; height: 76px; align-items: end; margin-top: 4px; }
+.curve { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; height: 76px; align-items: end; margin-top: 4px; }
 .curve .bar { display: grid; grid-template-rows: 1fr auto auto; height: 100%; justify-items: center; font: 600 11px var(--num); color: var(--ink-faint); }
 .curve .bar i { align-self: end; width: 70%; min-height: 2px; background: var(--energy-edge); border-radius: 3px 3px 0 0; }
 .curve .bar b { color: var(--ink-soft); font-size: 12px; }

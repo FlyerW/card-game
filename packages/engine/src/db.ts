@@ -14,6 +14,7 @@ function targetProblem(effect: Effect, spec: TargetSpec): string | null {
     case 'heal':
       return spec.kind === 'ally' ? null : '回復只能指定我方目標';
     case 'halveHp':
+      if (effect.all) return null;
       return spec.kind === 'enemy' && spec.allow === 'creature' ? null : 'HP 減半只能指定對手的生物';
     case 'destroy':
       return spec.kind === 'enemyItem' || spec.kind === 'enemyItemOrField'
@@ -37,7 +38,7 @@ function targetProblem(effect: Effect, spec: TargetSpec): string | null {
 
 function usesTarget(effect: Effect): boolean {
   if (effect.type === 'buff') return effect.on === 'target';
-  if ((effect.type === 'poison' || effect.type === 'burn' || effect.type === 'paralyze' || effect.type === 'sleep') && effect.all) return false;
+  if ((effect.type === 'halveHp' || effect.type === 'poison' || effect.type === 'burn' || effect.type === 'paralyze' || effect.type === 'sleep') && effect.all) return false;
   return ['damage', 'heal', 'halveHp', 'destroy', 'poison', 'burn', 'paralyze', 'sleep'].includes(effect.type);
 }
 

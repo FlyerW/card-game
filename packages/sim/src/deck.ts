@@ -4,9 +4,12 @@ import { SAMPLE_CARDS, type CreatureDef, type DeckCardDef } from '@card-game/eng
 //
 // 完全隨機組牌會抽到一堆沒有對應基礎生物的進化卡，卡在手上用不了。
 // 所以進化線照 3/2/1 帶：基礎 3 張、一階 2 張、二階 1 張；其餘隨機補滿。
+// 9 費以上的卡最多帶 3 張，不然前幾回合手上都是打不出來的牌。
 
 const DECK_SIZE = 40;
 const LINE_COPIES = [3, 2, 1];
+const HIGH_COST = 9;
+const MAX_HIGH_COST = 3;
 
 function random(seed: number): () => number {
   let t = seed >>> 0;
@@ -43,7 +46,7 @@ export function evolutionLines(pool: readonly DeckCardDef[]): CreatureDef[][] {
 
 /**
  * 組一副 40 張的牌：挑 lineCount 條進化線照 3/2/1 帶，英雄有進化卡就帶 2 張，
- * 其餘從不屬於任何進化線的卡隨機補滿（同名最多 3 張）。同一個 seed 一定組出同一副。
+ * 其餘從不屬於任何進化線的卡隨機補滿（同名最多 3 張，9 費以上合計最多 3 張）。同一個 seed 一定組出同一副。
  */
 export function buildDeck(seed: number, heroId: string | null, pool: readonly DeckCardDef[] = SAMPLE_CARDS, lineCount = 2): string[] {
   const rand = random(seed);
@@ -58,7 +61,11 @@ export function buildDeck(seed: number, heroId: string | null, pool: readonly De
     if (card.kind === 'heroEvolution' && card.evolvesFrom === heroId) deck.push(card.id, card.id);
   }
   const fillers = pool.filter((card) => card.kind !== 'heroEvolution' && !inLines.has(card.id));
-  const copies = shuffle(fillers.flatMap((card) => [card.id, card.id, card.id]), rand);
-  deck.push(...copies.slice(0, DECK_SIZE - deck.length));
+  let highCost = 0;
+  for (const card of shuffle(fillers.flatMap((card) => [card, card, card]), rand)) {
+    if (deck.length === DECK_SIZE) break;
+    if (card.cost >= HIGH_COST && highCost++ >= MAX_HIGH_COST) continue;
+    deck.push(card.id);
+  }
   return deck;
 }

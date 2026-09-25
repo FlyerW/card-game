@@ -52,8 +52,11 @@ export type Effect =
   | { type: 'opponentDiscardRandom'; count: number }
   /** 回復目標的 HP，不超過上限。 */
   | { type: 'heal'; amount: number }
-  /** 目標剩餘 HP 減半、無條件捨去。算失去 HP 不算傷害：減傷擋不住，也不受挑釁限制。 */
-  | { type: 'halveHp' }
+  /**
+   * 目標剩餘 HP 減半、無條件捨去。算失去 HP 不算傷害：減傷擋不住，也不受挑釁限制。
+   * all 為 true 時不選目標，對手每隻生物都減半。
+   */
+  | { type: 'halveHp'; all?: boolean }
   /** 發動者挑釁，直到對手下回合結束。 */
   | { type: 'taunt' }
   /**

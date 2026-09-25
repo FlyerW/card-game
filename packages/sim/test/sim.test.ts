@@ -26,6 +26,16 @@ describe('模擬環境', () => {
     }
   });
 
+  it('9 費以上的卡最多帶 3 張', () => {
+    for (const hero of SAMPLE_HEROES) {
+      for (let seed = 0; seed < 30; seed++) {
+        const deck = buildDeck(seed, hero.id, deckPool(engine.db, hero.id));
+        expect(deck, hero.name).toHaveLength(40);
+        expect(deck.filter((id) => engine.db.cards.get(id)!.cost >= 9).length, hero.name).toBeLessThanOrEqual(3);
+      }
+    }
+  });
+
   it('同一個種子組出同一副牌，而且每種卡最多 3 張', () => {
     const deck = mirrorDeck(123);
     expect(mirrorDeck(123)).toEqual(deck);

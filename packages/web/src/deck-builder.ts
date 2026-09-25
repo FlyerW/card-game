@@ -69,14 +69,26 @@ export function removeOne(deck: readonly string[], id: string): string[] {
   return index === -1 ? [...deck] : [...deck.slice(0, index), ...deck.slice(index + 1)];
 }
 
-/** 用英雄能用的卡隨機補到 40 張，已經放的不動。 */
+/** 9 費以上算高費卡；帶超過 3 張，前幾回合手上容易都是打不出來的牌。 */
+const HIGH_COST = 9;
+const MAX_HIGH_COST = 3;
+const highCostCount = (db: CardDb, deck: readonly string[]) => deck.filter((id) => (db.cards.get(id)?.cost ?? 0) >= HIGH_COST).length;
+
+/** 用英雄能用的卡隨機補到 40 張，已經放的不動。高費卡補到 3 張為止。 */
 export function fillRandom(db: CardDb, heroId: string, deck: readonly string[]): string[] {
   const spare = deckPool(db, heroId).flatMap((card) => Array<string>(maxCopies - count(deck, card.id)).fill(card.id));
   for (let i = spare.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [spare[i], spare[j]] = [spare[j]!, spare[i]!];
   }
-  return [...deck, ...spare.slice(0, Math.max(0, deckSize - deck.length))];
+  const filled = [...deck];
+  let highCost = highCostCount(db, deck);
+  for (const id of spare) {
+    if (filled.length >= deckSize) break;
+    if (db.cards.get(id)!.cost >= HIGH_COST && highCost++ >= MAX_HIGH_COST) continue;
+    filled.push(id);
+  }
+  return filled;
 }
 
 /** 跟電腦的牌組一樣自動組一副：進化線照 3/2/1 帶，其餘隨機。 */
@@ -94,6 +106,8 @@ export function deckIssues(db: CardDb, heroId: string, deck: readonly string[]):
     if (!deck.includes(base)) tips.push(`${def.name} 要由 ${name(base)} 進化，牌組裡沒有 ${name(base)}`);
     else if (count(deck, id) > count(deck, base)) tips.push(`${def.name} 比 ${name(base)} 多，容易卡在手上用不了（建議照 3/2/1 帶）`);
   }
+  const highCost = highCostCount(db, deck);
+  if (highCost > MAX_HIGH_COST) tips.push(`9 費以上的卡有 ${highCost} 張，前幾回合容易卡手（建議 ${MAX_HIGH_COST} 張以內）`);
   return { problems, tips };
 }
 
@@ -135,11 +149,11 @@ function poolCard(card: DeckCardDef, deck: readonly string[], focus: string | nu
 }
 
 function curve(db: CardDb, deck: readonly string[]): string {
-  const buckets = [1, 2, 3, 4, 5, 6, 7].map((cost) => ({
-    label: cost === 7 ? '7+' : String(cost),
+  const buckets = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((cost) => ({
+    label: cost === 9 ? '9+' : String(cost),
     n: deck.filter((id) => {
       const c = db.cards.get(id)!.cost;
-      return cost === 7 ? c >= 7 : cost === 1 ? c <= 1 : c === cost;
+      return cost === 9 ? c >= 9 : cost === 1 ? c <= 1 : c === cost;
     }).length,
   }));
   const top = Math.max(1, ...buckets.map((b) => b.n));

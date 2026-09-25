@@ -54,17 +54,30 @@ describe('範例卡池', () => {
   const sample = sampleDb();
   const colors = ['white', 'blue', 'black', 'red', 'green'] as const;
 
-  it('每個顏色至少 10 張、無色至少 6 張（英雄進化卡另計）', () => {
+  it('每個顏色至少 12 張、無色至少 8 張（英雄進化卡另計）', () => {
     const regular = [...sample.cards.values()].filter((card) => card.kind !== 'heroEvolution');
     for (const color of colors) {
-      expect(regular.filter((card) => card.colors.length === 1 && card.colors[0] === color).length, color).toBeGreaterThanOrEqual(10);
+      expect(regular.filter((card) => card.colors.length === 1 && card.colors[0] === color).length, color).toBeGreaterThanOrEqual(12);
     }
-    expect(regular.filter((card) => card.colors.length === 0).length).toBeGreaterThanOrEqual(6);
+    expect(regular.filter((card) => card.colors.length === 0).length).toBeGreaterThanOrEqual(8);
   });
 
   it('每個英雄能用的卡都夠組 40 張', () => {
     for (const hero of SAMPLE_HEROES) {
       expect(deckPool(sample, hero.id).length * DEFAULT_RULES.maxCopies, hero.name).toBeGreaterThanOrEqual(DEFAULT_RULES.deckSize);
+    }
+  });
+
+  it('9–12 費每一種費用都有卡；每個顏色都有 2 張 9 費以上的卡，每個英雄都拿得到', () => {
+    const regular = [...sample.cards.values()].filter((card) => card.kind !== 'heroEvolution');
+    for (const cost of [9, 10, 11, 12]) {
+      expect(regular.filter((card) => card.cost === cost).length, `${cost} 費`).toBeGreaterThanOrEqual(2);
+    }
+    for (const color of colors) {
+      expect(regular.filter((card) => card.cost >= 9 && card.colors.length === 1 && card.colors[0] === color).length, color).toBe(2);
+    }
+    for (const hero of SAMPLE_HEROES) {
+      expect(deckPool(sample, hero.id).some((card) => card.cost >= 9 && card.colors.length > 0), hero.name).toBe(true);
     }
   });
 

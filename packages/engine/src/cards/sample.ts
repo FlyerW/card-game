@@ -7,7 +7,7 @@ import type { Ability, DeckCardDef, HeroDef, TargetSpec } from '../types';
 // 只打生物的法術 = 同費用生物的 HP，而且至少比任意目標多 1，一張就能解掉同費用的生物；
 // 範圍法術能清掉便宜 3 費以上的生物。
 //
-// 每個顏色 10 張、無色 6 張（英雄進化卡另計），單色英雄有 16 種卡可以用，組得出 40 張的正式牌組。
+// 每個顏色 12 張、無色 8 張（英雄進化卡另計），單色英雄有 20 種卡可以用，組得出 40 張的正式牌組。
 // 每個顏色各有一條進化線，也各有自己的異常狀態：白沉睡、藍麻痺、黑中毒、紅灼燒。
 
 const ANY: TargetSpec = { kind: 'enemy', allow: 'any' };
@@ -517,6 +517,107 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     ],
   },
   { kind: 'item', id: 'bark-armor', name: '樹皮護甲', rarity: 'N', colors: ['green'], cost: 2, hp: 6, damageReduction: 1 },
+
+  // ── 高費（9–12）：每個顏色 2 張、無色 2 張 ──
+  // 9 費以上的生物一張佔一格、一回合只能發一個技能，比兩隻便宜的生物吃虧，
+  // 所以進場效果給得大方：每 1 能量的效果只扣 1 HP（一般是 2）。HP 照 2 + 2 × 費用：9 費 20、12 費 26。
+  {
+    kind: 'creature', id: 'siege-colossus', name: '攻城巨像', rarity: 'R', colors: [],
+    stage: 0, cost: 9, hp: 20,
+    skills: [
+      hit('攻城錘', 4, OPPOSITE, 14),
+      { name: '踐踏', cost: 5, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 5 }] },
+    ],
+  },
+  {
+    kind: 'creature', id: 'kraken', name: '深海巨妖', rarity: 'SR', colors: ['blue'],
+    stage: 0, cost: 9, hp: 19,
+    entry: { name: '萬觸纏身', target: NONE, effects: [{ type: 'paralyze', all: true }] },
+    skills: [
+      { name: '纏繞', cost: 4, target: CREATURE, effects: [{ type: 'damage', amount: 9 }, { type: 'paralyze' }] },
+      hit('巨浪', 5, DIAGONAL, 17),
+    ],
+  },
+  {
+    kind: 'creature', id: 'lord-of-decay', name: '腐朽之王', rarity: 'SR', colors: ['black'],
+    stage: 0, cost: 9, hp: 19,
+    entry: { name: '腐朽之息', target: NONE, effects: [{ type: 'poison', amount: 2, all: true }] },
+    skills: [
+      { name: '凋零之觸', cost: 3, target: CREATURE, effects: [{ type: 'halveHp' }] },
+      hit('靈魂收割', 5, HERO, 13),
+    ],
+  },
+  {
+    kind: 'spell', id: 'meteor', name: '隕石術', rarity: 'SR', colors: ['red'], cost: 9,
+    target: ANY, effects: [{ type: 'damage', amount: 18 }, { type: 'damageEnemyCreatures', amount: 2 }],
+  },
+  {
+    kind: 'creature', id: 'archangel', name: '天使長', rarity: 'UR', colors: ['white'],
+    stage: 0, cost: 10, hp: 24,
+    entry: { name: '聖光降臨', target: ALLY, effects: [{ type: 'heal', amount: 8 }] },
+    skills: [
+      { name: '天使之翼', cost: 3, target: ALLY, effects: [{ type: 'heal', amount: 8 }], instant: true },
+      hit('裁決之劍', 5, ANY, 12),
+    ],
+  },
+  {
+    kind: 'creature', id: 'mountain-giant', name: '山嶺巨人', rarity: 'SR', colors: ['green'],
+    stage: 0, cost: 10, hp: 26,
+    entry: { name: '大地之息', target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }] },
+    skills: [
+      hit('巨石投擲', 4, ANY, 9),
+      { name: '山崩', cost: 6, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 6 }] },
+    ],
+  },
+  // 範圍 6 ≈ 5 能量、全體麻痺 ≈ 3、抽 2 ≈ 3，合計 11 ≈ SR 的 10 費。
+  {
+    kind: 'spell', id: 'tsunami', name: '大海嘯', rarity: 'SR', colors: ['blue'], cost: 10,
+    target: NONE,
+    effects: [{ type: 'damageEnemyCreatures', amount: 6 }, { type: 'paralyze', all: true }, { type: 'draw', count: 2 }],
+  },
+  // 全體 HP 減半 ≈ 單體的 1.5 倍（4.5 能量），再各受 3 ≈ 3.5 能量，棄 1 張 ≈ 2 能量。
+  // 先減半再打，才清得掉場面；只有減半的話一隻都打不死，模擬裡勝率只有 43%。
+  {
+    kind: 'spell', id: 'withering', name: '萬物凋零', rarity: 'SR', colors: ['black'], cost: 10,
+    target: NONE,
+    effects: [{ type: 'halveHp', all: true }, { type: 'damageEnemyCreatures', amount: 3 }, { type: 'opponentDiscardRandom', count: 1 }],
+  },
+  {
+    kind: 'creature', id: 'inferno-demon', name: '炎魔', rarity: 'UR', colors: ['red'],
+    stage: 0, cost: 11, hp: 23,
+    entry: {
+      name: '煉獄降臨', target: HERO,
+      effects: [{ type: 'damage', amount: 5 }, { type: 'damageEnemyCreatures', amount: 4 }],
+    },
+    skills: [hit('爆炎', 4, DIAGONAL, 14), hit('末日烈焰', 6, HERO, 16)],
+  },
+  {
+    kind: 'creature', id: 'titan-of-light', name: '光之巨神', rarity: 'SR', colors: ['white'],
+    stage: 0, cost: 11, hp: 23,
+    entry: { name: '神聖光輝', target: NONE, effects: [{ type: 'sleep', all: true }] },
+    skills: [
+      { name: '聖盾', cost: 2, target: NONE, effects: [{ type: 'taunt' }, { type: 'buff', attack: 0, hp: 2, on: 'self' }] },
+      hit('光之審判', 6, OPPOSITE, 20),
+    ],
+  },
+  {
+    kind: 'creature', id: 'earth-titan', name: '大地泰坦', rarity: 'UR', colors: ['green'],
+    stage: 0, cost: 12, hp: 31,
+    entry: { name: '震地', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] },
+    skills: [
+      hit('泰坦之拳', 5, CREATURE, 15),
+      { name: '地裂', cost: 6, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 6 }] },
+    ],
+  },
+  {
+    kind: 'creature', id: 'astral-dragon', name: '星界巨龍', rarity: 'SR', colors: [],
+    stage: 0, cost: 12, hp: 25,
+    entry: { name: '星辰啟示', target: NONE, effects: [{ type: 'draw', count: 2 }] },
+    skills: [
+      { name: '星光吐息', cost: 5, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 5 }] },
+      hit('星隕', 6, ANY, 15),
+    ],
+  },
 
   // ── 英雄進化：每局限一次，費用約 5–7 ──
   // 像爐石的英雄卡：打出時有進場效果（戰吼），天生技變強或多一個被動。

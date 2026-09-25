@@ -95,6 +95,18 @@ describe('HP 減半與回復', () => {
     expect(currentHp(db, state, at(state, b, 0)!)).toBe(5);
   });
 
+  it('對手每隻生物都減半：只剩 1 HP 的會倒下，自己的不受影響', () => {
+    let { state, a, b } = start();
+    place(state, a, 0, 'witch');
+    place(state, a, 1, 'taunter');
+    place(state, b, 0, 'taunter', { damage: 1 }); // 剩 11
+    place(state, b, 2, 'wolf', { damage: 5 }); // 剩 1
+    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 2 });
+    expect(currentHp(db, state, at(state, b, 0)!)).toBe(5);
+    expect(at(state, b, 2)).toBeNull();
+    expect(at(state, a, 1)?.damage).toBe(0);
+  });
+
   it('回復不超過 HP 上限', () => {
     let { state, a } = start();
     place(state, a, 0, 'wolf', { damage: 2 });

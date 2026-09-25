@@ -37,7 +37,7 @@ export function describeEffect(effect: Effect): string {
     case 'heal':
       return `回復 ${effect.amount} HP`;
     case 'halveHp':
-      return '剩餘 HP 減半';
+      return `${effect.all ? '對手每隻生物' : ''}剩餘 HP 減半`;
     case 'taunt':
       return '挑釁（對手下回合的單體傷害必須先打牠）';
     case 'buff': {

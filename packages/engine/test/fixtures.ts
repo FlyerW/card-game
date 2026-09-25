@@ -31,6 +31,7 @@ export const TEST_CARDS: DeckCardDef[] = [
   creature('witch', [
     { name: 'halve', cost: 1, target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'halveHp' }] },
     { name: 'discard', cost: 1, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
+    { name: 'halveAll', cost: 1, target: NONE, effects: [{ type: 'halveHp', all: true }] },
   ]),
   creature('bruiser', [
     { name: 'boost3', cost: 1, target: NONE, effects: [{ type: 'buff', attack: 3, hp: 3, on: 'self' }] },
