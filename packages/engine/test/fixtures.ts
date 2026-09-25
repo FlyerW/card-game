@@ -79,6 +79,36 @@ export const TEST_CARDS: DeckCardDef[] = [
   { kind: 'field', id: 'shrine', name: 'shrine', rarity: 'R', colors: [], cost: 1, ceilingBonus: 1 },
   { kind: 'field', id: 'camp', name: 'camp', rarity: 'R', colors: [], cost: 1, creatures: { attack: 1, hp: 2 } },
 
+  // 進場效果
+  creature('sparker', [hit('a', ANY, 1), hit('b', ANY, 1)], {
+    hp: 4, entry: { name: 'spark', target: ANY, effects: [{ type: 'damage', amount: 2 }] },
+  }),
+  creature('biter', [hit('a', ANY, 1), hit('b', ANY, 1)], {
+    entry: { name: 'bite', target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'damage', amount: 3 }] },
+  }),
+  creature('charger', [hit('a', ANY, 1), hit('b', ANY, 1)], {
+    entry: { name: 'charge', target: { kind: 'lane', lane: 'opposite' }, effects: [{ type: 'damage', amount: 3 }] },
+  }),
+  creature('scout', [hit('a', ANY, 1), hit('b', ANY, 1)], {
+    entry: { name: 'look', target: NONE, effects: [{ type: 'draw', count: 1 }] },
+  }),
+  creature('rallier', [hit('a', ANY, 1), hit('b', ANY, 1)], {
+    entry: { name: 'rally', target: { kind: 'ally', allow: 'creature' }, effects: [{ type: 'buff', attack: 1, hp: 1, on: 'target' }] },
+  }),
+  creature('egg', [hit('a', ANY, 1), hit('b', ANY, 1)]),
+  creature('chick', [hit('a', ANY, 1), hit('b', ANY, 1)], {
+    rarity: 'SR', stage: 1, evolvesFrom: 'egg', cost: 1, hp: 12,
+    entry: { name: 'hatch', target: NONE, effects: [{ type: 'draw', count: 1 }] },
+  }),
+
+  // 英雄進化：只有 pinger 能用
+  {
+    kind: 'heroEvolution', id: 'pinger-plus', name: 'pinger-plus', rarity: 'SR', colors: ['red'],
+    cost: 3, evolvesFrom: 'pinger', hpBonus: 10,
+    power: hit('blast', ANY, 4, 2),
+    passive: { name: 'fury', creatures: { attack: 1 } },
+  },
+
   // 顏色測試
   creature('red-imp', [hit('x', ANY, 1), hit('y', ANY, 1)], { colors: ['red'] }),
   creature('gold-griffin', [hit('x', ANY, 1), hit('y', ANY, 1)], { colors: ['red', 'green'] }),

@@ -98,7 +98,15 @@ export interface CreatureDef extends CardBase {
   hp: number;
   skills: Ability[];
   keywords?: Keyword[];
+  /**
+   * 進場效果：這張卡進場時（召喚，或進化成這張）發動。
+   * 不另外花能量，價值算在費用裡，所以有進場效果的生物本體數值要低一點。
+   */
+  entry?: EntryEffect;
 }
+
+/** 進場效果跟技能一樣是「目標類型 + 效果」，只是沒有費用。 */
+export type EntryEffect = Omit<Ability, 'cost'>;
 
 export interface SpellDef extends CardBase {
   kind: 'spell';
@@ -128,7 +136,32 @@ export interface FieldDef extends CardBase {
   ceilingBonus?: number;
 }
 
-export type DeckCardDef = CreatureDef | SpellDef | ItemDef | FieldDef;
+export interface HeroPassive {
+  name: string;
+  /** 強化自己的生物。 */
+  creatures?: CreatureModifier;
+  /** 提高自己的最高上限。突破型，目前範例卡不使用。 */
+  ceilingBonus?: number;
+}
+
+/**
+ * 英雄進化卡：放在牌組裡，只有對應的英雄能用，每局只能進化一次。
+ * 進化後 HP 上限增加（已受的傷害保留），天生技換成新的，被動則是額外多一個。
+ */
+export interface HeroEvolutionDef extends CardBase {
+  kind: 'heroEvolution';
+  cost: number;
+  /** 由哪個英雄進化（英雄的 id）。 */
+  evolvesFrom: string;
+  /** HP 上限增加多少。 */
+  hpBonus: number;
+  /** 換成這個天生技；沒有就沿用原本的。 */
+  power?: Ability;
+  /** 額外多一個被動，跟原本的被動同時生效。 */
+  passive?: HeroPassive;
+}
+
+export type DeckCardDef = CreatureDef | SpellDef | ItemDef | FieldDef | HeroEvolutionDef;
 
 export interface HeroDef {
   kind: 'hero';
@@ -137,13 +170,7 @@ export interface HeroDef {
   colors: Color[];
   hp: number;
   power?: Ability;
-  passive?: {
-    name: string;
-    /** 強化自己的生物。 */
-    creatures?: CreatureModifier;
-    /** 提高自己的最高上限。突破型，目前範例卡不使用。 */
-    ceilingBonus?: number;
-  };
+  passive?: HeroPassive;
 }
 
 export interface CardDb {
@@ -206,6 +233,8 @@ export interface PlayerState {
   heroId: string;
   heroDamage: number;
   heroPowerUsedTurn: number | null;
+  /** 已經用掉的英雄進化卡；每局最多一張。 */
+  heroEvolution: CardRef | null;
   zones: (Creature | null)[];
   hand: CardRef[];
   /** [0] 是牌庫頂。 */
@@ -253,10 +282,11 @@ export type Target =
 /** 卡牌以手牌中的 uid 指定。target 只有一個合法目標時可以省略。 */
 export type Action =
   | { type: 'mulligan'; player: PlayerId; cards: number[] }
-  | { type: 'summon'; player: PlayerId; card: number; zone: number }
-  | { type: 'evolve'; player: PlayerId; card: number; zone: number }
+  | { type: 'summon'; player: PlayerId; card: number; zone: number; target?: Target }
+  | { type: 'evolve'; player: PlayerId; card: number; zone: number; target?: Target }
   | { type: 'useSkill'; player: PlayerId; zone: number; skill: number; target?: Target }
   | { type: 'heroPower'; player: PlayerId; target?: Target }
+  | { type: 'evolveHero'; player: PlayerId; card: number }
   | { type: 'castSpell'; player: PlayerId; card: number; target?: Target }
   | { type: 'attachItem'; player: PlayerId; card: number; zone: number }
   | { type: 'playField'; player: PlayerId; card: number }
@@ -277,7 +307,8 @@ export type GameEvent =
   | { type: 'mulliganed'; player: PlayerId; count: number }
   | { type: 'summoned'; player: PlayerId; zone: number; cardId: string }
   | { type: 'evolved'; player: PlayerId; zone: number; from: string; to: string }
-  | { type: 'abilityUsed'; player: PlayerId; source: 'creature' | 'hero' | 'spell'; cardId: string; ability: string }
+  | { type: 'heroEvolved'; player: PlayerId; cardId: string }
+  | { type: 'abilityUsed'; player: PlayerId; source: 'creature' | 'hero' | 'spell' | 'entry'; cardId: string; ability: string }
   | { type: 'itemAttached'; player: PlayerId; zone: number; cardId: string }
   | { type: 'fieldPlayed'; player: PlayerId; cardId: string }
   | { type: 'damaged'; target: Target; amount: number }

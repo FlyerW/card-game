@@ -1,4 +1,5 @@
 import type {
+  Ability,
   CardDb,
   Creature,
   CreatureDef,
@@ -6,6 +7,8 @@ import type {
   DeckCardDef,
   GameState,
   HeroDef,
+  HeroEvolutionDef,
+  HeroPassive,
   ItemDef,
   PlayerId,
 } from './types';
@@ -26,6 +29,25 @@ export function heroDef(db: CardDb, state: GameState, player: PlayerId): HeroDef
   return def;
 }
 
+/** 這位玩家用掉的英雄進化卡；還沒進化就是 null。 */
+export function heroEvolution(db: CardDb, state: GameState, player: PlayerId): HeroEvolutionDef | null {
+  const card = state.players[player].heroEvolution;
+  if (card === null) return null;
+  const def = cardDef(db, card.cardId);
+  if (def.kind !== 'heroEvolution') throw new Error(`${def.id} 不是英雄進化卡`);
+  return def;
+}
+
+/** 目前的天生技：進化卡有新的就用新的。 */
+export const heroPower = (db: CardDb, state: GameState, player: PlayerId): Ability | undefined =>
+  heroEvolution(db, state, player)?.power ?? heroDef(db, state, player).power;
+
+/** 目前生效的被動：原本的，加上進化卡多給的。 */
+export function heroPassives(db: CardDb, state: GameState, player: PlayerId): HeroPassive[] {
+  const passives = [heroDef(db, state, player).passive, heroEvolution(db, state, player)?.passive];
+  return passives.filter((passive): passive is HeroPassive => passive !== undefined);
+}
+
 export const currentCardId = (creature: Creature): string => creature.cards.at(-1)!.cardId;
 
 export function creatureDef(db: CardDb, creature: Creature): CreatureDef {
@@ -43,7 +65,7 @@ function itemDef(db: CardDb, creature: Creature): ItemDef | null {
 
 /** 英雄被動加上自己場地卡，給自己每隻生物的加成。 */
 export function aura(db: CardDb, state: GameState, player: PlayerId): Required<CreatureModifier> {
-  const sources: (CreatureModifier | undefined)[] = [heroDef(db, state, player).passive?.creatures];
+  const sources: (CreatureModifier | undefined)[] = heroPassives(db, state, player).map((passive) => passive.creatures);
   const { field } = state.players[player];
   if (field !== null) {
     const def = cardDef(db, field.cardId);
@@ -75,7 +97,7 @@ export const damageReduction = (db: CardDb, state: GameState, creature: Creature
   (itemDef(db, creature)?.damageReduction ?? 0) + aura(db, state, creature.owner).damageReduction;
 
 export const heroMaxHp = (db: CardDb, state: GameState, player: PlayerId): number =>
-  heroDef(db, state, player).hp;
+  heroDef(db, state, player).hp + (heroEvolution(db, state, player)?.hpBonus ?? 0);
 
 export const heroHp = (db: CardDb, state: GameState, player: PlayerId): number =>
   heroMaxHp(db, state, player) - state.players[player].heroDamage;
@@ -88,7 +110,7 @@ export function ceiling(db: CardDb, state: GameState, player: PlayerId): number 
   return (
     state.rules.baseCeiling +
     p.ceilingBonus +
-    (heroDef(db, state, player).passive?.ceilingBonus ?? 0) +
+    heroPassives(db, state, player).reduce((sum, passive) => sum + (passive.ceilingBonus ?? 0), 0) +
     fieldBonus
   );
 }

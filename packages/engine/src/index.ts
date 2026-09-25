@@ -1,7 +1,20 @@
 export { createEngine } from './engine';
 export type { AbilityRef, ApplyResult, Engine, GameConfig, PlayerConfig, Successor } from './engine';
 export { buildCardDb, CardDataError } from './db';
-export { currentHp, maxHp, attackBonus, heroHp, ceiling, creatureDef, cardDef, isTaunting, other } from './queries';
+export {
+  currentHp,
+  maxHp,
+  attackBonus,
+  heroHp,
+  heroMaxHp,
+  heroPower,
+  heroEvolution,
+  ceiling,
+  creatureDef,
+  cardDef,
+  isTaunting,
+  other,
+} from './queries';
 export { validateDeck } from './deck';
 export { DEFAULT_RULES, LEGACY_ENERGY_RULES } from './rules';
 export { RuleError } from './errors';

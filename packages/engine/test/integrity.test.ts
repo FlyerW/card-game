@@ -14,7 +14,8 @@ const DECK_SIZE = 40;
 
 /** 從範例卡池隨機組 40 張（每種最多 3 張）。虹彩賢者是五色，全部卡都能放。 */
 function randomDeck(seed: number): string[] {
-  const pool = SAMPLE_CARDS.flatMap((card) => [card.id, card.id, card.id]);
+  // 虹彩賢者沒有英雄進化卡，別的英雄的進化卡不能放進牌組。
+  const pool = SAMPLE_CARDS.filter((card) => card.kind !== 'heroEvolution').flatMap((card) => [card.id, card.id, card.id]);
   let rng = seed;
   for (let i = pool.length - 1; i > 0; i--) {
     const [value, next] = nextRandom(rng);
@@ -37,6 +38,7 @@ function checkInvariants(state: GameState): void {
       expect(currentHp(db, state, creature)).toBeGreaterThan(0);
     }
     if (p.field !== null) cards.push(p.field);
+    if (p.heroEvolution !== null) cards.push(p.heroEvolution);
     expect(cards).toHaveLength(DECK_SIZE); // 卡片不會憑空出現或消失
     uids.push(...cards.map((card) => card.uid));
     expect(p.energy).toBeGreaterThanOrEqual(0);

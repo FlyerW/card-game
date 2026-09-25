@@ -7,7 +7,8 @@ import { RARITIES, type CreatureDef, type DeckCardDef } from '../src/types';
 import { SAMPLE_CARDS, SAMPLE_HEROES } from '../src/cards/sample';
 
 const byId = new Map(SAMPLE_CARDS.map((card) => [card.id, card]));
-const nameOf = (id: string) => byId.get(id)?.name ?? id;
+const heroNames = new Map(SAMPLE_HEROES.map((hero) => [hero.id, hero.name]));
+const nameOf = (id: string) => byId.get(id)?.name ?? heroNames.get(id) ?? id;
 const rank = (card: DeckCardDef) => RARITIES.indexOf(card.rarity);
 
 function section(title: string, cards: DeckCardDef[]): string[] {
@@ -50,6 +51,7 @@ const lines = [
     return `| **${hero.name}** | ${describeColors(hero.colors)} | ${hero.hp} | ${effects} |`;
   }),
   '',
+  ...section('英雄進化', SAMPLE_CARDS.filter((card) => card.kind === 'heroEvolution')),
   '## 進化線',
   '',
   ...evolutionLines(),

@@ -70,7 +70,11 @@ function checkColors(colors: Color[], where: string): string[] {
   return problems;
 }
 
-function checkCard(card: DeckCardDef, cards: ReadonlyMap<string, DeckCardDef>): string[] {
+function checkCard(
+  card: DeckCardDef,
+  cards: ReadonlyMap<string, DeckCardDef>,
+  heroes: ReadonlyMap<string, HeroDef>,
+): string[] {
   const where = `${card.name}（${card.id}）`;
   const problems = checkColors(card.colors, where);
   if (!Number.isInteger(card.cost) || card.cost < 0) problems.push(`${where}：費用必須是非負整數`);
@@ -83,6 +87,7 @@ function checkCard(card: DeckCardDef, cards: ReadonlyMap<string, DeckCardDef>): 
       const minSkills = card.rarity === 'N' ? 1 : 2;
       if (card.skills.length < minSkills) problems.push(`${where}：${card.rarity} 生物至少要有 ${minSkills} 個技能`);
       for (const skill of card.skills) problems.push(...checkAbility(skill, where, true));
+      if (card.entry) problems.push(...checkAbility({ ...card.entry, cost: 0 }, `${where}的進場效果`, true));
       if (card.stage === 0 && card.evolvesFrom !== undefined) {
         problems.push(`${where}：基礎生物不能有進化來源`);
       }
@@ -108,6 +113,18 @@ function checkCard(card: DeckCardDef, cards: ReadonlyMap<string, DeckCardDef>): 
         }
       }
       break;
+    case 'heroEvolution': {
+      const hero = heroes.get(card.evolvesFrom);
+      if (hero === undefined) {
+        problems.push(`${where}：找不到要進化的英雄 ${card.evolvesFrom}`);
+      } else if ([...card.colors].sort().join() !== [...hero.colors].sort().join()) {
+        problems.push(`${where}：英雄進化卡的顏色必須跟 ${hero.name} 相同`);
+      }
+      if (!Number.isInteger(card.hpBonus) || card.hpBonus < 0) problems.push(`${where}：hpBonus 必須是非負整數`);
+      if (card.power) problems.push(...checkAbility(card.power, where, false));
+      problems.push(...checkModifier(card.passive?.creatures, where));
+      break;
+    }
     case 'field':
       problems.push(...checkModifier(card.creatures, where));
       if (card.ceilingBonus !== undefined && (!Number.isInteger(card.ceilingBonus) || card.ceilingBonus < 0)) {
@@ -145,8 +162,9 @@ export function buildCardDb(cards: readonly DeckCardDef[], heroes: readonly Hero
     seen.add(id);
   }
   const cardMap = new Map(cards.map((card) => [card.id, card]));
-  for (const card of cards) problems.push(...checkCard(card, cardMap));
+  const heroMap = new Map(heroes.map((hero) => [hero.id, hero]));
+  for (const card of cards) problems.push(...checkCard(card, cardMap, heroMap));
   for (const hero of heroes) problems.push(...checkHero(hero));
   if (problems.length > 0) throw new CardDataError(problems.join('\n'));
-  return { cards: cardMap, heroes: new Map(heroes.map((hero) => [hero.id, hero])) };
+  return { cards: cardMap, heroes: heroMap };
 }

@@ -114,6 +114,18 @@ describe('資料驗證', () => {
   });
 });
 
+describe('英雄進化卡的資料驗證', () => {
+  const hero: HeroDef = { kind: 'hero', id: 'h', name: 'h', colors: ['red'], hp: 40 };
+  const evolution = (patch: Partial<Extract<DeckCardDef, { kind: 'heroEvolution' }>>): DeckCardDef => ({
+    kind: 'heroEvolution', id: 'e', name: 'e', rarity: 'SR', colors: ['red'], cost: 5, evolvesFrom: 'h', hpBonus: 10, ...patch,
+  });
+  it('要對得上一個存在的英雄，顏色也要跟那個英雄相同', () => {
+    expect(problems([evolution({})], [hero])).toBe('');
+    expect(problems([evolution({ evolvesFrom: 'nope' })], [hero])).toContain('找不到要進化的英雄');
+    expect(problems([evolution({ colors: ['red', 'green'] })], [hero])).toContain('顏色必須跟 h 相同');
+  });
+});
+
 describe('牌組驗證', () => {
   const rules = { ...DEFAULT_RULES, deckSize: 4, maxCopies: 2 };
 
@@ -135,6 +147,13 @@ describe('牌組驗證', () => {
       'gold-griffin 需要英雄具有顏色：綠',
     );
     expect(validateDeck(db, rules, 'red-green', ['gold-griffin', 'wolf', 'wolf', 'hitter'])).toEqual([]);
+  });
+
+  it('不能放別的英雄的進化卡', () => {
+    expect(validateDeck(db, rules, 'pinger', ['pinger-plus', 'wolf', 'wolf', 'hitter'])).toEqual([]);
+    expect(validateDeck(db, rules, 'red-green', ['pinger-plus', 'wolf', 'wolf', 'hitter'])).toContain(
+      'pinger-plus 是pinger的進化卡，不能放進red-green的牌組',
+    );
   });
 
   it('英雄不能放進牌組，也不能放不存在的卡', () => {

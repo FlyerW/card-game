@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { attackBonus, creatureDef, currentHp, maxHp } from '../src/queries';
+import { attackBonus, creatureDef, currentHp, heroHp, heroMaxHp, maxHp } from '../src/queries';
+import type { GameState, PlayerId, Target } from '../src/types';
 import { act, at, creatureAt, db, endTurn, engine, give, hero, place, reject, start } from './helpers';
 
 describe('傷害與擊倒', () => {
@@ -179,6 +180,82 @@ describe('進化', () => {
   });
 });
 
+describe('進場效果', () => {
+  const summonAt = (state: GameState, player: PlayerId, cardId: string, zone: number, target?: Target): GameState => {
+    state.players[player].energy = 10;
+    const card = give(state, player, cardId);
+    return act(state, target === undefined ? { type: 'summon', player, card, zone } : { type: 'summon', player, card, zone, target });
+  };
+
+  it('召喚時發動，不另外花能量', () => {
+    let { state, a, b } = start();
+    state = summonAt(state, a, 'sparker', 0, hero(b));
+    expect(state.players[b].heroDamage).toBe(2);
+    expect(state.players[a].energy).toBe(9); // 只付了召喚費用 1
+  });
+
+  it('有多個目標時必須指定；只有一個時可以省略', () => {
+    const { state, a, b } = start();
+    place(state, b, 3, 'wolf');
+    state.players[a].energy = 10;
+    expect(reject(state, { type: 'summon', player: a, card: give(state, a, 'sparker'), zone: 0 })).toBe('TARGET_REQUIRED');
+    const next = summonAt(state, a, 'biter', 0); // 只打生物，唯一的目標是 ④ 的狼
+    expect(at(next, b, 3)?.damage).toBe(3);
+  });
+
+  it('場上沒有合法目標時照樣能召喚，只是效果不發動', () => {
+    let { state, a } = start();
+    state = summonAt(state, a, 'biter', 0);
+    expect(at(state, a, 0)?.cards[0]?.cardId).toBe('biter');
+  });
+
+  it('可以用位置：正對面是空格就打到英雄', () => {
+    let { state, a, b } = start();
+    state = summonAt(state, a, 'charger', 2);
+    expect(state.players[b].heroDamage).toBe(3);
+    place(state, b, 4, 'taunter');
+    state = summonAt(state, a, 'charger', 4);
+    expect(at(state, b, 4)?.damage).toBe(3);
+  });
+
+  it('進場傷害一樣受挑釁限制', () => {
+    const { state, a, b } = start();
+    place(state, b, 0, 'wolf');
+    place(state, b, 1, 'taunter', { tauntUntilTurn: 99 });
+    state.players[a].energy = 10;
+    expect(reject(state, { type: 'summon', player: a, card: give(state, a, 'sparker'), zone: 0, target: hero(b) })).toBe('MUST_TARGET_TAUNT');
+  });
+
+  it('進化成有進場效果的卡時也會發動', () => {
+    let { state, a } = start();
+    place(state, a, 0, 'egg');
+    state.players[a].energy = 10;
+    const handSize = state.players[a].hand.length;
+    state = act(state, { type: 'evolve', player: a, card: give(state, a, 'chick'), zone: 0 });
+    expect(state.players[a].hand).toHaveLength(handSize + 1); // 給了 chick（−1）、抽 1（+1），再加上 give 的那張
+  });
+
+  it('我方目標的進場效果可以選到自己', () => {
+    let { state, a } = start();
+    state = summonAt(state, a, 'rallier', 2); // 場上只有牠自己
+    expect(at(state, a, 2)).toMatchObject({ attackCounters: 1, hpCounters: 1 });
+  });
+
+  it('沒有進場效果的生物不能指定目標', () => {
+    const { state, a, b } = start();
+    expect(reject(state, { type: 'summon', player: a, card: give(state, a, 'wolf'), zone: 0, target: hero(b) })).toBe('TARGET_NOT_ALLOWED');
+  });
+
+  it('合法動作會把每個可選的目標都列出來', () => {
+    const { state, a, b } = start();
+    place(state, b, 0, 'wolf');
+    state.players[a].energy = 10;
+    const uid = give(state, a, 'sparker');
+    const summons = engine.legalActions(state, a).filter((x) => x.type === 'summon' && x.card === uid && x.zone === 2);
+    expect(summons.map((x) => (x.type === 'summon' ? x.target : undefined))).toEqual([creatureAt(b, 0), hero(b)]);
+  });
+});
+
 describe('從牌庫進化', () => {
   it('找進化卡：從牌庫把自己的進化卡加入手牌', () => {
     let { state, a } = start();
@@ -223,6 +300,52 @@ describe('手牌上限', () => {
     state = act(state, { type: 'endTurn', player: a });
     expect(state.players[b].hand).toHaveLength(10);
     expect(state.players[b].discard).toContainEqual(top);
+  });
+});
+
+describe('英雄進化', () => {
+  function pingerGame() {
+    const started = start();
+    started.state.players[started.a].heroId = 'pinger';
+    started.state.players[started.a].energy = 10;
+    return started;
+  }
+
+  it('HP 上限增加、已受的傷害保留；天生技換成新的，被動額外多一個', () => {
+    let { state, a, b } = pingerGame();
+    state.players[a].heroDamage = 6; // 46 − 6 = 40
+    place(state, a, 0, 'wolf');
+    state = act(state, { type: 'evolveHero', player: a, card: give(state, a, 'pinger-plus') });
+    expect([heroMaxHp(db, state, a), heroHp(db, state, a)]).toEqual([56, 50]);
+    expect(state.players[a].energy).toBe(7);
+    expect(attackBonus(db, state, at(state, a, 0)!)).toBe(1);
+    state = act(state, { type: 'heroPower', player: a, target: hero(b) });
+    expect(state.players[b].heroDamage).toBe(4);
+  });
+
+  it('每局只能進化一次', () => {
+    let { state, a } = pingerGame();
+    state = act(state, { type: 'evolveHero', player: a, card: give(state, a, 'pinger-plus') });
+    expect(reject(state, { type: 'evolveHero', player: a, card: give(state, a, 'pinger-plus') })).toBe('ALREADY_EVOLVED');
+  });
+
+  it('只有對應的英雄能用', () => {
+    const { state, a } = start();
+    state.players[a].energy = 10;
+    expect(reject(state, { type: 'evolveHero', player: a, card: give(state, a, 'pinger-plus') })).toBe('EVOLUTION_MISMATCH');
+  });
+
+  it('這回合已經用過天生技，進化後不會多一次', () => {
+    let { state, a } = pingerGame();
+    state = act(state, { type: 'heroPower', player: a });
+    state = act(state, { type: 'evolveHero', player: a, card: give(state, a, 'pinger-plus') });
+    expect(reject(state, { type: 'heroPower', player: a })).toBe('HERO_POWER_USED');
+  });
+
+  it('電腦的合法動作裡列得出英雄進化', () => {
+    const { state, a } = pingerGame();
+    give(state, a, 'pinger-plus');
+    expect(engine.legalActions(state, a).some((action) => action.type === 'evolveHero')).toBe(true);
   });
 });
 

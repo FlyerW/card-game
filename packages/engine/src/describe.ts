@@ -1,4 +1,4 @@
-import type { Ability, Color, CreatureModifier, DeckCardDef, Effect, HeroDef, TargetSpec } from './types';
+import type { Ability, Color, CreatureModifier, DeckCardDef, Effect, HeroDef, HeroPassive, TargetSpec } from './types';
 
 // 卡面文字由資料產生，不另外手寫，資料和說明才不會對不上。
 
@@ -95,7 +95,8 @@ export function describeCard(card: DeckCardDef, names: (id: string) => string = 
       const from = card.evolvesFrom === undefined ? '' : `，由${names(card.evolvesFrom)}進化`;
       const cost = card.stage === 0 ? `召喚 ${card.cost}` : `進化 ${card.cost}`;
       const keywords = card.keywords?.includes('haste') ? '｜速攻' : '';
-      return [`${card.name}　${tag}・${stage}${from}｜${cost}｜HP ${card.hp}${keywords}`, ...card.skills.map(describeAbility)];
+      const entry = card.entry ? [`進場 ${describeAbility({ ...card.entry, cost: 0 }).replace('（0）', '')}`] : [];
+      return [`${card.name}　${tag}・${stage}${from}｜${cost}｜HP ${card.hp}${keywords}`, ...entry, ...card.skills.map(describeAbility)];
     }
     case 'spell':
       return [`${card.name}　${tag}・法術`, describeAbility({ ...card })];
@@ -103,14 +104,22 @@ export function describeCard(card: DeckCardDef, names: (id: string) => string = 
       return [`${card.name}　${tag}・道具（${card.cost}）`, `這隻生物${describeModifier(card).join('、')}`];
     case 'field':
       return [`${card.name}　${tag}・場地（${card.cost}）`, describeOwnEffects(card.creatures, card.ceilingBonus)];
+    case 'heroEvolution': {
+      const lines = [`${card.name}　${tag}・英雄進化（${card.cost}）｜由${names(card.evolvesFrom)}進化`, `英雄 HP 上限 +${card.hpBonus}`];
+      if (card.power) lines.push(`天生技換成 ${describeAbility(card.power)}`);
+      if (card.passive) lines.push(`多一個${describePassive(card.passive)}`);
+      lines.push('每局只能進化一次');
+      return lines;
+    }
   }
 }
 
+const describePassive = (passive: HeroPassive): string =>
+  `被動「${passive.name}」：${describeOwnEffects(passive.creatures, passive.ceilingBonus)}`;
+
 export function describeHero(hero: HeroDef): string[] {
   const lines = [`${hero.name}　${describeColors(hero.colors)}｜HP ${hero.hp}`];
-  if (hero.passive) {
-    lines.push(`被動「${hero.passive.name}」：${describeOwnEffects(hero.passive.creatures, hero.passive.ceilingBonus)}`);
-  }
+  if (hero.passive) lines.push(describePassive(hero.passive));
   if (hero.power) lines.push(`天生技 ${describeAbility(hero.power)}`);
   if (!hero.passive && !hero.power) lines.push('沒有效果');
   return lines;

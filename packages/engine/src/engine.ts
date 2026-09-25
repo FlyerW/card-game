@@ -1,6 +1,6 @@
 import { validateDeck } from './deck';
 import { fail, RuleError, type ErrorCode } from './errors';
-import { cardDef, ceiling, creatureDef, currentCardId, heroDef, other } from './queries';
+import { cardDef, ceiling, creatureDef, currentCardId, heroDef, heroPower as currentHeroPower, other } from './queries';
 import { cleanup, drawCards, endGame, resolveAbility, shuffle, randomInt, type Ctx } from './resolve';
 import { DEFAULT_RULES } from './rules';
 import { baseTargets, legalTargets, sameTarget, type AbilitySource } from './targeting';
@@ -9,6 +9,7 @@ import type {
   Ability,
   Action,
   CardDb,
+  CreatureDef,
   CardRef,
   GameEvent,
   GameState,
@@ -105,6 +106,35 @@ function chooseTarget(ctx: Ctx, ability: Ability, source: AbilitySource, chosen:
   fail('ILLEGAL_TARGET', `「${ability.name}」不能指定這個目標`);
 }
 
+/**
+ * 進場效果：召喚或進化時發動。有目標可選就必須選（只有一個時可以省略）；
+ * 場上沒有合法目標時，生物照樣進場，只是效果不發動。
+ */
+function triggerEntry(ctx: Ctx, def: CreatureDef, player: PlayerId, zone: number, chosen: Target | undefined): void {
+  if (def.entry === undefined) {
+    if (chosen !== undefined) fail('TARGET_NOT_ALLOWED', `${def.name} 沒有進場效果，不需要指定目標`);
+    return;
+  }
+  const ability: Ability = { ...def.entry, cost: 0 };
+  const source: AbilitySource = { kind: 'creature', player, zone };
+  if (ability.target.kind !== 'none' && legalTargets(ctx.state, ability, source).length === 0) {
+    if (chosen !== undefined) fail('ILLEGAL_TARGET', `「${ability.name}」現在沒有可以指定的目標`);
+    return;
+  }
+  const target = chooseTarget(ctx, ability, source, chosen);
+  ctx.events.push({ type: 'abilityUsed', player, source: 'entry', cardId: def.id, ability: ability.name });
+  resolveAbility(ctx, ability, source, target);
+}
+
+/** 生物放到 zone 之後，進場效果能選的目標。召喚前就要算，所以把牠自己也算進我方生物。 */
+function entryTargets(state: GameState, def: CreatureDef, player: PlayerId, zone: number, alreadyThere: boolean): Target[] {
+  if (def.entry === undefined || def.entry.target.kind === 'none') return [];
+  const ability: Ability = { ...def.entry, cost: 0 };
+  const targets = legalTargets(state, ability, { kind: 'creature', player, zone });
+  if (!alreadyThere && def.entry.target.kind === 'ally') targets.push({ kind: 'creature', player, zone });
+  return targets;
+}
+
 // ─── 回合 ────────────────────────────────────────────────────────────────────
 
 function startTurn(ctx: Ctx, player: PlayerId): void {
@@ -182,6 +212,7 @@ function summon(ctx: Ctx, a: ActionOf<'summon'>): void {
     tauntUntilTurn: null,
   };
   ctx.events.push({ type: 'summoned', player: a.player, zone: a.zone, cardId: card.cardId });
+  triggerEntry(ctx, def, a.player, a.zone, a.target);
 }
 
 function evolve(ctx: Ctx, a: ActionOf<'evolve'>): void {
@@ -205,6 +236,7 @@ function evolve(ctx: Ctx, a: ActionOf<'evolve'>): void {
   creature.cards.push(card);
   creature.evolvedTurn = state.turn;
   ctx.events.push({ type: 'evolved', player: a.player, zone: a.zone, from, to: card.cardId });
+  triggerEntry(ctx, def, a.player, a.zone, a.target);
 }
 
 function useSkill(ctx: Ctx, a: ActionOf<'useSkill'>): void {
@@ -230,7 +262,7 @@ function heroPower(ctx: Ctx, a: ActionOf<'heroPower'>): void {
   const { db, state } = ctx;
   const p = state.players[a.player];
   const hero = heroDef(db, state, a.player);
-  const power = hero.power ?? fail('NO_HERO_POWER', `${hero.name} 沒有天生技`);
+  const power = currentHeroPower(db, state, a.player) ?? fail('NO_HERO_POWER', `${hero.name} 沒有天生技`);
   if (p.heroPowerUsedTurn === state.turn) fail('HERO_POWER_USED', '天生技每回合只能發動一次');
 
   const source: AbilitySource = { kind: 'hero', player: a.player };
@@ -239,6 +271,26 @@ function heroPower(ctx: Ctx, a: ActionOf<'heroPower'>): void {
   p.heroPowerUsedTurn = state.turn;
   ctx.events.push({ type: 'abilityUsed', player: a.player, source: 'hero', cardId: hero.id, ability: power.name });
   resolveAbility(ctx, power, source, target);
+}
+
+function evolveHero(ctx: Ctx, a: ActionOf<'evolveHero'>): void {
+  const { db, state } = ctx;
+  const p = state.players[a.player];
+  const card = handCard(p, a.card);
+  const def = cardDef(db, card.cardId);
+  if (def.kind !== 'heroEvolution') fail('WRONG_CARD_KIND', `${def.name} 不是英雄進化卡`);
+  const hero = heroDef(db, state, a.player);
+  if (def.evolvesFrom !== hero.id) {
+    fail('EVOLUTION_MISMATCH', `${def.name} 要由 ${db.heroes.get(def.evolvesFrom)?.name ?? def.evolvesFrom} 進化，你的英雄是 ${hero.name}`);
+  }
+  if (p.heroEvolution !== null) fail('ALREADY_EVOLVED', '英雄每局只能進化一次');
+
+  pay(p, def.cost);
+  removeFromHand(p, card.uid);
+  // 已受的傷害保留，HP 上限提高，所以目前 HP 跟著增加。本回合是否用過天生技也保留。
+  p.heroEvolution = card;
+  ctx.events.push({ type: 'heroEvolved', player: a.player, cardId: card.cardId });
+  cleanup(ctx);
 }
 
 function castSpell(ctx: Ctx, a: ActionOf<'castSpell'>): void {
@@ -318,6 +370,8 @@ function dispatch(ctx: Ctx, action: Action): void {
       return useSkill(ctx, action);
     case 'heroPower':
       return heroPower(ctx, action);
+    case 'evolveHero':
+      return evolveHero(ctx, action);
     case 'castSpell':
       return castSpell(ctx, action);
     case 'attachItem':
@@ -362,6 +416,7 @@ export function createEngine(db: CardDb) {
       heroId,
       heroDamage: 0,
       heroPowerUsedTurn: null,
+      heroEvolution: null,
       zones: Array.from({ length: rules.zones }, () => null),
       hand: [],
       deck: [],
@@ -412,7 +467,7 @@ export function createEngine(db: CardDb) {
       ability = creatureDef(db, creature).skills[ref.skill];
       source = { kind: 'creature', player, zone: ref.zone };
     } else if (ref.kind === 'heroPower') {
-      ability = heroDef(db, state, player).power;
+      ability = currentHeroPower(db, state, player);
       source = { kind: 'hero', player };
     } else {
       const card = state.players[player].hand.find((c) => c.uid === ref.card);
@@ -450,15 +505,20 @@ export function createEngine(db: CardDb) {
       const def = cardDef(db, card.cardId);
       if (def.kind === 'creature') {
         for (const zone of zones) {
-          candidates.push({ type: def.stage === 0 ? 'summon' : 'evolve', player, card: card.uid, zone });
+          const type = def.stage === 0 ? 'summon' : 'evolve';
+          const targets = entryTargets(state, def, player, zone, type === 'evolve');
+          if (targets.length === 0) candidates.push({ type, player, card: card.uid, zone });
+          for (const target of targets) candidates.push({ type, player, card: card.uid, zone, target });
         }
       } else if (def.kind === 'spell') {
         const spell = spellAbility(db, card.cardId)!;
         withTargets({ type: 'castSpell', player, card: card.uid }, spell, targetsFor(state, player, { kind: 'spell', card: card.uid }));
       } else if (def.kind === 'item') {
         for (const zone of zones) candidates.push({ type: 'attachItem', player, card: card.uid, zone });
-      } else {
+      } else if (def.kind === 'field') {
         candidates.push({ type: 'playField', player, card: card.uid });
+      } else {
+        candidates.push({ type: 'evolveHero', player, card: card.uid });
       }
     }
     p.zones.forEach((creature, zone) => {
@@ -468,7 +528,7 @@ export function createEngine(db: CardDb) {
         withTargets({ type: 'useSkill', player, zone, skill: index }, skill, targetsFor(state, player, ref));
       });
     });
-    const power = heroDef(db, state, player).power;
+    const power = currentHeroPower(db, state, player);
     if (power) withTargets({ type: 'heroPower', player }, power, targetsFor(state, player, { kind: 'heroPower' }));
     candidates.push({ type: 'endTurn', player });
     return expand(state, candidates);

@@ -31,6 +31,8 @@ export interface CreatureView {
 
 export interface SideView {
   heroId: string;
+  /** 用掉的英雄進化卡；還沒進化是 null。 */
+  heroEvolution: string | null;
   heroHp: number;
   heroMaxHp: number;
   heroPowerUsedThisTurn: boolean;
@@ -84,6 +86,7 @@ function sideView(db: CardDb, state: GameState, player: PlayerId): SideView {
   const p = state.players[player];
   return {
     heroId: p.heroId,
+    heroEvolution: p.heroEvolution?.cardId ?? null,
     heroHp: heroHp(db, state, player),
     heroMaxHp: heroMaxHp(db, state, player),
     heroPowerUsedThisTurn: p.heroPowerUsedTurn === state.turn,
