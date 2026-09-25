@@ -25,7 +25,7 @@ npm install
 npm test            # 全部測試
 npm run typecheck   # 型別檢查
 npm run cards       # 從卡牌資料重新產生 docs/cards.md
-npm run sim         # 平衡模擬，4 核心約 25 分鐘；結果寫到 docs/balance-results.md
+npm run sim         # 平衡模擬，16 個 worker 約 8 分鐘（核心少會久很多）；結果寫到 docs/balance-results.md
 npm run sim -- --games 200   # 快速試跑
 npm run dev         # 網頁試玩版的開發伺服器，改程式碼會即時更新
 npm run build:web   # 打包網頁版；dist/artifact.html 是可以直接發布的單一檔案
