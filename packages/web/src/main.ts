@@ -2,13 +2,13 @@ import {
   createEngine,
   describeAbility,
   describeCard,
+  describeColors,
   describeHero,
   heroPower,
   sampleDb,
   SAMPLE_CARDS,
   SAMPLE_HEROES,
   type Action,
-  type Color,
   type CreatureView,
   type DeckCardDef,
   type GameEvent,
@@ -19,8 +19,20 @@ import {
   type Target,
 } from '@card-game/engine';
 import { chooseAction, STYLES } from '@card-game/sim/bot';
-import { buildDeck } from '@card-game/sim/deck';
 import { describeEvents, ZONE, type LogLine } from './log';
+import {
+  addProblem,
+  autoDeck,
+  deckIssues,
+  deckScreen,
+  fillRandom,
+  loadDecks,
+  removeOne,
+  saveDecks,
+  type Builder,
+  type KindFilter,
+} from './deck-builder';
+import { esc, kindLabel, pips } from './ui';
 import './style.css';
 
 const db = sampleDb();
@@ -44,8 +56,10 @@ type Selection =
   | { kind: 'field'; player: PlayerId };
 
 interface Saved {
-  screen: 'setup' | 'play';
+  screen: 'setup' | 'deck' | 'play';
   heroId: string;
+  /** 每個英雄的自訂牌組；沒有就每局自動組。 */
+  decks: Record<string, string[]>;
   state: GameState | null;
   log: LogLine[];
   redraw: number[];
@@ -57,11 +71,14 @@ interface App extends Saved {
   toast: string | null;
   /** 選了「這回合都不回應」的回合編號。 */
   skipResponsesTurn: number | null;
+  builder: Builder;
 }
 
 const app: App = {
   screen: 'setup',
   heroId: SAMPLE_HEROES[1]!.id,
+  decks: loadDecks(db),
+  builder: { heroId: SAMPLE_HEROES[1]!.id, filter: 'all', focus: null },
   state: null,
   log: [],
   redraw: [],
@@ -82,33 +99,13 @@ const root = document.getElementById('app')!;
 
 // ─── 小工具 ──────────────────────────────────────────────────────────────────
 
-const esc = (text: string) =>
-  text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 const card = (id: string) => db.cards.get(id)!;
 const hero = (id: string) => db.heroes.get(id)!;
 const nameOf = (id: string) => db.cards.get(id)?.name ?? db.heroes.get(id)?.name ?? id;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const targetKey = (t: Target) => (t.kind === 'hero' ? `h${t.player}` : t.kind === 'field' ? `f${t.player}` : `z${t.player}${t.zone}`);
 
-function pips(colors: Color[]): string {
-  if (colors.length === 0) return '<span class="pips" aria-label="無色"><i class="pip none"></i></span>';
-  return `<span class="pips" aria-label="${colors.join('')}">${colors.map((c) => `<i class="pip ${c}"></i>`).join('')}</span>`;
-}
 
-function kindLabel(def: DeckCardDef): string {
-  switch (def.kind) {
-    case 'creature':
-      return def.stage === 0 ? '生物' : `進化・${def.stage === 1 ? '一階' : '二階'}`;
-    case 'spell':
-      return '法術';
-    case 'item':
-      return '道具';
-    case 'field':
-      return '場地';
-    case 'heroEvolution':
-      return '英雄進化';
-  }
-}
 
 // ─── 合法動作與可點的目標 ─────────────────────────────────────────────────────
 //
@@ -227,13 +224,13 @@ function startGame(): void {
   const seed = (Math.random() * 2 ** 32) >>> 0;
   const rivals = SAMPLE_HEROES.filter((h) => h.id !== app.heroId);
   const rival = rivals[seed % rivals.length]!.id;
+  // 雙方都照正式規則組牌；你有自訂牌組就用你的，電腦每局自動組一副。
   const created = engine.createGame({
     seed,
     players: [
-      { heroId: app.heroId, deck: buildDeck(seed ^ 0x9e3779b9, app.heroId) },
-      { heroId: rival, deck: buildDeck(seed + 1, rival) },
+      { heroId: app.heroId, deck: app.decks[app.heroId] ?? autoDeck(db, app.heroId, seed ^ 0x9e3779b9) },
+      { heroId: rival, deck: autoDeck(db, rival, seed + 1) },
     ],
-    skipDeckValidation: true,
   });
   if (!created.ok) {
     app.toast = created.error.message;
@@ -303,7 +300,8 @@ function chainBox(view: PlayerView): string {
     .map((l) => {
       const who = l.player === YOU ? '你' : '電腦';
       const target = l.target ? ` → ${targetLabel(view, l.target)}` : '';
-      return `<li class="${l.player === YOU ? 't-you' : 't-bot'}">${who}：${esc(nameOf(l.cardId))}「${esc(l.ability)}」${esc(target)}</li>`;
+      const what = l.source === 'spell' ? nameOf(l.cardId) : `${nameOf(l.cardId)}「${l.ability}」`;
+      return `<li class="${l.player === YOU ? 't-you' : 't-bot'}">${who}：${esc(what)}${esc(target)}</li>`;
     })
     .join('');
   return `<div class="chain"><p class="chain-title">連鎖・上面的先結算</p><ol>${items}</ol></div>`;
@@ -619,10 +617,22 @@ function setupScreen(): string {
       <span class="hp-name">${esc(h.name)}</span>${pips(h.colors)}
       <span class="hp-text">${esc(body.join('　'))}</span><span class="sr">${esc(head ?? '')}</span></button>`;
   }).join('');
+  const custom = app.decks[app.heroId];
+  const problems = custom ? deckIssues(db, app.heroId, custom).problems : [];
+  const colors = describeColors(hero(app.heroId).colors);
+  const deckText = !custom
+    ? `還沒有自訂牌組：每局從${colors}與無色的卡自動組一副（進化線照 3/2/1 帶）。`
+    : problems.length
+      ? `自訂牌組還不能用：${problems[0]}`
+      : `用你的自訂牌組（${custom.length} 張）。`;
   return `<main class="setup">
     <header><h1>卡牌試玩桌</h1><p>選一名英雄，跟電腦打一局。對手的英雄隨機，開局時會先告訴你是誰。</p></header>
     <div class="heroes">${heroes}</div>
-    <button class="primary big" data-do="start">開始對戰</button>
+    <section class="deck-bar">
+      <div><p class="d-head">牌組</p><p class="d-line${problems.length ? ' warn' : ''}">${esc(deckText)}</p></div>
+      <button class="ghost" data-do="builder">${custom ? '編輯牌組' : '自己組牌'}</button>
+    </section>
+    <button class="primary big" data-do="start" ${problems.length ? 'disabled' : ''}>開始對戰</button>
     ${app.toast ? `<p class="toast" role="alert">${esc(app.toast)}</p>` : ''}
     <section class="howto">
       <h2>怎麼玩</h2>
@@ -635,9 +645,11 @@ function setupScreen(): string {
         <li>手牌上限 10 張，滿手時抽到的牌直接進棄牌區。場地卡放在自己的場地區，只強化自己的生物。</li>
         <li>有些英雄有英雄進化卡：HP 上限增加、天生技變強，每局只能進化一次。</li>
         <li>異常狀態只會中在生物身上：中毒（回合開始時失去 HP）、灼燒（回合結束時受到傷害）、麻痺、沉睡（都不能發動技能，沉睡被打就醒）。進化會解除全部。</li>
+        <li>即時回應：對手宣告動作之後、結算之前，你可以用存下來的能量打出瞬發法術，或發動生物的【瞬發】技能。回應也能再被回應，後打出的先結算。發動的生物在結算前被打倒，牠的技能就不會打出來。</li>
         <li>把對手英雄的 HP 打到 0 就贏了。</li>
       </ul>
-      <p class="note">試玩說明：範例卡只有 ${SAMPLE_CARDS.length} 張，單色組不成 40 張，所以雙方的牌組都從全部範例卡隨機組成，不限顏色。電腦用的是模擬平衡時的均衡打法。</p>
+      <p class="note">試玩說明：範例卡有 ${SAMPLE_CARDS.length} 張，牌組照正式規則：40 張、同名最多 3 張、只能放英雄顏色內的卡與無色卡。
+        你可以自己組牌；電腦每局自動組一副。電腦用的是模擬平衡時的均衡打法。</p>
     </section>
   </main>`;
 }
@@ -646,7 +658,13 @@ function setupScreen(): string {
 
 function render(): void {
   const handScroll = root.querySelector('.hand')?.scrollLeft ?? 0;
-  root.innerHTML = app.screen === 'setup' ? setupScreen() : playScreen();
+  const custom = app.decks[app.builder.heroId];
+  root.innerHTML =
+    app.screen === 'setup'
+      ? setupScreen()
+      : app.screen === 'deck'
+        ? deckScreen(db, app.builder, custom ?? [], custom !== undefined)
+        : playScreen();
   const handEl = root.querySelector('.hand');
   if (handEl) handEl.scrollLeft = handScroll;
   const log = root.querySelector('.log');
@@ -687,8 +705,49 @@ function chooseAbility(acts: Action[], selection: Selection): void {
   }
 }
 
+/** 組牌畫面的點擊。處理了就回傳 true。 */
+function builderClick(el: HTMLElement, command: string | undefined): boolean {
+  const { add, remove, focus, filter } = el.dataset;
+  const heroId = app.builder.heroId;
+  const deck = app.decks[heroId] ?? [];
+  const edit = (next: string[]) => {
+    app.decks = { ...app.decks, [heroId]: next };
+    saveDecks(app.decks);
+  };
+  if (add) {
+    if (addProblem(deck, add) === null) edit([...deck, add]);
+    app.builder.focus = add;
+  } else if (remove) {
+    edit(removeOne(deck, remove));
+    app.builder.focus = remove;
+  } else if (focus) {
+    app.builder.focus = app.builder.focus === focus ? null : focus;
+  } else if (filter) {
+    app.builder.filter = filter as KindFilter;
+  } else if (command === 'deck-fill') {
+    edit(fillRandom(db, heroId, deck));
+  } else if (command === 'deck-auto') {
+    edit(autoDeck(db, heroId, (Math.random() * 2 ** 32) >>> 0));
+  } else if (command === 'deck-clear') {
+    edit([]);
+  } else if (command === 'deck-forget') {
+    const { [heroId]: _, ...rest } = app.decks;
+    app.decks = rest;
+    saveDecks(app.decks);
+  } else if (command === 'deck-done') {
+    app.screen = 'setup';
+    window.scrollTo(0, 0);
+  } else {
+    return false;
+  }
+  render();
+  return true;
+}
+
 root.addEventListener('click', (event) => {
-  const el = (event.target as HTMLElement).closest<HTMLElement>('[data-do],[data-key],[data-hand],[data-skill],[data-hero],[data-mull]');
+  const el = (event.target as HTMLElement).closest<HTMLElement>(
+    '[data-do],[data-key],[data-hand],[data-skill],[data-hero],[data-mull],[data-add],[data-remove],[data-focus],[data-filter]',
+  );
   if (!el) {
     if (app.selection) {
       app.selection = null;
@@ -697,6 +756,7 @@ root.addEventListener('click', (event) => {
     return;
   }
   const { do: command, key, hand: handUid, skill, hero: heroId, mull } = el.dataset;
+  if (app.screen === 'deck' && builderClick(el, command)) return;
 
   if (heroId) {
     app.heroId = heroId;
@@ -723,6 +783,12 @@ root.addEventListener('click', (event) => {
       } else perform(act);
     } else if (act) perform(act);
     else if (app.state) inspect(key);
+  } else if (command === 'builder') {
+    app.builder = { heroId: app.heroId, filter: app.builder.filter, focus: null };
+    app.screen = 'deck';
+    app.toast = null;
+    render();
+    window.scrollTo(0, 0);
   } else if (command === 'start' || command === 'again') {
     startGame();
   } else if (command === 'setup') {
@@ -769,7 +835,7 @@ interface Hot {
   data?: Partial<Saved>;
 }
 const hot = (window as unknown as { claude?: { hot?: Hot } }).claude?.hot;
-hot?.snapshot?.(() => ({ screen: app.screen, heroId: app.heroId, state: app.state, log: app.log, redraw: app.redraw }));
+hot?.snapshot?.(() => ({ screen: app.screen, heroId: app.heroId, decks: app.decks, state: app.state, log: app.log, redraw: app.redraw }));
 
 function start(data: Partial<Saved>): void {
   Object.assign(app, data);

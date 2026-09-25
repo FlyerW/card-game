@@ -27,6 +27,9 @@ export function describeEvents(
 ): LogLine[] {
   const name = (id: string) => db.cards.get(id)?.name ?? db.heroes.get(id)?.name ?? id;
   const who = (player: PlayerId) => (player === you ? '你' : '電腦');
+  /** 法術的效果名就是卡名，只寫一次。 */
+  const ability = (cardId: string, abilityName: string) =>
+    name(cardId) === abilityName ? name(cardId) : `${name(cardId)}「${abilityName}」`;
   const tone = (player: PlayerId): LogLine['tone'] => (player === you ? 'you' : 'bot');
   const targetText = (target: Target): string => {
     if (target.kind === 'hero') return `${who(target.player)}的英雄`;
@@ -42,7 +45,7 @@ export function describeEvents(
         responding = true;
         break;
       case 'resolving':
-        lines.push({ text: `　結算 ${name(event.cardId)}「${event.ability}」`, tone: 'turn' });
+        lines.push({ text: `　結算 ${ability(event.cardId, event.ability)}`, tone: 'turn' });
         break;
       case 'fizzled':
         lines.push({ text: `　${name(event.cardId)} 已經離場，「${event.ability}」沒有發動`, tone: 'turn' });
