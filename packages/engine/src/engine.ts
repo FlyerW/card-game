@@ -10,6 +10,7 @@ import {
   currentCardId,
   fieldDef,
   heroDef,
+  heroPassives,
   heroPower as currentHeroPower,
   isSilenced,
   isWeakened,
@@ -300,6 +301,10 @@ function checkCanAct(ctx: Ctx, creature: Creature, what: string, target?: Target
   if (isParalyzed(state, creature)) fail('PARALYZED', `${def.name} 麻痺中，不能${what}`);
 }
 
+/** 英雄被動讓我方生物被擋住也打得到英雄。 */
+const pierces = (db: CardDb, state: GameState, player: PlayerId): boolean =>
+  heroPassives(db, state, player).some((passive) => passive.pierce === true);
+
 /** 天使的「光輝」召喚時回復多少。 */
 const ANGEL_HEAL = 3;
 
@@ -318,7 +323,7 @@ function attack(ctx: Ctx, a: ActionOf<'attack'>): void {
   if (creature.attackedTurn === state.turn) fail('ALREADY_ATTACKED', `${def.name} 這回合已經攻擊過（或休息了）`);
   if (isWeakened(state, creature)) fail('WEAKENED', `${def.name} 虛弱中，不能攻擊`);
   if (attackPower(db, state, creature) <= 0) fail('NO_ATTACK', `${def.name} 的攻擊力是 0，不能攻擊`);
-  const legal = attackTargets(state, a.player, a.zone);
+  const legal = attackTargets(state, a.player, a.zone, pierces(db, state, a.player));
   if (!legal.some((t) => sameTarget(t, a.target))) {
     const enemy = other(a.player);
     const target = a.target;
@@ -695,7 +700,7 @@ export function createEngine(db: CardDb) {
     }
     p.zones.forEach((creature, zone) => {
       if (creature === null) return;
-      for (const target of attackTargets(state, player, zone)) candidates.push({ type: 'attack', player, zone, target });
+      for (const target of attackTargets(state, player, zone, pierces(db, state, player))) candidates.push({ type: 'attack', player, zone, target });
       creatureSkills(db, creature).forEach((skill, index) => {
         const ref: AbilityRef = { kind: 'skill', zone, skill: index };
         withTargets({ type: 'useSkill', player, zone, skill: index }, skill, targetsFor(state, player, ref));

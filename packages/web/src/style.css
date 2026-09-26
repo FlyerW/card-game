@@ -406,8 +406,9 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .chip { background: none; border: 1px solid var(--mat-edge); border-radius: 999px; padding: 4px 12px; color: var(--ink-soft); font-size: 13px; }
 .chip.on { background: var(--zone); border-color: var(--zone-edge); color: var(--ink); }
 .pool { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 14px 10px; padding: 8px 0 0 8px; }
-.pool-card { display: grid; gap: 4px; min-width: 0; }
-.pool-card .card { width: 100%; min-height: 128px; }
+/* 卡片與下面的 − ＋ 一樣寬，太寬的欄位就置中，＋ 不會跑到卡片外面 */
+.pool-card { display: grid; gap: 4px; min-width: 0; width: 100%; max-width: 132px; justify-self: center; }
+.pool .pool-card .card { width: 100%; min-height: 128px; }
 .pool-card.in-deck .card { border-color: var(--pick); }
 .pool-card.focused .card { outline: 2px solid var(--ink); outline-offset: 2px; }
 .pc-count { display: grid; grid-template-columns: 30px 1fr 30px; align-items: center; text-align: center; font: 600 13px var(--num); color: var(--ink-soft); }

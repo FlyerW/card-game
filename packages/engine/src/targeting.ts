@@ -78,7 +78,7 @@ export const attackZones = (state: GameState, zone: number): number[] =>
  * 那幾格只要有一格空著，就能從空格打到後面的英雄；三格都被擋住就打不到英雄。
  * 打得到的生物裡有挑釁中的，就只能打挑釁的；挑釁的生物不在範圍內就不受影響。
  */
-export function attackTargets(state: GameState, player: PlayerId, zone: number): Target[] {
+export function attackTargets(state: GameState, player: PlayerId, zone: number, pierce = false): Target[] {
   const enemy = other(player);
   const zones = attackZones(state, zone);
   const inReach = zones
@@ -89,7 +89,8 @@ export function attackTargets(state: GameState, player: PlayerId, zone: number):
     return creature != null && isTaunting(state, creature);
   });
   if (taunting.length > 0) return taunting;
-  const open = inReach.length < zones.length;
+  // pierce：英雄被動讓牠們被擋住也打得到英雄。
+  const open = pierce || inReach.length < zones.length;
   return open ? [...inReach, { kind: 'hero', player: enemy }] : inReach;
 }
 

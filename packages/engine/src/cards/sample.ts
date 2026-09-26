@@ -34,11 +34,11 @@ export const SAMPLE_HEROES: HeroDef[] = [
   // 英雄 HP 的起點是 55 − 3 ×（顏色數 − 1）− 效果強度，再照模擬調整。
   // 單色的五個是基礎英雄，每個人都有；雙色以上的是 UR，要從卡包抽到。
   {
-    kind: 'hero', id: 'nameless-swordsman', name: '無名劍士', colors: ['white'], hp: 72,
-    passive: { name: '劍士之道', creatures: { attack: 1 } },
+    kind: 'hero', id: 'nameless-swordsman', name: '無名劍士', colors: ['white'], hp: 52,
+    passive: { name: '劍士之道', creatures: { attack: 1 }, pierce: true },
   },
   {
-    kind: 'hero', id: 'deep-seer', name: '深海先知', colors: ['blue'], hp: 52,
+    kind: 'hero', id: 'deep-seer', name: '深海先知', colors: ['blue'], hp: 55,
     power: { name: '預見', cost: 3, target: NONE, effects: [{ type: 'draw', count: 1 }] },
   },
   {
@@ -46,7 +46,7 @@ export const SAMPLE_HEROES: HeroDef[] = [
     power: { name: '蝕心', cost: 4, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
   },
   {
-    kind: 'hero', id: 'flame-lord', name: '烈焰領主', colors: ['red'], hp: 62,
+    kind: 'hero', id: 'flame-lord', name: '烈焰領主', colors: ['red'], hp: 66,
     power: hit('燃燼', 1, ANY, 1),
   },
   {
@@ -60,7 +60,7 @@ export const SAMPLE_HEROES: HeroDef[] = [
   },
   {
     // 潮與影輪流：抽牌用完變成棄牌，棄牌用完又變回抽牌。
-    kind: 'hero', id: 'tide-shadow-twins', name: '潮影雙生', rarity: 'UR', colors: ['blue', 'black'], hp: 38,
+    kind: 'hero', id: 'tide-shadow-twins', name: '潮影雙生', rarity: 'UR', colors: ['blue', 'black'], hp: 36,
     power: { name: '潮之面', cost: 3, target: NONE, effects: [{ type: 'draw', count: 1 }] },
     alternatePower: { name: '影之面', cost: 4, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
   },
@@ -218,7 +218,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   {
     kind: 'creature', id: 'void-scholar', name: '虛空學者', rarity: 'SR', colors: ['blue'], race: 'human',
     stage: 0, cost: 6, attack: 6, hp: 9,
-    skills: [{ name: '虛空奔流', cost: 0, maxEnergyCost: 4, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }],
+    skills: [{ name: '虛空奔流', cost: 0, maxEnergyCost: 4, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] }],
   },
   {
     kind: 'creature', id: 'apprentice-scholar', name: '見習學者', rarity: 'R', colors: ['blue'], race: 'human',
@@ -246,7 +246,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     kind: 'creature', id: 'kraken', name: '深海巨妖', rarity: 'SR', colors: ['blue'], race: 'beast',
     stage: 0, cost: 9, attack: 9, hp: 12,
     entry: { name: '萬觸纏身', target: NONE, effects: [{ type: 'paralyze', all: true }] },
-    skills: [{ name: '纏繞', cost: 4, target: CREATURE, effects: [{ type: 'damage', amount: 5 }, { type: 'paralyze' }] }],
+    skills: [{ name: '纏繞', cost: 5, target: CREATURE, effects: [{ type: 'damage', amount: 5 }, { type: 'paralyze' }] }],
   },
   { kind: 'spell', id: 'ice-shard', name: '冰錐', rarity: 'N', colors: ['blue'], cost: 2, target: ANY, effects: [{ type: 'damage', amount: 3 }] },
   { kind: 'spell', id: 'glacial-bind', name: '冰封', rarity: 'R', colors: ['blue'], cost: 2, target: CREATURE, effects: [{ type: 'paralyze' }] },
@@ -318,7 +318,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   {
     kind: 'creature', id: 'soul-eater', name: '影噬魔', rarity: 'SR', colors: ['black'], race: 'undead',
     stage: 0, cost: 5, attack: 5, hp: 8,
-    skills: [{ name: '蝕魂', cost: 3, target: CREATURE, effects: [{ type: 'halveHp' }] }],
+    skills: [{ name: '蝕魂', cost: 4, target: CREATURE, effects: [{ type: 'halveHp' }] }],
   },
   {
     kind: 'creature', id: 'blood-ritualist', name: '血祭術士', rarity: 'R', colors: ['black'], race: 'human',
@@ -329,7 +329,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     kind: 'creature', id: 'abyss-devourer', name: '深淵吞噬者', rarity: 'UR', colors: ['black'], race: 'undead',
     stage: 0, cost: 8, attack: 9, hp: 11,
     skills: [
-      { name: '深淵獻祭', cost: 0, maxEnergyCost: 4, target: ANY, effects: [{ type: 'damage', amount: 7 }] },
+      { name: '深淵獻祭', cost: 0, maxEnergyCost: 5, target: ANY, effects: [{ type: 'damage', amount: 7 }] },
       hit('深淵之觸', 5, CREATURE, 7),
     ],
   },
@@ -537,37 +537,37 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   // ── 英雄進化：每局限一次，費用約 5–7 ──
   // 像爐石的英雄卡：打出時有進場效果（戰吼），天生技變強或多一個被動。
   {
-    kind: 'heroEvolution', id: 'flame-sovereign', name: '烈焰君王', rarity: 'SR', colors: ['red'],
+    kind: 'heroEvolution', id: 'flame-sovereign', name: '烈焰君王', rarity: 'UR', colors: ['red'],
     cost: 6, evolvesFrom: 'flame-lord', hpBonus: 9,
     entry: { name: '焚城', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] },
     power: hit('煉獄', 2, ANY, 3),
   },
   {
-    kind: 'heroEvolution', id: 'world-tree-king', name: '萬木之王', rarity: 'SR', colors: ['green'],
+    kind: 'heroEvolution', id: 'world-tree-king', name: '萬木之王', rarity: 'UR', colors: ['green'],
     cost: 5, evolvesFrom: 'forest-king', hpBonus: 11,
     entry: { name: '萬木回春', target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }] },
     power: { name: '萬木生長', cost: 3, target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }, { type: 'draw', count: 1 }] },
   },
   {
-    kind: 'heroEvolution', id: 'sword-saint', name: '無名劍聖', rarity: 'SR', colors: ['white'],
+    kind: 'heroEvolution', id: 'sword-saint', name: '無名劍聖', rarity: 'UR', colors: ['white'],
     cost: 6, evolvesFrom: 'nameless-swordsman', hpBonus: 9,
     entry: { name: '劍陣', target: ALLY_CREATURE, effects: [{ type: 'buff', attack: 2, hp: 2, on: 'target' }] },
-    power: { name: '劍意', cost: 2, target: ALLY_CREATURE, effects: [{ type: 'buff', attack: 1, hp: 0, on: 'target' }] },
+    power: { name: '劍意', cost: 2, target: ALLY_CREATURE, effects: [{ type: 'buff', attack: 3, hp: 3, on: 'target' }] },
   },
   {
-    kind: 'heroEvolution', id: 'abyssal-sage', name: '深淵大賢者', rarity: 'SR', colors: ['blue'],
+    kind: 'heroEvolution', id: 'abyssal-sage', name: '深淵大賢者', rarity: 'UR', colors: ['blue'],
     cost: 6, evolvesFrom: 'deep-seer', hpBonus: 10,
     entry: { name: '知識之潮', target: NONE, effects: [{ type: 'draw', count: 2 }] },
     power: { name: '洞見', cost: 2, target: NONE, effects: [{ type: 'draw', count: 1 }] },
   },
   {
-    kind: 'heroEvolution', id: 'underworld-lord', name: '冥府之主', rarity: 'SR', colors: ['black'],
+    kind: 'heroEvolution', id: 'underworld-lord', name: '冥府之主', rarity: 'UR', colors: ['black'],
     cost: 6, evolvesFrom: 'underworld-priest', hpBonus: 10,
     entry: { name: '亡者之潮', target: NONE, effects: [{ type: 'poison', amount: 2, all: true }] },
     power: { name: '奪心', cost: 3, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
   },
   {
-    kind: 'heroEvolution', id: 'tide-shadow-sovereign', name: '潮影君主', rarity: 'SR', colors: ['blue', 'black'],
+    kind: 'heroEvolution', id: 'tide-shadow-sovereign', name: '潮影君主', rarity: 'UR', colors: ['blue', 'black'],
     cost: 6, evolvesFrom: 'tide-shadow-twins', hpBonus: 11,
     entry: { name: '潮汐吞噬', target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 2 }] },
     power: {

@@ -219,6 +219,8 @@ export interface HeroPassive {
   opponentTurn?: CreatureModifier;
   /** 提高自己的最高上限。突破型，目前範例卡不使用。 */
   ceilingBonus?: number;
+  /** 我方生物攻擊時，正前方與斜對角都被擋住也打得到英雄。 */
+  pierce?: boolean;
 }
 
 /**

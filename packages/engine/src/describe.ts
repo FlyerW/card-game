@@ -216,6 +216,7 @@ export function describeCard(card: DeckCardDef, names: Names = ids): string[] {
 
 function describePassive(passive: HeroPassive): string {
   const parts = [describeOwnEffects(passive.creatures, passive.ceilingBonus)];
+  if (passive.pierce) parts.push('我方生物攻擊時，正前方與斜對角都被擋住也打得到英雄');
   const own = describeModifier(passive.ownTurn);
   if (own.length > 0) parts.push(`我方回合，${ourCreatures(own)}`);
   const theirs = describeModifier(passive.opponentTurn);
