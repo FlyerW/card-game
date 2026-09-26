@@ -79,6 +79,7 @@ export function place(
     hpCounters: 0,
     item: null,
     summonedTurn: 0,
+    undyingUsed: false,
     attackedTurn: null,
     skillUsedTurn: null,
     tauntUntilTurn: null,

@@ -1,4 +1,4 @@
-import type { Color, DeckCardDef } from '@card-game/engine';
+import { RACE_NAMES, type Color, type DeckCardDef } from '@card-game/engine';
 
 // 牌桌與組牌畫面共用的小工具。
 
@@ -12,8 +12,11 @@ export function pips(colors: Color[]): string {
 
 export function kindLabel(def: DeckCardDef): string {
   switch (def.kind) {
-    case 'creature':
-      return def.stage === 0 ? '生物' : '進化';
+    case 'creature': {
+      // 生物寫種族；進化卡多標「進化」。
+      const race = def.race ? RACE_NAMES[def.race] : '生物';
+      return def.stage === 0 ? race : `${race}・進化`;
+    }
     case 'spell':
       return '法術';
     case 'item':

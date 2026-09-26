@@ -34,23 +34,23 @@ export const SAMPLE_HEROES: HeroDef[] = [
   // 英雄 HP 的起點是 55 − 3 ×（顏色數 − 1）− 效果強度，再照模擬調整。
   // 單色的五個是基礎英雄，每個人都有；雙色以上的是 UR，要從卡包抽到。
   {
-    kind: 'hero', id: 'nameless-swordsman', name: '無名劍士', colors: ['white'], hp: 59,
+    kind: 'hero', id: 'nameless-swordsman', name: '無名劍士', colors: ['white'], hp: 72,
     passive: { name: '劍士之道', creatures: { attack: 1 } },
   },
   {
-    kind: 'hero', id: 'deep-seer', name: '深海先知', colors: ['blue'], hp: 42,
+    kind: 'hero', id: 'deep-seer', name: '深海先知', colors: ['blue'], hp: 52,
     power: { name: '預見', cost: 3, target: NONE, effects: [{ type: 'draw', count: 1 }] },
   },
   {
-    kind: 'hero', id: 'underworld-priest', name: '冥府祭司', colors: ['black'], hp: 54,
+    kind: 'hero', id: 'underworld-priest', name: '冥府祭司', colors: ['black'], hp: 44,
     power: { name: '蝕心', cost: 4, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
   },
   {
-    kind: 'hero', id: 'flame-lord', name: '烈焰領主', colors: ['red'], hp: 51,
+    kind: 'hero', id: 'flame-lord', name: '烈焰領主', colors: ['red'], hp: 62,
     power: hit('燃燼', 1, ANY, 1),
   },
   {
-    kind: 'hero', id: 'forest-king', name: '林海之王', colors: ['green'], hp: 58,
+    kind: 'hero', id: 'forest-king', name: '林海之王', colors: ['green'], hp: 54,
     power: { name: '萌發', cost: 3, target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }] },
   },
   // ── UR 英雄：多色。技能盡量不跟別的英雄重複 ──
@@ -60,44 +60,44 @@ export const SAMPLE_HEROES: HeroDef[] = [
   },
   {
     // 潮與影輪流：抽牌用完變成棄牌，棄牌用完又變回抽牌。
-    kind: 'hero', id: 'tide-shadow-twins', name: '潮影雙生', rarity: 'UR', colors: ['blue', 'black'], hp: 42,
-    power: { name: '潮之面', cost: 2, target: NONE, effects: [{ type: 'draw', count: 1 }] },
+    kind: 'hero', id: 'tide-shadow-twins', name: '潮影雙生', rarity: 'UR', colors: ['blue', 'black'], hp: 38,
+    power: { name: '潮之面', cost: 3, target: NONE, effects: [{ type: 'draw', count: 1 }] },
     alternatePower: { name: '影之面', cost: 3, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
   },
   {
-    kind: 'hero', id: 'prism-sage', name: '虹彩賢者', rarity: 'UR', colors: ['white', 'blue', 'black', 'red', 'green'], hp: 47,
+    kind: 'hero', id: 'prism-sage', name: '虹彩賢者', rarity: 'UR', colors: ['white', 'blue', 'black', 'red', 'green'], hp: 40,
     power: { name: '稜光', cost: 3, target: NONE, effects: [{ type: 'buff', attack: 1, hp: 1, on: 'all' }] },
   },
 ];
 
 export const SAMPLE_CARDS: DeckCardDef[] = [
   // ── 無色：比同費用有顏色的卡少 1 點數值 ──
-  { kind: 'creature', id: 'gray-wolf', name: '灰狼', rarity: 'N', colors: [], stage: 0, cost: 1, attack: 1, hp: 1, skills: [] },
+  { kind: 'creature', id: 'gray-wolf', name: '灰狼', rarity: 'N', colors: [], race: 'beast', stage: 0, cost: 1, attack: 1, hp: 1, skills: [] },
   {
     // 用攻擊力換 HP：打不了人，但能休息挑釁擋刀。
-    kind: 'creature', id: 'rock-turtle', name: '岩殼龜', rarity: 'R', colors: [],
+    kind: 'creature', id: 'rock-turtle', name: '岩殼龜', rarity: 'R', colors: [], race: 'beast',
     stage: 0, cost: 2, attack: 0, hp: 5,
     skills: [{ name: '縮殼', cost: 0, rest: true, target: NONE, effects: [{ type: 'taunt' }] }],
   },
   {
-    kind: 'creature', id: 'wandering-mercenary', name: '流浪傭兵', rarity: 'R', colors: [],
+    kind: 'creature', id: 'wandering-mercenary', name: '流浪傭兵', rarity: 'R', colors: [], race: 'human',
     stage: 0, cost: 3, attack: 3, hp: 3,
     skills: [{ name: '磨刀', cost: 0, rest: true, target: NONE, effects: [{ type: 'buff', attack: 2, hp: 0, on: 'self' }] }],
   },
   {
     // 能量上限 −X：另一種費用。能量上限每回合 +2、最高 12，後期接近免費，所以效果給得比同樣能量的強一點。
-    kind: 'creature', id: 'overload-golem', name: '過載石像', rarity: 'R', colors: [],
+    kind: 'creature', id: 'overload-golem', name: '過載石像', rarity: 'R', colors: [], race: 'construct',
     stage: 0, cost: 5, attack: 4, hp: 6,
     skills: [{ name: '過載', cost: 0, maxEnergyCost: 2, target: NONE, effects: [{ type: 'buff', attack: 3, hp: 3, on: 'self' }] }],
   },
-  { kind: 'creature', id: 'gargoyle', name: '石像鬼', rarity: 'N', colors: [], stage: 0, cost: 4, attack: 4, hp: 4, skills: [] },
+  { kind: 'creature', id: 'gargoyle', name: '石像鬼', rarity: 'N', colors: [], race: 'construct', stage: 0, cost: 4, attack: 4, hp: 4, skills: [] },
   {
-    kind: 'creature', id: 'siege-colossus', name: '攻城巨像', rarity: 'R', colors: [],
+    kind: 'creature', id: 'siege-colossus', name: '攻城巨像', rarity: 'R', colors: [], race: 'construct',
     stage: 0, cost: 9, attack: 9, hp: 9,
     skills: [{ name: '踐踏', cost: 5, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }],
   },
   {
-    kind: 'creature', id: 'astral-dragon', name: '星界巨龍', rarity: 'SR', colors: [],
+    kind: 'creature', id: 'astral-dragon', name: '星界巨龍', rarity: 'SR', colors: [], race: 'dragon',
     stage: 0, cost: 12, attack: 12, hp: 14,
     entry: { name: '星辰啟示', target: NONE, effects: [{ type: 'draw', count: 2 }] },
     skills: [hit('星隕', 5, ANY, 6)],
@@ -111,47 +111,47 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   { kind: 'spell', id: 'snare', name: '捕獸夾', rarity: 'N', colors: [], cost: 2, target: CREATURE, effects: [{ type: 'damage', amount: 3 }] },
 
   // ── 白：守護、秩序。挑釁、回復、減傷；異常狀態是沉默與繳械 ──
-  { kind: 'creature', id: 'squire', name: '見習騎士', rarity: 'N', colors: ['white'], stage: 0, cost: 2, attack: 2, hp: 3, skills: [] },
+  { kind: 'creature', id: 'squire', name: '見習騎士', rarity: 'N', colors: ['white'], race: 'human', stage: 0, cost: 2, attack: 2, hp: 3, skills: [] },
   {
-    kind: 'creature', id: 'paladin', name: '聖騎士', rarity: 'R', colors: ['white'],
+    kind: 'creature', id: 'paladin', name: '聖騎士', rarity: 'R', colors: ['white'], race: 'human',
     stage: 1, evolvesFrom: 'squire', cost: 3, attack: 5, hp: 6,
     skills: [{ name: '守護', cost: 0, rest: true, target: NONE, effects: [{ type: 'taunt' }] }],
   },
   {
     // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物（見開頭：數值照 R、技能貴 1 費）。
-    kind: 'creature', id: 'seraph', name: '熾天使', rarity: 'SR', colors: ['white'],
+    kind: 'creature', id: 'seraph', name: '熾天使', rarity: 'SR', colors: ['white'], race: 'angel',
     stage: 0, cost: 6, attack: 6, hp: 7,
     skills: [{ name: '神聖庇護', cost: 3, target: ALLY, effects: [{ type: 'heal', amount: 5 }] }],
   },
   {
-    kind: 'creature', id: 'shield-knight', name: '盾衛騎士', rarity: 'R', colors: ['white'],
+    kind: 'creature', id: 'shield-knight', name: '盾衛騎士', rarity: 'R', colors: ['white'], race: 'human',
     stage: 0, cost: 3, attack: 3, hp: 4,
     skills: [{ name: '挑釁', cost: 0, rest: true, target: NONE, effects: [{ type: 'taunt' }] }],
   },
   {
-    kind: 'creature', id: 'spring-nun', name: '聖泉修女', rarity: 'R', colors: ['white'],
+    kind: 'creature', id: 'spring-nun', name: '聖泉修女', rarity: 'R', colors: ['white'], race: 'human',
     stage: 0, cost: 2, attack: 2, hp: 3,
     skills: [{ name: '治療', cost: 1, target: ALLY, effects: [{ type: 'heal', amount: 3 }] }],
   },
   {
-    kind: 'creature', id: 'lullaby-priest', name: '緘默祭司', rarity: 'R', colors: ['white'],
+    kind: 'creature', id: 'lullaby-priest', name: '緘默祭司', rarity: 'R', colors: ['white'], race: 'human',
     stage: 0, cost: 3, attack: 3, hp: 4,
     skills: [{ name: '禁言', cost: 2, target: CREATURE, effects: [{ type: 'silence' }] }],
   },
   {
-    kind: 'creature', id: 'dream-herald', name: '聖光使者', rarity: 'R', colors: ['white'],
+    kind: 'creature', id: 'dream-herald', name: '聖光使者', rarity: 'R', colors: ['white'], race: 'angel',
     stage: 0, cost: 3, attack: 3, hp: 3,
     entry: { name: '聖光束縛', target: CREATURE, effects: [{ type: 'silence' }] },
     skills: [hit('聖光', 2, ANY, 3)],
   },
   {
-    kind: 'creature', id: 'assault-rider', name: '突擊騎兵', rarity: 'R', colors: ['white'],
+    kind: 'creature', id: 'assault-rider', name: '突擊騎兵', rarity: 'R', colors: ['white'], race: 'human',
     stage: 0, cost: 4, attack: 4, hp: 4,
     entry: { name: '衝鋒', target: OPPOSITE, effects: [{ type: 'damage', amount: 2 }] },
     skills: [hit('長槍', 3, OPPOSITE, 5)],
   },
   {
-    kind: 'creature', id: 'archangel', name: '天使長', rarity: 'UR', colors: ['white'],
+    kind: 'creature', id: 'archangel', name: '天使長', rarity: 'UR', colors: ['white'], race: 'angel',
     stage: 0, cost: 10, attack: 12, hp: 13,
     entry: { name: '聖光降臨', target: ALLY, effects: [{ type: 'heal', amount: 5 }] },
     skills: [
@@ -160,7 +160,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     ],
   },
   {
-    kind: 'creature', id: 'titan-of-light', name: '光之巨神', rarity: 'SR', colors: ['white'],
+    kind: 'creature', id: 'titan-of-light', name: '光之巨神', rarity: 'SR', colors: ['white'], race: 'angel',
     stage: 0, cost: 11, attack: 11, hp: 14,
     entry: { name: '神聖光輝', target: NONE, effects: [{ type: 'silence', all: true }] },
     skills: [{ name: '聖盾', cost: 0, rest: true, target: NONE, effects: [{ type: 'taunt' }, { type: 'buff', attack: 0, hp: 2, on: 'self' }] }],
@@ -193,57 +193,57 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   { kind: 'field', id: 'sanctuary', name: '聖域', rarity: 'R', colors: ['white'], cost: 3, heroRegenerate: 3 },
 
   // ── 藍：知識、控制。抽牌、干擾對手；異常狀態是麻痺 ──
-  { kind: 'creature', id: 'jellyfish', name: '小水母', rarity: 'N', colors: ['blue'], stage: 0, cost: 1, attack: 1, hp: 2, skills: [] },
+  { kind: 'creature', id: 'jellyfish', name: '小水母', rarity: 'N', colors: ['blue'], race: 'beast', stage: 0, cost: 1, attack: 1, hp: 2, skills: [] },
   {
-    kind: 'creature', id: 'storm-jelly', name: '雷光水母', rarity: 'R', colors: ['blue'],
+    kind: 'creature', id: 'storm-jelly', name: '雷光水母', rarity: 'R', colors: ['blue'], race: 'beast',
     stage: 1, evolvesFrom: 'jellyfish', cost: 2, attack: 3, hp: 4,
     skills: [{ name: '麻痺觸手', cost: 2, target: CREATURE, effects: [{ type: 'paralyze' }] }],
   },
   {
     // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物（見開頭：數值照 R、技能貴 1 費）。
-    kind: 'creature', id: 'jelly-empress', name: '深海水母皇', rarity: 'SR', colors: ['blue'],
+    kind: 'creature', id: 'jelly-empress', name: '深海水母皇', rarity: 'SR', colors: ['blue'], race: 'beast',
     stage: 0, cost: 5, attack: 5, hp: 6,
     skills: [{ name: '麻痺電網', cost: 4, target: CREATURE, effects: [{ type: 'damage', amount: 3 }, { type: 'paralyze' }] }],
   },
   {
-    kind: 'creature', id: 'tide-mage', name: '潮汐術士', rarity: 'R', colors: ['blue'],
+    kind: 'creature', id: 'tide-mage', name: '潮汐術士', rarity: 'R', colors: ['blue'], race: 'human',
     stage: 0, cost: 2, attack: 2, hp: 3,
     skills: [{ name: '洞察', cost: 1, target: NONE, effects: [{ type: 'draw', count: 1 }] }],
   },
   {
-    kind: 'creature', id: 'spring-sprite', name: '湧泉精靈', rarity: 'R', colors: ['blue'],
+    kind: 'creature', id: 'spring-sprite', name: '湧泉精靈', rarity: 'R', colors: ['blue'], race: 'elemental',
     stage: 0, cost: 2, attack: 2, hp: 3,
     skills: [{ name: '湧泉', cost: 0, maxEnergyCost: 2, target: NONE, effects: [{ type: 'draw', count: 2 }] }],
   },
   {
-    kind: 'creature', id: 'void-scholar', name: '虛空學者', rarity: 'SR', colors: ['blue'],
+    kind: 'creature', id: 'void-scholar', name: '虛空學者', rarity: 'SR', colors: ['blue'], race: 'human',
     stage: 0, cost: 6, attack: 6, hp: 9,
     skills: [{ name: '虛空奔流', cost: 0, maxEnergyCost: 4, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }],
   },
   {
-    kind: 'creature', id: 'apprentice-scholar', name: '見習學者', rarity: 'R', colors: ['blue'],
+    kind: 'creature', id: 'apprentice-scholar', name: '見習學者', rarity: 'R', colors: ['blue'], race: 'human',
     stage: 0, cost: 3, attack: 3, hp: 3,
     entry: { name: '求知', target: NONE, effects: [{ type: 'draw', count: 1 }] },
     skills: [hit('冰錐', 2, ANY, 3)],
   },
   {
-    kind: 'creature', id: 'mind-thief', name: '心靈竊賊', rarity: 'R', colors: ['blue'],
+    kind: 'creature', id: 'mind-thief', name: '心靈竊賊', rarity: 'R', colors: ['blue'], race: 'human',
     stage: 0, cost: 3, attack: 3, hp: 4,
     skills: [{ name: '竊讀', cost: 3, target: NONE, effects: [{ type: 'draw', count: 1 }, { type: 'opponentDiscardRandom', count: 1 }] }],
   },
   {
-    kind: 'creature', id: 'shock-eel', name: '電鰻', rarity: 'R', colors: ['blue'],
+    kind: 'creature', id: 'shock-eel', name: '電鰻', rarity: 'R', colors: ['blue'], race: 'beast',
     stage: 0, cost: 3, attack: 3, hp: 3,
     entry: { name: '電擊', target: CREATURE, effects: [{ type: 'paralyze' }] },
     skills: [hit('放電', 2, ANY, 3)],
   },
   {
-    kind: 'creature', id: 'sea-serpent', name: '海龍', rarity: 'SR', colors: ['blue'],
+    kind: 'creature', id: 'sea-serpent', name: '海龍', rarity: 'SR', colors: ['blue'], race: 'dragon',
     stage: 0, cost: 6, attack: 6, hp: 9,
     skills: [{ name: '深海呼喚', cost: 3, target: NONE, effects: [{ type: 'draw', count: 2 }] }],
   },
   {
-    kind: 'creature', id: 'kraken', name: '深海巨妖', rarity: 'SR', colors: ['blue'],
+    kind: 'creature', id: 'kraken', name: '深海巨妖', rarity: 'SR', colors: ['blue'], race: 'beast',
     stage: 0, cost: 9, attack: 9, hp: 12,
     entry: { name: '萬觸纏身', target: NONE, effects: [{ type: 'paralyze', all: true }] },
     skills: [{ name: '纏繞', cost: 4, target: CREATURE, effects: [{ type: 'damage', amount: 5 }, { type: 'paralyze' }] }],
@@ -282,51 +282,51 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   { kind: 'field', id: 'wellspring', name: '知識之泉', rarity: 'R', colors: ['blue'], cost: 4, extraDraw: 1 },
 
   // ── 黑：侵蝕、犧牲。破壞卡牌、讓對手棄牌、HP 減半、消滅；異常狀態是中毒與詛咒 ──
-  { kind: 'creature', id: 'skeleton', name: '骷髏兵', rarity: 'N', colors: ['black'], stage: 0, cost: 2, attack: 2, hp: 3, skills: [] },
+  { kind: 'creature', id: 'skeleton', name: '骷髏兵', rarity: 'N', colors: ['black'], race: 'undead', stage: 0, cost: 2, attack: 2, hp: 3, skills: [] },
   {
-    kind: 'creature', id: 'skeleton-knight', name: '骷髏騎士', rarity: 'R', colors: ['black'],
+    kind: 'creature', id: 'skeleton-knight', name: '骷髏騎士', rarity: 'R', colors: ['black'], race: 'undead',
     stage: 1, evolvesFrom: 'skeleton', cost: 3, attack: 5, hp: 6,
     skills: [{ name: '碎骨', cost: 1, target: { kind: 'enemyItemOrField' }, effects: [{ type: 'destroy' }] }],
   },
   {
     // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物（見開頭：數值照 R、技能貴 1 費）。
-    kind: 'creature', id: 'death-knight', name: '死亡騎士', rarity: 'SR', colors: ['black'],
+    kind: 'creature', id: 'death-knight', name: '死亡騎士', rarity: 'SR', colors: ['black'], race: 'undead',
     stage: 0, cost: 6, attack: 6, hp: 7,
     skills: [{ name: '凋零', cost: 4, target: CREATURE, effects: [{ type: 'halveHp' }] }],
   },
   {
-    kind: 'creature', id: 'rust-mite', name: '腐蝕蟲', rarity: 'R', colors: ['black'],
+    kind: 'creature', id: 'rust-mite', name: '腐蝕蟲', rarity: 'R', colors: ['black'], race: 'beast',
     stage: 0, cost: 2, attack: 2, hp: 3,
     skills: [{ name: '腐蝕', cost: 1, target: { kind: 'enemyItemOrField' }, effects: [{ type: 'destroy' }] }],
   },
   {
-    kind: 'creature', id: 'venom-spider', name: '毒蛛', rarity: 'R', colors: ['black'],
+    kind: 'creature', id: 'venom-spider', name: '毒蛛', rarity: 'R', colors: ['black'], race: 'beast',
     stage: 0, cost: 2, attack: 2, hp: 3,
     skills: [{ name: '劇毒', cost: 2, target: CREATURE, effects: [{ type: 'poison', amount: 2 }] }],
   },
   {
-    kind: 'creature', id: 'plague-rat', name: '瘟疫鼠', rarity: 'R', colors: ['black'],
+    kind: 'creature', id: 'plague-rat', name: '瘟疫鼠', rarity: 'R', colors: ['black'], race: 'beast',
     stage: 0, cost: 2, attack: 2, hp: 2,
     entry: { name: '病菌', target: CREATURE, effects: [{ type: 'poison', amount: 2 }] },
     skills: [{ name: '散播', cost: 3, target: NONE, effects: [{ type: 'poison', amount: 2, all: true }] }],
   },
   {
-    kind: 'creature', id: 'hex-witch', name: '咒術巫婆', rarity: 'R', colors: ['black'],
+    kind: 'creature', id: 'hex-witch', name: '咒術巫婆', rarity: 'R', colors: ['black'], race: 'human',
     stage: 0, cost: 3, attack: 3, hp: 4,
     skills: [{ name: '咒縛', cost: 1, target: CREATURE, effects: [{ type: 'poison', amount: 1 }] }],
   },
   {
-    kind: 'creature', id: 'soul-eater', name: '影噬魔', rarity: 'SR', colors: ['black'],
+    kind: 'creature', id: 'soul-eater', name: '影噬魔', rarity: 'SR', colors: ['black'], race: 'undead',
     stage: 0, cost: 5, attack: 5, hp: 8,
     skills: [{ name: '蝕魂', cost: 3, target: CREATURE, effects: [{ type: 'halveHp' }] }],
   },
   {
-    kind: 'creature', id: 'blood-ritualist', name: '血祭術士', rarity: 'R', colors: ['black'],
+    kind: 'creature', id: 'blood-ritualist', name: '血祭術士', rarity: 'R', colors: ['black'], race: 'human',
     stage: 0, cost: 4, attack: 4, hp: 5,
     skills: [{ name: '血祭', cost: 0, maxEnergyCost: 3, target: CREATURE, effects: [{ type: 'damage', amount: 6 }] }],
   },
   {
-    kind: 'creature', id: 'abyss-devourer', name: '深淵吞噬者', rarity: 'UR', colors: ['black'],
+    kind: 'creature', id: 'abyss-devourer', name: '深淵吞噬者', rarity: 'UR', colors: ['black'], race: 'undead',
     stage: 0, cost: 8, attack: 9, hp: 11,
     skills: [
       { name: '深淵獻祭', cost: 0, maxEnergyCost: 4, target: ANY, effects: [{ type: 'damage', amount: 7 }] },
@@ -334,7 +334,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     ],
   },
   {
-    kind: 'creature', id: 'lord-of-decay', name: '腐朽之王', rarity: 'SR', colors: ['black'],
+    kind: 'creature', id: 'lord-of-decay', name: '腐朽之王', rarity: 'SR', colors: ['black'], race: 'undead',
     stage: 0, cost: 9, attack: 9, hp: 12,
     entry: { name: '腐朽之息', target: NONE, effects: [{ type: 'poison', amount: 2, all: true }] },
     skills: [hit('靈魂收割', 5, HERO, 7)],
@@ -368,44 +368,44 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   { kind: 'field', id: 'rot-marsh', name: '腐沼', rarity: 'R', colors: ['black'], cost: 5, enemyDecay: 1, lifesteal: true },
 
   // ── 紅：速度、爆發。直接傷害、只打英雄、範圍傷害、速攻；異常狀態是灼燒 ──
-  { kind: 'creature', id: 'ember-fox', name: '焰尾狐', rarity: 'N', colors: ['red'], stage: 0, cost: 2, attack: 3, hp: 2, skills: [] },
+  { kind: 'creature', id: 'ember-fox', name: '焰尾狐', rarity: 'N', colors: ['red'], race: 'beast', stage: 0, cost: 2, attack: 3, hp: 2, skills: [] },
   {
-    kind: 'creature', id: 'ember-fox-king', name: '焰狐王', rarity: 'R', colors: ['red'],
+    kind: 'creature', id: 'ember-fox-king', name: '焰狐王', rarity: 'R', colors: ['red'], race: 'beast',
     stage: 1, evolvesFrom: 'ember-fox', cost: 3, attack: 5, hp: 5,
     entry: { name: '狐火彈', target: ANY, effects: [{ type: 'damage', amount: 2 }] },
     skills: [{ name: '狐火', cost: 2, target: DIAGONAL, effects: [{ type: 'damage', amount: 3 }, { type: 'draw', count: 1 }] }],
   },
   {
     // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物（見開頭：數值照 R、技能貴 1 費）。
-    kind: 'creature', id: 'nine-tailed-fox', name: '九尾天狐', rarity: 'SR', colors: ['red'],
+    kind: 'creature', id: 'nine-tailed-fox', name: '九尾天狐', rarity: 'SR', colors: ['red'], race: 'beast',
     stage: 0, cost: 7, attack: 7, hp: 7,
     entry: { name: '九焰', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] },
     skills: [{ name: '燎天', cost: 5, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }, { type: 'buff', attack: 1, hp: 1, on: 'self' }] }],
   },
   {
-    kind: 'creature', id: 'flame-imp', name: '炎之小鬼', rarity: 'R', colors: ['red'],
+    kind: 'creature', id: 'flame-imp', name: '炎之小鬼', rarity: 'R', colors: ['red'], race: 'elemental',
     stage: 0, cost: 2, attack: 2, hp: 2,
     entry: { name: '火星', target: ANY, effects: [{ type: 'damage', amount: 2 }] },
     skills: [hit('火舌', 2, DIAGONAL, 4)],
   },
   {
-    kind: 'creature', id: 'self-immolator', name: '焚身狂徒', rarity: 'R', colors: ['red'],
+    kind: 'creature', id: 'self-immolator', name: '焚身狂徒', rarity: 'R', colors: ['red'], race: 'human',
     stage: 0, cost: 3, attack: 3, hp: 4,
     skills: [{ name: '燃命', cost: 0, maxEnergyCost: 2, target: ANY, effects: [{ type: 'damage', amount: 4 }] }],
   },
   {
-    kind: 'creature', id: 'blast-mage', name: '炎爆術士', rarity: 'R', colors: ['red'],
+    kind: 'creature', id: 'blast-mage', name: '炎爆術士', rarity: 'R', colors: ['red'], race: 'human',
     stage: 0, cost: 2, attack: 2, hp: 2,
     entry: { name: '引燃', target: CREATURE, effects: [{ type: 'burn', amount: 2 }] },
     skills: [hit('爆燃', 2, CREATURE, 4)],
   },
   {
-    kind: 'creature', id: 'arsonist', name: '縱火狂', rarity: 'R', colors: ['red'],
+    kind: 'creature', id: 'arsonist', name: '縱火狂', rarity: 'R', colors: ['red'], race: 'human',
     stage: 0, cost: 3, attack: 3, hp: 3, keywords: ['haste'],
     skills: [{ name: '點燃', cost: 2, target: CREATURE, effects: [{ type: 'burn', amount: 2 }] }],
   },
   {
-    kind: 'creature', id: 'inferno-demon', name: '炎魔', rarity: 'UR', colors: ['red'],
+    kind: 'creature', id: 'inferno-demon', name: '炎魔', rarity: 'UR', colors: ['red'], race: 'elemental',
     stage: 0, cost: 11, attack: 13, hp: 14,
     entry: { name: '煉獄降臨', target: HERO, effects: [{ type: 'damage', amount: 4 }, { type: 'damageEnemyCreatures', amount: 3 }] },
     skills: [hit('爆炎', 4, DIAGONAL, 6), hit('末日烈焰', 6, HERO, 8)],
@@ -424,21 +424,21 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   { kind: 'field', id: 'war-drums', name: '燎原戰鼓', rarity: 'R', colors: ['red'], cost: 3, creatures: { attack: 1 } },
 
   // ── 綠：成長、巨大。大型生物、提高能量上限、高 HP、吸血與再生；異常狀態是虛弱 ──
-  { kind: 'creature', id: 'forest-stag', name: '林鹿', rarity: 'N', colors: ['green'], stage: 0, cost: 2, attack: 2, hp: 3, skills: [] },
-  { kind: 'creature', id: 'moss-lizard', name: '苔甲巨蜥', rarity: 'N', colors: ['green'], stage: 0, cost: 5, attack: 4, hp: 7, skills: [] },
+  { kind: 'creature', id: 'forest-stag', name: '林鹿', rarity: 'N', colors: ['green'], race: 'beast', stage: 0, cost: 2, attack: 2, hp: 3, skills: [] },
+  { kind: 'creature', id: 'moss-lizard', name: '苔甲巨蜥', rarity: 'N', colors: ['green'], race: 'beast', stage: 0, cost: 5, attack: 4, hp: 7, skills: [] },
   {
-    kind: 'creature', id: 'grove-bear', name: '林地蠻熊', rarity: 'R', colors: ['green'],
+    kind: 'creature', id: 'grove-bear', name: '林地蠻熊', rarity: 'R', colors: ['green'], race: 'beast',
     stage: 0, cost: 4, attack: 4, hp: 5,
     skills: [{ name: '呼喚熊王', cost: 1, target: NONE, effects: [{ type: 'searchEvolution' }] }],
   },
   {
-    kind: 'creature', id: 'grove-bear-king', name: '森林熊王', rarity: 'SR', colors: ['green'],
+    kind: 'creature', id: 'grove-bear-king', name: '森林熊王', rarity: 'SR', colors: ['green'], race: 'beast',
     stage: 1, evolvesFrom: 'grove-bear', cost: 3, attack: 7, hp: 10,
     skills: [{ name: '巨力', cost: 4, target: NONE, effects: [{ type: 'buff', attack: 3, hp: 5, on: 'self' }] }],
   },
   {
     // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物（見開頭：數值照 R、技能貴 1 費）。
-    kind: 'creature', id: 'ancient-bear-god', name: '古樹熊神', rarity: 'UR', colors: ['green'],
+    kind: 'creature', id: 'ancient-bear-god', name: '古樹熊神', rarity: 'UR', colors: ['green'], race: 'beast',
     stage: 0, cost: 8, attack: 8, hp: 8, keywords: ['lifesteal'],
     skills: [
       { name: '森之怒', cost: 6, target: CREATURE, effects: [{ type: 'damage', amount: 7 }, { type: 'buff', attack: 1, hp: 1, on: 'self' }] },
@@ -446,50 +446,50 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     ],
   },
   {
-    kind: 'creature', id: 'grove-druid', name: '林語德魯伊', rarity: 'R', colors: ['green'],
+    kind: 'creature', id: 'grove-druid', name: '林語德魯伊', rarity: 'R', colors: ['green'], race: 'human',
     stage: 0, cost: 3, attack: 3, hp: 4,
     skills: [{ name: '催生', cost: 2, target: ALLY_CREATURE, effects: [{ type: 'buff', attack: 2, hp: 2, on: 'target' }] }],
   },
   {
-    kind: 'creature', id: 'sapling-guard', name: '樹苗守衛', rarity: 'R', colors: ['green'],
+    kind: 'creature', id: 'sapling-guard', name: '樹苗守衛', rarity: 'R', colors: ['green'], race: 'plant',
     stage: 0, cost: 2, attack: 2, hp: 2,
     entry: { name: '萌芽', target: ALLY_CREATURE, effects: [{ type: 'buff', attack: 2, hp: 2, on: 'target' }] },
     skills: [{ name: '扎根', cost: 0, rest: true, target: NONE, effects: [{ type: 'buff', attack: 0, hp: 2, on: 'self' }] }],
   },
   {
-    kind: 'creature', id: 'strangler-vine', name: '絞殺藤', rarity: 'R', colors: ['green'],
+    kind: 'creature', id: 'strangler-vine', name: '絞殺藤', rarity: 'R', colors: ['green'], race: 'plant',
     stage: 0, cost: 3, attack: 3, hp: 4,
     skills: [{ name: '纏繞', cost: 2, target: CREATURE, effects: [{ type: 'weaken' }] }],
   },
   {
-    kind: 'creature', id: 'blood-vine', name: '吸血藤', rarity: 'R', colors: ['green'],
+    kind: 'creature', id: 'blood-vine', name: '吸血藤', rarity: 'R', colors: ['green'], race: 'plant',
     stage: 0, cost: 3, attack: 3, hp: 3, keywords: ['lifesteal'],
     skills: [hit('汲取', 2, ANY, 3)],
   },
   {
-    kind: 'creature', id: 'moss-sprite', name: '苔蘚精靈', rarity: 'R', colors: ['green'],
+    kind: 'creature', id: 'moss-sprite', name: '苔蘚精靈', rarity: 'R', colors: ['green'], race: 'plant',
     stage: 0, cost: 2, attack: 2, hp: 2, regenerate: 1,
     skills: [{ name: '滋養', cost: 1, target: ALLY, effects: [{ type: 'heal', amount: 3 }] }],
   },
   {
-    kind: 'creature', id: 'vine-colossus', name: '藤蔓巨像', rarity: 'SR', colors: ['green'],
+    kind: 'creature', id: 'vine-colossus', name: '藤蔓巨像', rarity: 'SR', colors: ['green'], race: 'plant',
     stage: 0, cost: 6, attack: 6, hp: 9,
     skills: [{ name: '扎根', cost: 2, target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }] }],
   },
   {
-    kind: 'creature', id: 'elder-treant', name: '萬年樹人', rarity: 'SR', colors: ['green'],
+    kind: 'creature', id: 'elder-treant', name: '萬年樹人', rarity: 'SR', colors: ['green'], race: 'plant',
     stage: 0, cost: 7, attack: 7, hp: 10, regenerate: 2,
     skills: [{ name: '年輪', cost: 0, rest: true, target: NONE, effects: [{ type: 'buff', attack: 0, hp: 4, on: 'self' }] }],
   },
   {
     // 原本進場是能量上限 +1，但打得出 10 費時下回合就到上限 12 了，沒有用；改成全體回復。
-    kind: 'creature', id: 'mountain-giant', name: '山嶺巨人', rarity: 'SR', colors: ['green'],
+    kind: 'creature', id: 'mountain-giant', name: '山嶺巨人', rarity: 'SR', colors: ['green'], race: 'elemental',
     stage: 0, cost: 10, attack: 10, hp: 13,
     entry: { name: '大地之息', target: NONE, effects: [{ type: 'healAll', amount: 5 }] },
     skills: [{ name: '山崩', cost: 6, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }],
   },
   {
-    kind: 'creature', id: 'earth-titan', name: '大地泰坦', rarity: 'UR', colors: ['green'],
+    kind: 'creature', id: 'earth-titan', name: '大地泰坦', rarity: 'UR', colors: ['green'], race: 'elemental',
     stage: 0, cost: 12, attack: 14, hp: 15,
     entry: { name: '震地', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] },
     skills: [hit('泰坦之拳', 5, CREATURE, 7), { name: '地裂', cost: 6, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }],
@@ -514,7 +514,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
 
   // ── 紅綠 ──
   {
-    kind: 'creature', id: 'ancient-dragon', name: '遠古巨龍', rarity: 'UR', colors: ['red', 'green'],
+    kind: 'creature', id: 'ancient-dragon', name: '遠古巨龍', rarity: 'UR', colors: ['red', 'green'], race: 'dragon',
     stage: 0, cost: 8, attack: 10, hp: 11,
     skills: [
       { name: '龍息', cost: 3, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] },
@@ -523,12 +523,12 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   },
 
   // ── 衍生物（先只給白色）：只能由效果召喚，不能放進牌組，離場就消失；召喚當回合一樣不能攻擊 ──
-  { kind: 'creature', id: 'soldier-token', name: '士兵', rarity: 'N', colors: ['white'], stage: 0, cost: 0, attack: 2, hp: 2, skills: [], token: true },
+  { kind: 'creature', id: 'soldier-token', name: '士兵', rarity: 'N', colors: ['white'], race: 'human', stage: 0, cost: 0, attack: 2, hp: 2, skills: [], token: true },
   // 衍生物照同數值的白板生物算：2 隻 2/2 ≈ 兩隻 2 費生物。
   { kind: 'spell', id: 'rally', name: '集結號令', rarity: 'R', colors: ['white'], cost: 4, target: NONE, effects: [{ type: 'summonToken', token: 'soldier-token', count: 2 }] },
   {
     // 進場帶 1 隻士兵，本體扣 1 點；技能每次再叫 1 隻。
-    kind: 'creature', id: 'knight-captain', name: '騎士隊長', rarity: 'R', colors: ['white'],
+    kind: 'creature', id: 'knight-captain', name: '騎士隊長', rarity: 'R', colors: ['white'], race: 'human',
     stage: 0, cost: 5, attack: 5, hp: 5,
     entry: { name: '隨從', target: NONE, effects: [{ type: 'summonToken', token: 'soldier-token', count: 1 }] },
     skills: [{ name: '號召', cost: 3, target: NONE, effects: [{ type: 'summonToken', token: 'soldier-token', count: 1 }] }],

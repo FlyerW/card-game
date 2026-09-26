@@ -8,6 +8,8 @@ import {
   describeEntry,
   describeHero,
   other,
+  RACE_NAMES,
+  RACE_TRAITS,
   sampleDb,
   SAMPLE_CARDS,
   SAMPLE_HEROES,
@@ -641,6 +643,11 @@ const myMove = (view: PlayerView) => view.phase === 'main' && view.activePlayer 
 
 function creatureStatus(cv: CreatureView): string {
   const tags: string[] = [`⚔ ${cv.attack}${cv.attackBonus ? `（含加成 +${cv.attackBonus}）` : ''}`, `♥ ${cv.hp} / ${cv.maxHp}`];
+  const def = card(cv.cardId);
+  if (def.kind === 'creature' && def.race) {
+    const used = def.race === 'undead' && cv.undyingUsed ? '（已經用過）' : '';
+    tags.push(`${RACE_NAMES[def.race]}・${RACE_TRAITS[def.race]}${used}${cv.silenced ? '（沉默中失效）' : ''}`);
+  }
   if (cv.damageReduction) tags.push(`受到傷害 −${cv.damageReduction}`);
   if (cv.item) tags.push(`道具：${nameOf(cv.item)}`);
   if (cv.taunting) tags.push('挑釁中');
@@ -1081,12 +1088,13 @@ function setupScreen(): string {
         <li>能量：先攻第一回合 1 點、後攻 2 點，之後每回合上限 +2，最高 12。每個回合開始時補滿。</li>
         <li>點手牌出牌。生物要選一個空格召喚；道具要選自己的生物；進化卡要點場上對應的生物。</li>
         <li>每隻生物有攻擊力（⚔）和血量（♥）。血量滿的是綠色，受過傷的是紅色。</li>
-        <li>點你的生物，再點發光的對手生物或英雄就是攻擊：不花能量，只打得到正前方與左右兩個斜對角，那幾格都空著才打得到英雄。打生物時對方會用牠的攻擊力反擊，打英雄不會被反擊。技能要花能量，不會被反擊。攻擊和技能每隻每回合各一次，可以都用；召喚當回合都不行（有【速攻】的例外；進化卡都算有速攻，召喚當回合就能進化、進化完馬上能動）。</li>
+        <li>點你的生物，再點發光的對手生物或英雄就是攻擊：不花能量，只打得到正前方與左右兩個斜對角的生物，那幾格有一格空著就能打到英雄。打生物時對方會用牠的攻擊力反擊，打英雄不會被反擊。技能要花能量，不會被反擊。攻擊和技能每隻每回合各一次，可以都用；召喚當回合都不行（有【速攻】的例外；進化卡都算有速攻，召喚當回合就能進化、進化完馬上能動）。</li>
         <li>標「休息」的技能不花能量，但這回合還沒攻擊才能用，用了這回合就不能攻擊（例如挑釁）。</li>
         <li>正對面、斜對角的技能，目標格空著就會打到後面的英雄。</li>
         <li>對手的生物在挑釁時，打得到牠的攻擊只能打牠；選得到牠的技能也必須打牠，只打英雄的技能不受影響。</li>
         <li>手牌上限 10 張，滿手時抽到的牌直接進棄牌區。場地卡放在自己的場地區，只強化自己的生物。</li>
         <li>有些英雄有英雄進化卡：血量上限增加、天生技變強，每局只能進化一次。</li>
+        <li>每隻生物有種族，各有一個特色：人類同袍（有其他人類時 ⚔ +1）、野獸猛撲（召喚當回合就能攻擊生物）、亡靈不死（第一次倒下留 1♥）、元素之力（技能傷害 +1）、植物扎根（回合開始回復 1♥）、龍鱗（不中異常狀態）、構造體堅固（受到傷害 −1）、天使光輝（召喚時英雄回復 3♥）。沉默時種族特色也失效。</li>
         <li>異常狀態只會中在生物身上：中毒（施放者的回合結束時失去血量，減傷擋不住）、灼燒（施放者的回合結束時受到傷害）、麻痺（不能攻擊也不能發動技能）、沉默（不能發動技能、吸血與再生失效，身上的增益與挑釁直接消失）、虛弱（不能攻擊，也不會反擊）。後面三種都到牠的下個回合結束，進化會解除全部。</li>
         <li>把對手英雄的血量打到 0 就贏了。</li>
       </ul>

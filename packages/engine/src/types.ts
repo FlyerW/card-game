@@ -131,8 +131,18 @@ interface CardBase {
   rarity: Rarity;
 }
 
+/**
+ * 種族：每個種族有一個天生的特色（沉默時跟卡上其他效果一樣失效）。
+ * 人類：同袍（我方場上有其他人類時 ⚔ +1）；野獸：猛撲（召喚當回合就能攻擊生物）；
+ * 亡靈：不死（第一次被打倒時留下 1 HP）；元素：技能與進場效果的傷害 +1；植物：扎根（回合開始時回復 1）；
+ * 龍：龍鱗（不會中異常狀態）；構造體：堅固（受到的傷害 −1）；天使：光輝（召喚時英雄回復 3）。
+ */
+export type Race = 'human' | 'beast' | 'undead' | 'elemental' | 'plant' | 'dragon' | 'construct' | 'angel';
+
 export interface CreatureDef extends CardBase {
   kind: 'creature';
+  /** 種族；進化線上的卡同一個種族。沒有種族就沒有種族特色（測試用的卡）。 */
+  race?: Race;
   /** 0 = 基礎，1 = 進化。最多進化一次。 */
   stage: 0 | 1;
   /** 基礎生物是召喚費用，進化生物是進化費用。 */
@@ -309,6 +319,8 @@ export interface Creature {
   skillUsedTurn: number | null;
   /** 挑釁持續到這個回合結束（含）。 */
   tauntUntilTurn: number | null;
+  /** 亡靈的「不死」用過了沒（每隻一次）。 */
+  undyingUsed: boolean;
   /** 中毒的數字，0 表示沒有中毒。 */
   poison: number;
   /** 灼燒的數字，0 表示沒有灼燒。 */
@@ -448,4 +460,8 @@ export type GameEvent =
   | { type: 'statusTriggered'; player: PlayerId; zone: number; status: 'poison' | 'burn'; amount: number }
   /** 進化解除了全部異常狀態。 */
   | { type: 'statusesCleared'; player: PlayerId; zone: number }
+  /** 龍鱗：龍不會中異常狀態。 */
+  | { type: 'statusBlocked'; player: PlayerId; zone: number }
+  /** 不死：亡靈第一次被打倒，留下 1 HP。 */
+  | { type: 'undying'; player: PlayerId; zone: number }
   | { type: 'gameOver'; result: GameResult };

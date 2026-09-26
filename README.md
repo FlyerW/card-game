@@ -10,12 +10,13 @@
 ## 目前進度
 
 - [x] 規則設計：[docs/design.md](docs/design.md)（v0.8）
-- [x] 規則引擎：[`packages/engine`](packages/engine)，包括異常狀態、吸血與再生；185 個測試
+- [x] 規則引擎：[`packages/engine`](packages/engine)，包括異常狀態、吸血與再生；201 個測試
 - [x] 平衡模擬：[`packages/sim`](packages/sim)，讓機器人大量對打，比較不同規則、估算一局要打多久。結果見 [docs/balance-results.md](docs/balance-results.md)
 - [x] 網頁試玩版：[`packages/web`](packages/web)，跟電腦對戰，可以自己組牌。引擎和電腦對手都在瀏覽器裡跑，不需要伺服器
 - [x] 伺服器：兩人連線對戰（[`packages/server`](packages/server)），見下面「跟朋友連線對戰」
 - [x] 金幣、每日任務、卡包、兌換卷：規則在 [`packages/economy`](packages/economy)
 - [x] 英雄：基礎五色每個人都有，雙色以上的是 UR（卡包抽）
+- [x] 種族（8 種，各有一個特色）、生物攻擊範圍（正前方與兩個斜對角）
 - [x] 登入：測試帳號（10000 金幣、全卡，存在瀏覽器）或 Google 帳號（存在伺服器），見下面「Google 登入」
 - [ ] 網頁客戶端
 - [ ] 配對、牌位；牌組存到伺服器（目前存在瀏覽器裡）

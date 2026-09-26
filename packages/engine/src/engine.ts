@@ -1,6 +1,7 @@
 import { validateDeck } from './deck';
 import { fail, RuleError, type ErrorCode } from './errors';
 import {
+  activeRace,
   attackPower,
   cardDef,
   ceiling,
@@ -32,6 +33,7 @@ import {
   tickField,
   tickPoison,
   tickRegenerate,
+  healHero,
   type Ctx,
 } from './resolve';
 import { DEFAULT_RULES } from './rules';
@@ -255,6 +257,8 @@ function summon(ctx: Ctx, a: ActionOf<'summon'>): void {
   removeFromHand(p, card.uid);
   p.zones[a.zone] = newCreature(card.uid, a.player, card.cardId, state.turn);
   ctx.events.push({ type: 'summoned', player: a.player, zone: a.zone, cardId: card.cardId });
+  // 天使的「光輝」：召喚時你的英雄回復 3。
+  if (def.race === 'angel') healHero(ctx, a.player, ANGEL_HEAL);
   triggerEntry(ctx, def, a.player, a.zone, a.target);
 }
 
@@ -284,14 +288,25 @@ function evolve(ctx: Ctx, a: ActionOf<'evolve'>): void {
  * 攻擊與發動技能共用的檢查：召喚當回合不行，但有速攻或進化過的可以（進化卡都算有速攻）；麻痺不行。
  * 攻擊與技能每回合各一次，分開算。
  */
-function checkCanAct(ctx: Ctx, creature: Creature, what: string): void {
+function checkCanAct(ctx: Ctx, creature: Creature, what: string, target?: Target): void {
   const { db, state } = ctx;
   const def = creatureDef(db, creature);
-  const evolved = creature.cards.length > 1;
-  if (creature.summonedTurn === state.turn && !evolved && !def.keywords?.includes('haste')) {
-    fail('SUMMONED_THIS_TURN', `召喚當回合不能${what}`);
+  if (summoningSick(ctx, creature)) {
+    // 野獸的「猛撲」：召喚當回合就能攻擊生物，但不能打英雄。
+    const pounce = target !== undefined && activeRace(db, state, creature) === 'beast';
+    if (!pounce) fail('SUMMONED_THIS_TURN', `召喚當回合不能${what}`);
+    if (target.kind !== 'creature') fail('POUNCE_CREATURES_ONLY', `${def.name} 是野獸，召喚當回合只能攻擊生物，不能打英雄`);
   }
   if (isParalyzed(state, creature)) fail('PARALYZED', `${def.name} 麻痺中，不能${what}`);
+}
+
+/** 天使的「光輝」召喚時回復多少。 */
+const ANGEL_HEAL = 3;
+
+/** 召喚當回合還不能行動：不是進化來的，也沒有速攻。 */
+function summoningSick(ctx: Ctx, creature: Creature): boolean {
+  const evolved = creature.cards.length > 1;
+  return creature.summonedTurn === ctx.state.turn && !evolved && !creatureDef(ctx.db, creature).keywords?.includes('haste');
 }
 
 /** 生物攻擊：不花能量，每回合一次；發動了【休息】技能就不能攻擊。 */
@@ -299,7 +314,7 @@ function attack(ctx: Ctx, a: ActionOf<'attack'>): void {
   const { db, state } = ctx;
   const creature = ownCreature(state, a.player, a.zone);
   const def = creatureDef(db, creature);
-  checkCanAct(ctx, creature, '攻擊');
+  checkCanAct(ctx, creature, '攻擊', a.target);
   if (creature.attackedTurn === state.turn) fail('ALREADY_ATTACKED', `${def.name} 這回合已經攻擊過（或休息了）`);
   if (isWeakened(state, creature)) fail('WEAKENED', `${def.name} 虛弱中，不能攻擊`);
   if (attackPower(db, state, creature) <= 0) fail('NO_ATTACK', `${def.name} 的攻擊力是 0，不能攻擊`);
@@ -309,7 +324,7 @@ function attack(ctx: Ctx, a: ActionOf<'attack'>): void {
     const target = a.target;
     if (target.player !== enemy || target.kind === 'field') fail('ILLEGAL_TARGET', '只能攻擊對手的生物或英雄');
     if (target.kind === 'creature' && state.players[enemy].zones[target.zone] == null) fail('ILLEGAL_TARGET', '那一格沒有生物');
-    if (target.kind === 'hero') fail('OUT_OF_RANGE', '正前方或斜對角還有對手的生物，要先打倒牠們才打得到英雄');
+    if (target.kind === 'hero') fail('OUT_OF_RANGE', '正前方與斜對角都被對手的生物擋住，打不到英雄');
     if (!attackZones(state, a.zone).includes(target.zone)) fail('OUT_OF_RANGE', '只能攻擊正前方與左右兩個斜對角');
     fail('MUST_TARGET_TAUNT', '打得到的範圍裡有挑釁中的生物，必須先攻擊牠');
   }

@@ -74,7 +74,7 @@ function put(state: GameState, player: PlayerId, zone: number, cardId: string, d
   const uid = state.nextUid++;
   const creature: Creature = {
     uid, owner: player, cards: [{ uid, cardId }], damage, attackCounters: 0, hpCounters: 0, item: null,
-    summonedTurn: 0, attackedTurn: null, skillUsedTurn: null, tauntUntilTurn: null,
+    summonedTurn: 0, undyingUsed: false, attackedTurn: null, skillUsedTurn: null, tauntUntilTurn: null,
     poison: 0, burn: 0, paralyzedUntilTurn: null, silencedUntilTurn: null, weakenedUntilTurn: null,
   };
   state.players[player].zones[zone] = creature;

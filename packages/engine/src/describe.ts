@@ -1,8 +1,31 @@
-import type { Ability, Color, CreatureDef, CreatureModifier, DeckCardDef, Effect, HeroDef, HeroPassive, TargetSpec } from './types';
+import type { Ability, Color, CreatureDef, CreatureModifier, DeckCardDef, Effect, HeroDef, HeroPassive, Race, TargetSpec } from './types';
 
 // 卡面文字由資料產生，不另外手寫，資料和說明才不會對不上。
 
 export const COLOR_NAMES: Record<Color, string> = { white: '白', blue: '藍', black: '黑', red: '紅', green: '綠' };
+
+export const RACE_NAMES: Record<Race, string> = {
+  human: '人類',
+  beast: '野獸',
+  undead: '亡靈',
+  elemental: '元素',
+  plant: '植物',
+  dragon: '龍',
+  construct: '構造體',
+  angel: '天使',
+};
+
+/** 每個種族的特色：名字與說明。 */
+export const RACE_TRAITS: Record<Race, string> = {
+  human: '同袍：我方場上有其他人類時 ⚔ +1',
+  beast: '猛撲：召喚當回合就能攻擊生物（不能打英雄）',
+  undead: '不死：第一次被打倒時，留下 1♥',
+  elemental: '元素之力：技能與進場效果的傷害 +1',
+  plant: '扎根：你的回合開始時回復 1♥',
+  dragon: '龍鱗：不會中異常狀態',
+  construct: '堅固：受到的傷害 −1',
+  angel: '光輝：召喚時你的英雄回復 3♥',
+};
 
 export const describeColors = (colors: readonly Color[]): string =>
   colors.length === 0 ? '無色' : colors.map((color) => COLOR_NAMES[color]).join('');
@@ -104,9 +127,10 @@ export function describeAbility(ability: Ability, names: Names = ids): string {
 export const describeEntry = (entry: Omit<Ability, 'cost'>, names: Names = ids): string =>
   `進場 ${entry.name}：${describeEffects(entry, names)}`;
 
-/** 關鍵字與再生，各自一行說明。 */
+/** 種族特色、關鍵字與再生，各自一行說明。 */
 function describeTraits(card: CreatureDef): string[] {
   const lines: string[] = [];
+  if (card.race) lines.push(`${RACE_NAMES[card.race]}・${RACE_TRAITS[card.race]}`);
   if (card.keywords?.includes('haste')) lines.push('速攻：召喚當回合就能攻擊或發動技能');
   else if (card.evolvesFrom !== undefined) lines.push('速攻（進化卡都有）：召喚當回合也能進化，進化完馬上能攻擊或發動技能');
   if (card.keywords?.includes('lifesteal')) lines.push('吸血：牠造成傷害時（攻擊、反擊、技能），你的英雄回復等量的 ♥');
@@ -157,11 +181,12 @@ export function describeCard(card: DeckCardDef, names: Names = ids): string[] {
   const cost = `能量 ${card.cost}`;
   switch (card.kind) {
     case 'creature': {
-      if (card.token) return [`${card.name}　${tag}・衍生物（不能放進牌組）｜⚔ ${card.attack}｜♥ ${card.hp}`, ...describeTraits(card)];
+      const race = card.race ? `・${RACE_NAMES[card.race]}` : '';
+      if (card.token) return [`${card.name}　${tag}${race}・衍生物（不能放進牌組）｜⚔ ${card.attack}｜♥ ${card.hp}`, ...describeTraits(card)];
       const stage = card.evolvesFrom === undefined ? '基礎' : `由${names(card.evolvesFrom)}進化`;
       const entry = card.entry ? [describeEntry(card.entry, names)] : [];
       const skills = card.skills.map((skill) => describeAbility(skill, names));
-      return [`${card.name}　${tag}・${stage}｜${cost}｜⚔ ${card.attack}｜♥ ${card.hp}`, ...describeTraits(card), ...entry, ...skills];
+      return [`${card.name}　${tag}${race}・${stage}｜${cost}｜⚔ ${card.attack}｜♥ ${card.hp}`, ...describeTraits(card), ...entry, ...skills];
     }
     case 'spell':
       return [`${card.name}　${tag}・法術｜${cost}`, describeEffects(card, names)];

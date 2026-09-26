@@ -13,6 +13,7 @@ import type {
   ItemDef,
   Keyword,
   PlayerId,
+  Race,
 } from './types';
 
 export const other = (player: PlayerId): PlayerId => (player === 0 ? 1 : 0);
@@ -100,9 +101,22 @@ export const maxHp = (db: CardDb, state: GameState, creature: Creature): number 
 export const currentHp = (db: CardDb, state: GameState, creature: Creature): number =>
   maxHp(db, state, creature) - creature.damage;
 
-/** 攻擊力加成：攻擊指示物、道具、場地卡與英雄被動。 */
+/** 發揮作用的種族：沉默時種族特色跟卡上其他效果一樣失效。 */
+export const activeRace = (db: CardDb, state: GameState, creature: Creature): Race | null =>
+  isSilenced(state, creature) ? null : (creatureDef(db, creature).race ?? null);
+
+/** 人類的「同袍」：我方場上有其他人類時 ⚔ +1。 */
+function comradeBonus(db: CardDb, state: GameState, creature: Creature): number {
+  if (activeRace(db, state, creature) !== 'human') return 0;
+  const others = state.players[creature.owner].zones.some(
+    (other) => other !== null && other.uid !== creature.uid && creatureDef(db, other).race === 'human',
+  );
+  return others ? 1 : 0;
+}
+
+/** 攻擊力加成：攻擊指示物、道具、場地卡、英雄被動與種族特色。 */
 export const attackBonus = (db: CardDb, state: GameState, creature: Creature): number =>
-  creature.attackCounters + (itemDef(db, creature)?.attack ?? 0) + aura(db, state, creature.owner).attack;
+  creature.attackCounters + (itemDef(db, creature)?.attack ?? 0) + aura(db, state, creature.owner).attack + comradeBonus(db, state, creature);
 
 /** 目前的攻擊力：卡上的攻擊力加上加成。 */
 export const attackPower = (db: CardDb, state: GameState, creature: Creature): number =>
@@ -122,12 +136,17 @@ export function fieldDef(db: CardDb, state: GameState, player: PlayerId): FieldD
   return def.kind === 'field' ? def : null;
 }
 
+/** 減傷：道具、場地卡與英雄被動，加上構造體的「堅固」。 */
 export const damageReduction = (db: CardDb, state: GameState, creature: Creature): number =>
-  (itemDef(db, creature)?.damageReduction ?? 0) + aura(db, state, creature.owner).damageReduction;
+  (itemDef(db, creature)?.damageReduction ?? 0) +
+  aura(db, state, creature.owner).damageReduction +
+  (activeRace(db, state, creature) === 'construct' ? 1 : 0);
 
-/** 再生：卡上的再生（沉默時失效），加上英雄被動與場地卡給的。 */
+/** 再生：卡上的再生與植物的「扎根」（沉默時失效），加上英雄被動與場地卡給的。 */
 export const regeneration = (db: CardDb, state: GameState, creature: Creature): number =>
-  (isSilenced(state, creature) ? 0 : (creatureDef(db, creature).regenerate ?? 0)) + aura(db, state, creature.owner).regenerate;
+  (isSilenced(state, creature) ? 0 : (creatureDef(db, creature).regenerate ?? 0)) +
+  (activeRace(db, state, creature) === 'plant' ? 1 : 0) +
+  aura(db, state, creature.owner).regenerate;
 
 /** 這隻生物是衍生物（token）。 */
 export const isToken = (db: CardDb, creature: Creature): boolean => creatureDef(db, creature).token === true;

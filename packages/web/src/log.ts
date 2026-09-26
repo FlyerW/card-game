@@ -170,6 +170,12 @@ export function describeEvents(
       case 'statusesCleared':
         lines.push({ text: `　${ZONE[event.zone]} 進化，異常狀態全部解除`, tone: 'turn' });
         break;
+      case 'statusBlocked':
+        lines.push({ text: `　${targetText({ kind: 'creature', player: event.player, zone: event.zone })}是龍，不受異常狀態影響`, tone: 'turn' });
+        break;
+      case 'undying':
+        lines.push({ text: `　${targetText({ kind: 'creature', player: event.player, zone: event.zone })}不死，留下 1♥`, tone: 'turn' });
+        break;
       case 'gameOver': {
         const { winner, reason } = event.result;
         const why = { heroDefeated: '英雄被打倒', deckOut: '牌庫抽完', concede: '投降' }[reason];

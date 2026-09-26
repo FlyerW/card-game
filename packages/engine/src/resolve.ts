@@ -6,6 +6,7 @@ import {
   currentCardId,
   currentHp,
   damageReduction,
+  activeRace,
   fieldDef,
   hasLifesteal,
   heroHp,
@@ -98,6 +99,7 @@ export function newCreature(uid: number, owner: PlayerId, cardId: string, turn: 
     hpCounters: 0,
     item: null,
     summonedTurn: turn,
+    undyingUsed: false,
     attackedTurn: null,
     skillUsedTurn: null,
     tauntUntilTurn: null,
@@ -121,12 +123,19 @@ function removeCreature(ctx: Ctx, player: PlayerId, zone: number): void {
   ctx.events.push({ type: 'creatureDestroyed', player, zone, cardId: currentCardId(creature) });
 }
 
-/** 清掉 HP 歸零的生物，再檢查英雄。每個效果結算完都要跑一次。 */
+/** 清掉 HP 歸零的生物，再檢查英雄。每個效果結算完都要跑一次。亡靈第一次倒下會留下 1 HP。 */
 export function cleanup(ctx: Ctx): void {
   const { db, state } = ctx;
   for (const player of [0, 1] as const) {
     state.players[player].zones.forEach((creature, zone) => {
-      if (creature !== null && currentHp(db, state, creature) <= 0) removeCreature(ctx, player, zone);
+      if (creature === null || currentHp(db, state, creature) > 0) return;
+      if (!creature.undyingUsed && activeRace(db, state, creature) === 'undead' && maxHp(db, state, creature) > 0) {
+        creature.undyingUsed = true;
+        creature.damage = maxHp(db, state, creature) - 1;
+        ctx.events.push({ type: 'undying', player, zone });
+        return;
+      }
+      removeCreature(ctx, player, zone);
     });
   }
   if (state.phase === 'over') return;
@@ -162,7 +171,7 @@ function dealDamage(ctx: Ctx, target: Target, creature: Creature | null, amount:
   return 0;
 }
 
-function healHero(ctx: Ctx, player: PlayerId, amount: number): void {
+export function healHero(ctx: Ctx, player: PlayerId, amount: number): void {
   const owner = ctx.state.players[player];
   const healed = Math.min(amount, owner.heroDamage);
   owner.heroDamage -= healed;
@@ -192,6 +201,10 @@ function stripEffects(ctx: Ctx, creature: Creature): void {
 /** 對一隻生物施加異常狀態。 */
 function inflict(ctx: Ctx, creature: Creature, player: PlayerId, zone: number, effect: StatusEffect): void {
   const { state } = ctx;
+  if (activeRace(ctx.db, state, creature) === 'dragon') {
+    ctx.events.push({ type: 'statusBlocked', player, zone });
+    return;
+  }
   let status: StatusKind;
   let amount: number | undefined;
   switch (effect.type) {
@@ -335,10 +348,13 @@ function applyEffect(
     if (sourceCreature !== null) lifesteal(ctx, sourceCreature, dealt);
   };
 
+  // 元素的「元素之力」：牠的技能與進場效果傷害 +1。
+  const elemental = sourceCreature !== null && activeRace(db, state, sourceCreature) === 'elemental' ? 1 : 0;
+
   switch (effect.type) {
     case 'damage':
       if (target !== null && (target.kind === 'hero' || creature !== null)) {
-        steal(dealDamage(ctx, target, creature, effect.amount));
+        steal(dealDamage(ctx, target, creature, effect.amount + elemental));
       }
       return;
 
@@ -346,7 +362,7 @@ function applyEffect(
       const enemy = other(me);
       let dealt = 0;
       state.players[enemy].zones.forEach((each, zone) => {
-        if (each !== null) dealt += dealDamage(ctx, { kind: 'creature', player: enemy, zone }, each, effect.amount);
+        if (each !== null) dealt += dealDamage(ctx, { kind: 'creature', player: enemy, zone }, each, effect.amount + elemental);
       });
       steal(dealt);
       return;

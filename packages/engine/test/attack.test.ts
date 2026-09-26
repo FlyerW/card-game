@@ -133,6 +133,7 @@ describe('攻擊', () => {
     expect(attacks).toEqual([
       { type: 'attack', player: a, zone: 0, target: hero(b) }, // 0 號格打得到 0、1 號格，都空著
       { type: 'attack', player: a, zone: 3, target: creatureAt(b, 2) },
+      { type: 'attack', player: a, zone: 3, target: hero(b) }, // 3、4 號格空著，打得到英雄
     ]);
   });
 });
@@ -325,14 +326,14 @@ describe('攻擊範圍', () => {
     expect(reject(state, { type: 'attack', player: a, zone: 2, target: creatureAt(b, 4) })).toBe('OUT_OF_RANGE');
   });
 
-  it('範圍裡有生物就打不到英雄；範圍裡都空著才打得到', () => {
+  it('範圍裡只要有一格空著就打得到英雄；三格都被擋住就打不到', () => {
     let { state, a, b } = start();
-    place(state, a, 0, 'brute');
+    place(state, a, 0, 'brute'); // 範圍是 0、1 號格
     place(state, b, 1, 'wall');
-    expect(reject(state, { type: 'attack', player: a, zone: 0, target: hero(b) })).toBe('OUT_OF_RANGE');
-    state.players[b].zones[1] = null;
-    place(state, b, 2, 'wall'); // 2 號格不在 0 號格的範圍內
-    state = act(state, { type: 'attack', player: a, zone: 0, target: hero(b) });
+    state = act(state, { type: 'attack', player: a, zone: 0, target: hero(b) }); // 從空著的 0 號格打過去
     expect(state.players[b].heroDamage).toBe(5);
+    state = endTurn(endTurn(state));
+    place(state, b, 0, 'wall');
+    expect(reject(state, { type: 'attack', player: a, zone: 0, target: hero(b) })).toBe('OUT_OF_RANGE');
   });
 });

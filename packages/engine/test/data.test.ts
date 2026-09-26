@@ -59,6 +59,20 @@ describe('範例英雄', () => {
   });
 });
 
+describe('種族', () => {
+  it('每隻範例生物都有種族，進化線上的卡同一個種族', () => {
+    const sample = sampleDb();
+    for (const card of sample.cards.values()) {
+      if (card.kind !== 'creature') continue;
+      expect(card.race, card.name).toBeDefined();
+      if (card.evolvesFrom) {
+        const base = sample.cards.get(card.evolvesFrom)!;
+        expect(base.kind === 'creature' && base.race, card.name).toBe(card.race);
+      }
+    }
+  });
+});
+
 describe('範例卡池', () => {
   const sample = sampleDb();
   const colors = ['white', 'blue', 'black', 'red', 'green'] as const;

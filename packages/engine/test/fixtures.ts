@@ -166,6 +166,15 @@ export const TEST_CARDS: DeckCardDef[] = [
     keywords: ['lifesteal'],
   }),
   creature('moss', [hit('x', ANY, 1), hit('y', ANY, 1)], { regenerate: 2 }),
+  // 種族
+  creature('footman', [], { rarity: 'N', race: 'human', attack: 2, hp: 4 }),
+  creature('pouncer', [], { rarity: 'N', race: 'beast', attack: 3, hp: 4 }),
+  creature('ghoul', [], { rarity: 'N', race: 'undead', attack: 2, hp: 3 }),
+  creature('sprite', [hit('zap', ANY, 2)], { race: 'elemental', hp: 4 }),
+  creature('sapling', [], { rarity: 'N', race: 'plant', attack: 1, hp: 5 }),
+  creature('drake', [], { rarity: 'N', race: 'dragon', attack: 3, hp: 6 }),
+  creature('golem', [], { rarity: 'N', race: 'construct', attack: 2, hp: 6 }),
+  creature('cherub', [], { rarity: 'N', race: 'angel', attack: 2, hp: 3 }),
   creature('burnout', [
     { name: 'sacrifice', cost: 0, maxEnergyCost: 2, target: ANY, effects: [{ type: 'damage', amount: 4 }] },
   ]),
