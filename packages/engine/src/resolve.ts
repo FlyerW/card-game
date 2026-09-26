@@ -4,17 +4,19 @@ import {
   cardDef,
   ceiling,
   currentCardId,
+  creatureDef,
   currentHp,
   damageReduction,
-  activeRace,
   fieldDef,
   hasLifesteal,
   heroHp,
+  isSilenced,
   isToken,
   isWeakened,
   maxHp,
   other,
   ownersTurn,
+  raceTrait,
   regeneration,
 } from './queries';
 import type { AbilitySource } from './targeting';
@@ -23,6 +25,7 @@ import type {
   CardDb,
   CardRef,
   Creature,
+  DeathEffect,
   Effect,
   GameEvent,
   GameResult,
@@ -30,6 +33,7 @@ import type {
   PlayerId,
   StatusKind,
   Target,
+  TriggerWhen,
 } from './types';
 
 /** 一個動作執行期間的工作區：狀態是複本，出錯時整份丟掉，不會留下改到一半的狀態。 */
@@ -37,6 +41,8 @@ export interface Ctx {
   db: CardDb;
   state: GameState;
   events: GameEvent[];
+  /** 正在結算「每當英雄回復」的持續效果；這時再回復不會再觸發，免得無限循環。 */
+  healTriggering?: boolean;
 }
 
 export function randomInt(ctx: Ctx, bound: number): number {
@@ -121,36 +127,68 @@ export function newCreature(uid: number, owner: PlayerId, cardId: string, turn: 
 }
 
 /** 把生物連同進化堆疊與道具送進棄牌區。 */
-function removeCreature(ctx: Ctx, player: PlayerId, zone: number): void {
+/** 死掉的生物，等著發動遺言。 */
+interface Fallen {
+  player: PlayerId;
+  zone: number;
+  creature: Creature;
+  death: DeathEffect;
+}
+
+/** 生物離場（死掉或被消滅）。有遺言、而且不在沉默中的，回傳等著發動的遺言。 */
+function removeCreature(ctx: Ctx, player: PlayerId, zone: number): Fallen | null {
   const p = ctx.state.players[player];
   const creature = p.zones[zone];
-  if (creature == null) return;
+  if (creature == null) return null;
+  const death = isSilenced(ctx.state, creature) ? undefined : creatureDef(ctx.db, creature).death;
   p.zones[zone] = null;
   // 衍生物離場就消失；身上的道具照樣進棄牌區。
   if (!isToken(ctx.db, creature)) p.discard.push(...creature.cards);
   if (creature.item !== null) p.discard.push(creature.item);
   ctx.events.push({ type: 'creatureDestroyed', player, zone, cardId: currentCardId(creature) });
+  return death ? { player, zone, creature, death } : null;
 }
 
-/** 清掉 HP 歸零的生物，再檢查英雄。每個效果結算完都要跑一次。亡靈第一次倒下會留下 1 HP。 */
+/**
+ * 發動遺言：照順序一個一個結算。遺言打死的生物會再發動牠們的遺言。
+ * 有英雄倒下、對局結束了就不再發動。
+ */
+function triggerDeaths(ctx: Ctx, fallen: Fallen[]): void {
+  for (const { player, zone, creature, death } of fallen) {
+    if (ctx.state.phase === 'over') return;
+    ctx.events.push({ type: 'deathTriggered', player, zone, cardId: currentCardId(creature), name: death.name });
+    resolveAbility(ctx, death, { kind: 'creature', player, zone }, null, creature);
+  }
+}
+
+/**
+ * 清掉 HP 歸零的生物，再檢查英雄，最後發動遺言。每個效果結算完都要跑一次。亡靈第一次倒下會留下 1 HP。
+ * 遺言的順序：回合玩家的先，同一邊由左到右。
+ */
 export function cleanup(ctx: Ctx): void {
   const { db, state } = ctx;
-  for (const player of [0, 1] as const) {
+  const fallen: Fallen[] = [];
+  for (const player of [state.activePlayer, other(state.activePlayer)]) {
     state.players[player].zones.forEach((creature, zone) => {
       if (creature === null || currentHp(db, state, creature) > 0) return;
-      if (!creature.undyingUsed && activeRace(db, state, creature) === 'undead' && maxHp(db, state, creature) > 0) {
+      // 亡靈的「不死 N」：第一次倒下留 N HP（不超過上限）。
+      const undying = raceTrait(db, state, creature, 'undead');
+      if (!creature.undyingUsed && undying > 0 && maxHp(db, state, creature) > 0) {
+        const hp = Math.min(undying, maxHp(db, state, creature));
         creature.undyingUsed = true;
-        creature.damage = maxHp(db, state, creature) - 1;
-        ctx.events.push({ type: 'undying', player, zone });
+        creature.damage = maxHp(db, state, creature) - hp;
+        ctx.events.push({ type: 'undying', player, zone, hp });
         return;
       }
-      removeCreature(ctx, player, zone);
+      const dead = removeCreature(ctx, player, zone);
+      if (dead) fallen.push(dead);
     });
   }
   if (state.phase === 'over') return;
   const defeated = ([0, 1] as const).filter((player) => heroHp(db, state, player) <= 0);
   if (defeated.length === 2) endGame(ctx, { winner: 'draw', reason: 'heroDefeated' });
   else if (defeated.length === 1) endGame(ctx, { winner: other(defeated[0]!), reason: 'heroDefeated' });
+  triggerDeaths(ctx, fallen);
 }
 
 /** 目標格子現在那隻生物的 uid。 */
@@ -185,6 +223,30 @@ export function healHero(ctx: Ctx, player: PlayerId, amount: number): void {
   const owner = ctx.state.players[player];
   owner.heroDamage -= amount;
   ctx.events.push({ type: 'healed', target: { kind: 'hero', player }, amount });
+  if (amount > 0 && !ctx.healTriggering) {
+    ctx.healTriggering = true;
+    fireTriggers(ctx, player, 'heroHealed');
+    ctx.healTriggering = false;
+  }
+}
+
+/**
+ * 發動 player 場上生物的持續效果（when 這一種），由左到右。沉默中的不發動；
+ * 前面的效果打死了後面的生物，牠就不發動。
+ */
+export function fireTriggers(ctx: Ctx, player: PlayerId, when: TriggerWhen): void {
+  const { db, state } = ctx;
+  const present = [...state.players[player].zones];
+  present.forEach((was, zone) => {
+    if (was === null) return;
+    for (const trigger of creatureDef(db, was).triggers ?? []) {
+      const creature = state.players[player].zones[zone];
+      if (state.phase === 'over' || creature?.uid !== was.uid || isSilenced(state, creature)) return;
+      if (trigger.when !== when) continue;
+      ctx.events.push({ type: 'triggered', player, zone, cardId: currentCardId(creature), name: trigger.name });
+      resolveAbility(ctx, trigger, { kind: 'creature', player, zone }, null);
+    }
+  });
 }
 
 function healCreature(ctx: Ctx, creature: Creature, target: Target, amount: number): void {
@@ -210,7 +272,7 @@ function stripEffects(ctx: Ctx, creature: Creature): void {
 /** 對一隻生物施加異常狀態。 */
 function inflict(ctx: Ctx, creature: Creature, player: PlayerId, zone: number, effect: StatusEffect): void {
   const { state } = ctx;
-  if (activeRace(ctx.db, state, creature) === 'dragon') {
+  if (raceTrait(ctx.db, state, creature, 'dragon') > 0) {
     ctx.events.push({ type: 'statusBlocked', player, zone });
     return;
   }
@@ -357,8 +419,8 @@ function applyEffect(
     if (sourceCreature !== null) lifesteal(ctx, sourceCreature, dealt);
   };
 
-  // 元素的「元素之力」：牠的技能與進場效果傷害 +1。
-  const elemental = sourceCreature !== null && activeRace(db, state, sourceCreature) === 'elemental' ? 1 : 0;
+  // 元素的「元素之力 N」：牠的技能、進場效果與遺言的傷害 +N。
+  const elemental = sourceCreature === null ? 0 : raceTrait(db, state, sourceCreature, 'elemental');
 
   switch (effect.type) {
     case 'damage':
@@ -397,6 +459,10 @@ function applyEffect(
       else if (creature !== null) healCreature(ctx, creature, target!, effect.amount);
       return;
 
+    case 'healHero':
+      healHero(ctx, me, effect.amount);
+      return;
+
     case 'healAll':
       healHero(ctx, me, effect.amount);
       player.zones.forEach((each, zone) => {
@@ -405,12 +471,17 @@ function applyEffect(
       return;
 
     case 'destroyCreature':
-      if (creature !== null && target?.kind === 'creature') removeCreature(ctx, target.player, target.zone);
+      if (creature !== null && target?.kind === 'creature') {
+        const dead = removeCreature(ctx, target.player, target.zone);
+        if (dead) triggerDeaths(ctx, [dead]);
+      }
       return;
 
     case 'summonToken':
       for (let i = 0; i < effect.count; i++) {
-        const zone = player.zones.findIndex((each) => each === null);
+        // 遺言召喚的：第一隻放回死掉那隻原本的格子。
+        const vacated = source.kind === 'creature' && sourceCreature !== null && player.zones[source.zone] === null;
+        const zone = vacated ? source.zone : player.zones.findIndex((each) => each === null);
         if (zone === -1) return;
         const uid = state.nextUid++;
         player.zones[zone] = newCreature(uid, me, effect.token, state.turn);
@@ -553,10 +624,17 @@ function applyEffect(
  * 依序結算一個技能、天生技或法術的每個效果。
  * 前一個效果打倒了目標生物，針對它的效果就不發動。
  */
-export function resolveAbility(ctx: Ctx, ability: Ability, source: AbilitySource, target: Target | null): void {
+export function resolveAbility(
+  ctx: Ctx,
+  ability: Pick<Ability, 'name' | 'effects'>,
+  source: AbilitySource,
+  target: Target | null,
+  /** 遺言用：已經離場的那隻生物（元素之力、吸血照樣看牠）。 */
+  fallen: Creature | null = null,
+): void {
   const { state } = ctx;
   const targetUid = targetCreatureUid(state, target);
-  const sourceCreature = source.kind === 'creature' ? (state.players[source.player].zones[source.zone] ?? null) : null;
+  const sourceCreature = fallen ?? (source.kind === 'creature' ? (state.players[source.player].zones[source.zone] ?? null) : null);
   for (const effect of ability.effects) {
     if (state.phase === 'over') return;
     applyEffect(ctx, effect, source, sourceCreature, target, targetUid, ability.name);

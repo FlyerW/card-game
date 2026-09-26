@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { SAMPLE_HEROES, sampleDb } from '../src/cards/sample';
 import { buildCardDb, CardDataError } from '../src/db';
 import { copyLimit, deckPool, validateDeck } from '../src/deck';
-import { describeCard } from '../src/describe';
+import { describeCard, explainKeywords } from '../src/describe';
 import { DEFAULT_RULES } from '../src/rules';
 import type { Ability, DeckCardDef, HeroDef } from '../src/types';
 import { db } from './helpers';
@@ -105,18 +105,19 @@ describe('範例卡池', () => {
     }
   });
 
-  it('技能數照稀有度：N 沒有、R 與 SR 一個、UR 兩個', () => {
+  it('技能數照稀有度：N 沒有、R 與 SR 一個、UR 兩個（持續效果算一個技能）', () => {
     const expected = { N: 0, R: 1, SR: 1, UR: 2 } as const;
     for (const card of sample.cards.values()) {
-      if (card.kind === 'creature') expect(card.skills.length, card.name).toBe(expected[card.rarity]);
+      if (card.kind === 'creature') expect(card.skills.length + (card.triggers?.length ?? 0), card.name).toBe(expected[card.rarity]);
     }
   });
 
   it('無色生物比同費用、同稀有度的有色生物弱一點', () => {
     const stats = (card: DeckCardDef) => (card.kind === 'creature' ? card.attack + card.hp : 0);
-    // 有進場效果、關鍵字或再生的生物，數值本來就扣過，不拿來比。
+    // 有進場效果、關鍵字、再生、持續效果或遺言的生物，數值本來就扣過，不拿來比。
     const creatures = [...sample.cards.values()].filter(
-      (card) => card.kind === 'creature' && card.stage === 0 && !card.entry && !card.keywords && !card.regenerate,
+      (card) =>
+        card.kind === 'creature' && card.stage === 0 && !card.entry && !card.keywords && !card.regenerate && !card.triggers && !card.death,
     );
     for (const plain of creatures.filter((card) => card.colors.length === 0)) {
       const rivals = creatures.filter((card) => card.colors.length > 0 && card.cost === plain.cost && card.rarity === plain.rarity);
@@ -138,14 +139,22 @@ describe('卡面文字', () => {
     const hound = db.cards.get('hound')!;
     expect(describeCard(hound, (id) => db.cards.get(id)!.name)).toEqual([
       'hound　R・無色・由pup進化｜能量 2｜⚔ 2｜♥ 10',
-      '速攻（進化卡都有）：召喚當回合也能進化，進化完馬上能攻擊或發動技能',
+      '**速攻**',
       'bite2（能量 1）：〔任意目標〕造成 2 傷害',
       'sniff（能量 1）：抽 1 張牌',
     ]);
   });
 
   it('費用一律寫成「能量 N」，法術不重複寫名字', () => {
-    expect(describeCard(db.cards.get('dart')!)).toEqual(['dart　N・無色・法術｜能量 1', '〔任意目標〕造成 1 傷害，中毒 2（你的每個回合結束時，牠失去 2♥）']);
+    expect(describeCard(db.cards.get('dart')!)).toEqual(['dart　N・無色・法術｜能量 1', '〔任意目標〕造成 1 傷害，**中毒 2**']);
+  });
+
+  it('關鍵字寫成粗體，意思另外列出，數字帶進說明', () => {
+    expect(explainKeywords(['〔任意目標〕造成 1 傷害，**中毒 2**', '**速攻**、**同袍 2**'])).toEqual([
+      '**中毒 2**：施放者的每個回合結束時失去 2♥（不算傷害，減傷擋不住；再中一次相加）',
+      '**速攻**：召喚當回合就能攻擊或發動技能；進化卡都有速攻，召喚當回合也能進化，進化完馬上能動',
+      '**同袍 2**：我方場上有其他人類時 ⚔ +2',
+    ]);
   });
 });
 

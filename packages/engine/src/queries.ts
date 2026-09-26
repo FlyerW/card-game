@@ -101,17 +101,27 @@ export const maxHp = (db: CardDb, state: GameState, creature: Creature): number 
 export const currentHp = (db: CardDb, state: GameState, creature: Creature): number =>
   maxHp(db, state, creature) - creature.damage;
 
-/** 發揮作用的種族：沉默時種族特色跟卡上其他效果一樣失效。 */
-export const activeRace = (db: CardDb, state: GameState, creature: Creature): Race | null =>
-  isSilenced(state, creature) ? null : (creatureDef(db, creature).race ?? null);
+/** 種族特色的預設強度：光輝回復 3，其他都是 1。 */
+export const TRAIT_BASE: Record<Race, number> = { human: 1, beast: 1, undead: 1, elemental: 1, plant: 1, dragon: 1, machine: 1, angel: 3 };
 
-/** 人類的「同袍」：我方場上有其他人類時 ⚔ +1。 */
+/** 卡上寫的種族特色強度；0 = 沒有種族特色。 */
+export const traitOf = (def: CreatureDef): number => (def.race === undefined ? 0 : (def.trait ?? TRAIT_BASE[def.race]));
+
+/** 發揮作用的種族特色強度：不是這個種族、卡上沒有特色，或沉默中（跟卡上其他效果一樣失效），就是 0。 */
+export function raceTrait(db: CardDb, state: GameState, creature: Creature, race: Race): number {
+  if (isSilenced(state, creature)) return 0;
+  const def = creatureDef(db, creature);
+  return def.race === race ? traitOf(def) : 0;
+}
+
+/** 人類的「同袍 N」：我方場上有其他人類時 ⚔ +N。 */
 function comradeBonus(db: CardDb, state: GameState, creature: Creature): number {
-  if (activeRace(db, state, creature) !== 'human') return 0;
+  const level = raceTrait(db, state, creature, 'human');
+  if (level === 0) return 0;
   const others = state.players[creature.owner].zones.some(
     (other) => other !== null && other.uid !== creature.uid && creatureDef(db, other).race === 'human',
   );
-  return others ? 1 : 0;
+  return others ? level : 0;
 }
 
 /** 攻擊力加成：攻擊指示物、道具、場地卡、英雄被動與種族特色。 */
@@ -136,16 +146,16 @@ export function fieldDef(db: CardDb, state: GameState, player: PlayerId): FieldD
   return def.kind === 'field' ? def : null;
 }
 
-/** 減傷：道具、場地卡與英雄被動，加上構造體的「堅固」。 */
+/** 減傷：道具、場地卡與英雄被動，加上機械的「堅固 N」。 */
 export const damageReduction = (db: CardDb, state: GameState, creature: Creature): number =>
   (itemDef(db, creature)?.damageReduction ?? 0) +
   aura(db, state, creature.owner).damageReduction +
-  (activeRace(db, state, creature) === 'construct' ? 1 : 0);
+  raceTrait(db, state, creature, 'machine');
 
 /** 再生：卡上的再生與植物的「扎根」（沉默時失效），加上英雄被動與場地卡給的。 */
 export const regeneration = (db: CardDb, state: GameState, creature: Creature): number =>
   (isSilenced(state, creature) ? 0 : (creatureDef(db, creature).regenerate ?? 0)) +
-  (activeRace(db, state, creature) === 'plant' ? 1 : 0) +
+  raceTrait(db, state, creature, 'plant') +
   aura(db, state, creature.owner).regenerate;
 
 /** 這隻生物是衍生物（token）。 */

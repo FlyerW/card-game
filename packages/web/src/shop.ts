@@ -3,6 +3,7 @@ import {
   copyLimit,
   DEFAULT_RULES,
   describeCard,
+  cardNames,
   describeHero,
   RARITIES,
   type CardDb,
@@ -13,7 +14,7 @@ import {
 } from '@card-game/engine';
 import { ECONOMY, packItems, questDef, type PackCard, type PackItem, type Profile } from '@card-game/economy';
 import type { Backend } from './account';
-import { cardFace, esc, pips } from './ui';
+import { cardFace, detailLines, esc, pips } from './ui';
 
 // 卡包與收藏：金幣、開卡包、兌換卷。規則在 @card-game/economy，這裡只負責畫面；
 // 開卡包與兌換交給登入的帳號（測試帳號在瀏覽器裡算，Google 帳號交給伺服器）。
@@ -144,14 +145,12 @@ export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: stri
         ? `${focus.rarity} 兌換卷不夠（${vouchers}/${ECONOMY.vouchersPerCard}）`
         : null;
     const lines = focus.def.kind === 'hero'
-      ? describeHero(focus.def)
-      : describeCard(focus.def, (id) => db.cards.get(id)?.name ?? id);
+      ? describeHero(focus.def, cardNames(db))
+      : describeCard(focus.def, cardNames(db));
     const have = focus.hero
       ? `${n > 0 ? '已經有了，開局時可以選' : '還沒有：從卡包抽到，或用兌換卷換'}。`
       : `擁有 <b>${n}</b> 張，牌組最多放 ${focus.limit} 張。`;
-    focusBox = `<div class="focus">${lines
-      .map((line, i) => (i === 0 ? `<p class="d-head">${esc(line)}</p>` : `<p class="d-line">${esc(line)}</p>`))
-      .join('')}
+    focusBox = `<div class="focus">${detailLines(lines)}
       <p class="d-line">${have}</p>
       <button class="primary" data-exchange="${focus.id}" ${why || shop.busy ? 'disabled' : ''}>用 ${ECONOMY.vouchersPerCard} 張 ${focus.rarity} 兌換卷換${focus.hero ? '這個英雄' : '一張'}</button>
       ${why ? `<p class="d-line">${why}</p>` : ''}</div>`;

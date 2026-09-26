@@ -4,25 +4,27 @@
 召喚生物、使用技能、施放法術都從池裡付費；每位玩家有一名英雄，英雄的顏色決定牌組能放哪些卡，
 英雄被打倒就輸。遊戲名稱暫定。
 
-> **這是大縮模實驗分支**（`claude/hearthstone-scale`）：生物有攻擊力，每回合可以免費攻擊一次（會被反擊）、花能量發動技能一次，
+> **main 現在就是大縮模實驗的版本**（開發分支 `claude/hearthstone-scale`）：生物有攻擊力，每回合可以免費攻擊一次（會被反擊）、花能量發動技能一次，
 > 數字跟爐石一樣（攻擊 = 費用、HP = 費用 + 1）；牌組 30 張、同名最多 2 張、UR 最多 1 張，最多進化一次、進化線照 2/2 帶。規則見 [docs/design.md 的「大縮模實驗」](docs/design.md#大縮模實驗這個分支)。
 
 ## 目前進度
 
 - [x] 規則設計：[docs/design.md](docs/design.md)（v0.8）
-- [x] 規則引擎：[`packages/engine`](packages/engine)，包括異常狀態、吸血與再生；201 個測試
+- [x] 規則引擎：[`packages/engine`](packages/engine)，包括異常狀態、吸血與再生、遺言、持續效果；286 個測試
 - [x] 平衡模擬：[`packages/sim`](packages/sim)，讓機器人大量對打，比較不同規則、估算一局要打多久。結果見 [docs/balance-results.md](docs/balance-results.md)
 - [x] 網頁試玩版：[`packages/web`](packages/web)，跟電腦對戰，可以自己組牌。引擎和電腦對手都在瀏覽器裡跑，不需要伺服器
 - [x] 伺服器：兩人連線對戰（[`packages/server`](packages/server)），見下面「跟朋友連線對戰」
 - [x] 金幣、每日任務、卡包、兌換卷：規則在 [`packages/economy`](packages/economy)
 - [x] 英雄：基礎五色每個人都有，雙色以上的是 UR（卡包抽）
-- [x] 種族（8 種，各有一個特色）、生物攻擊範圍（正前方與兩個斜對角）
+- [x] 種族（8 種，特色有強度，例如同袍 2）、生物攻擊範圍（正前方與兩個斜對角）
+- [x] 卡面文字用粗體關鍵字，點卡片看說明時列出關鍵字的意思
 - [x] 登入：測試帳號（10000 金幣、全卡，存在瀏覽器）或 Google 帳號（存在伺服器），見下面「Google 登入」
 - [ ] 網頁客戶端
 - [x] 排位賽：配對、牌位（銅牌到大師）、賽季與排行榜，結果由伺服器決定
 - [x] 新手教學（11 步的引導對局）、電腦難度（普通／困難）
 - [ ] 牌組存到伺服器（目前存在瀏覽器裡）
 - [x] 卡牌插圖：AI 畫的試玩用插圖（`python3 packages/web/scripts/art.py`，見 [docs/art.md](docs/art.md)）
+- [x] 背景音樂：瀏覽器即時合成（[`packages/web/src/music.ts`](packages/web/src/music.ts)），選單與對戰各一首，可以關掉
 
 範例卡牌見 [docs/cards.md](docs/cards.md)。
 

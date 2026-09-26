@@ -1,9 +1,22 @@
-import { RACE_NAMES, type Color, type DeckCardDef, type HeroDef } from '@card-game/engine';
+import { explainKeywords, RACE_NAMES, type Color, type DeckCardDef, type HeroDef } from '@card-game/engine';
 
 // 牌桌與組牌畫面共用的小工具。
 
 export const esc = (text: string) =>
   text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+
+/** 說明文字：跳脫之後把 **關鍵字** 換成粗體。 */
+export const rich = (text: string) => esc(text).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+
+/** 卡牌說明：第一行是標題，其餘是效果，最後用小字解釋用到的關鍵字。 */
+export function detailLines(texts: readonly string[]): string {
+  const [head, ...body] = texts;
+  const glossary = explainKeywords(body);
+  return (
+    `<p class="d-head">${rich(head ?? '')}</p>${body.map((text) => `<p class="d-line">${rich(text)}</p>`).join('')}` +
+    (glossary.length > 0 ? `<ul class="d-kw">${glossary.map((text) => `<li>${rich(text)}</li>`).join('')}</ul>` : '')
+  );
+}
 
 export function pips(colors: Color[]): string {
   if (colors.length === 0) return '<span class="pips" aria-label="無色"><i class="pip none"></i></span>';

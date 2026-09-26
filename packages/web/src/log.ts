@@ -174,7 +174,13 @@ export function describeEvents(
         lines.push({ text: `　${targetText({ kind: 'creature', player: event.player, zone: event.zone })}是龍，不受異常狀態影響`, tone: 'turn' });
         break;
       case 'undying':
-        lines.push({ text: `　${targetText({ kind: 'creature', player: event.player, zone: event.zone })}不死，留下 1♥`, tone: 'turn' });
+        lines.push({ text: `　${targetText({ kind: 'creature', player: event.player, zone: event.zone })}不死，留下 ${event.hp}♥`, tone: 'turn' });
+        break;
+      case 'triggered':
+        lines.push({ text: `　${who(event.player)}的 ${name(event.cardId)} 發動「${event.name}」`, tone: 'turn' });
+        break;
+      case 'deathTriggered':
+        lines.push({ text: `　${who(event.player)}的 ${name(event.cardId)} 發動遺言「${event.name}」`, tone: 'turn' });
         break;
       case 'gameOver': {
         const { winner, reason } = event.result;

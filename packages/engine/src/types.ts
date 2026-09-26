@@ -59,9 +59,14 @@ export type Effect =
   | { type: 'heal'; amount: number }
   /** 自己的英雄與每隻生物各回復 N，不選目標。 */
   | { type: 'healAll'; amount: number }
+  /** 自己的英雄回復 N，不選目標。 */
+  | { type: 'healHero'; amount: number }
   /** 消滅目標生物：直接送進棄牌區，不算傷害，減傷擋不住。 */
   | { type: 'destroyCreature' }
-  /** 在自己最左邊的空格召喚 count 隻衍生物（token 是衍生物卡的 id）；格子滿了就不召喚。 */
+  /**
+   * 召喚 count 隻衍生物（token 是衍生物卡的 id），放在自己最左邊的空格；格子滿了就不召喚。
+   * 遺言召喚的第一隻放在死掉那隻原本的格子。
+   */
   | { type: 'summonToken'; token: string; count: number }
   /** 看牌庫頂 look 張，選 pick 張加入手牌，其餘放回牌庫底。選的時候對局停下來等這位玩家決定。 */
   | { type: 'lookPick'; look: number; pick: number }
@@ -137,12 +142,17 @@ interface CardBase {
  * 亡靈：不死（第一次被打倒時留下 1 HP）；元素：技能與進場效果的傷害 +1；植物：扎根（回合開始時回復 1）；
  * 龍：龍鱗（不會中異常狀態）；構造體：堅固（受到的傷害 −1）；天使：光輝（召喚時英雄回復 3）。
  */
-export type Race = 'human' | 'beast' | 'undead' | 'elemental' | 'plant' | 'dragon' | 'construct' | 'angel';
+export type Race = 'human' | 'beast' | 'undead' | 'elemental' | 'plant' | 'dragon' | 'machine' | 'angel';
 
 export interface CreatureDef extends CardBase {
   kind: 'creature';
   /** 種族；進化線上的卡同一個種族。沒有種族就沒有種族特色（測試用的卡）。 */
   race?: Race;
+  /**
+   * 種族特色的強度，例如同袍 2、扎根 3、光輝 5。沒寫就是種族的預設（光輝 3，其他 1）。
+   * 0 表示這張卡沒有種族特色（種族照樣算，例如別的人類的同袍會把牠算進去）。猛撲、龍鱗沒有強度，不是 0 就有。
+   */
+  trait?: number;
   /** 0 = 基礎，1 = 進化。最多進化一次。 */
   stage: 0 | 1;
   /** 基礎生物是召喚費用，進化生物是進化費用。 */
@@ -163,6 +173,32 @@ export interface CreatureDef extends CardBase {
    * 不另外花能量，價值算在費用裡，所以有進場效果的生物本體數值要低一點。
    */
   entry?: EntryEffect;
+  /**
+   * 遺言：這隻生物死掉時發動（HP 歸零或被消滅；亡靈的不死留下 1 HP 不算死）。
+   * 不選目標；死的時候在沉默中就不發動。
+   */
+  death?: DeathEffect;
+  /** 持續效果：在場上時，每當條件成立就發動。 */
+  triggers?: TriggeredEffect[];
+}
+
+/**
+ * 持續效果什麼時候發動：擁有者的回合開始（抽牌、再生之後）、回合結束（中毒與灼燒之前），
+ * 或每當擁有者的英雄回復 HP。
+ */
+export type TriggerWhen = 'turnStart' | 'turnEnd' | 'heroHealed';
+
+/** 持續效果：不選目標、不花能量；沉默中不發動。 */
+export interface TriggeredEffect {
+  when: TriggerWhen;
+  name: string;
+  effects: Effect[];
+}
+
+/** 遺言：名字加上不選目標的效果。 */
+export interface DeathEffect {
+  name: string;
+  effects: Effect[];
 }
 
 /** 進場效果跟技能一樣是「目標類型 + 效果」，只是沒有費用。 */
@@ -468,5 +504,9 @@ export type GameEvent =
   /** 龍鱗：龍不會中異常狀態。 */
   | { type: 'statusBlocked'; player: PlayerId; zone: number }
   /** 不死：亡靈第一次被打倒，留下 1 HP。 */
-  | { type: 'undying'; player: PlayerId; zone: number }
+  | { type: 'undying'; player: PlayerId; zone: number; hp: number }
+  /** 持續效果發動。 */
+  | { type: 'triggered'; player: PlayerId; zone: number; cardId: string; name: string }
+  /** 遺言發動：zone 是死掉那隻原本的格子。 */
+  | { type: 'deathTriggered'; player: PlayerId; zone: number; cardId: string; name: string }
   | { type: 'gameOver'; result: GameResult };

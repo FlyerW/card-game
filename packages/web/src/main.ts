@@ -6,11 +6,12 @@ import {
   describeColors,
   describeEffects,
   describeEntry,
+  cardNames,
   describeHero,
   describePassive,
   other,
+  describeTrait,
   RACE_NAMES,
-  RACE_TRAITS,
   sampleDb,
   SAMPLE_CARDS,
   SAMPLE_HEROES,
@@ -76,10 +77,11 @@ import {
   type ServerMe,
   type Session,
 } from './account';
+import { music } from './music';
 import { ONLINE_AVAILABLE, OnlineClient } from './online';
 import { scriptedTurn, startTutorial, STEPS, TUTORIAL_KEY } from './tutorial';
 import { newShop, ownedOf, shopClick, shopScreen, walletBar, type Shop } from './shop';
-import { artUrl, cardFace, esc, pips } from './ui';
+import { artUrl, cardFace, detailLines, esc, pips, rich } from './ui';
 import './style.css';
 
 const db = sampleDb();
@@ -506,6 +508,8 @@ const root = document.getElementById('app')!;
 const card = (id: string) => db.cards.get(id)!;
 const hero = (id: string) => db.heroes.get(id)!;
 const nameOf = (id: string) => db.cards.get(id)?.name ?? db.heroes.get(id)?.name ?? id;
+/** 卡牌說明用：衍生物帶上數值。 */
+const describeName = cardNames(db);
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const targetKey = (t: Target) => (t.kind === 'hero' ? `h${t.player}` : t.kind === 'field' ? `f${t.player}` : `z${t.player}${t.zone}`);
 
@@ -773,9 +777,9 @@ function heroInfo(side: SideView): string {
   if (evolution?.kind === 'heroEvolution' && evolution.passive) lines.push(describePassive(evolution.passive));
   const current = powerOf(side);
   if (current) {
-    lines.push(`天生技 ${describeAbility(current.power, nameOf)}${current.next ? `；用完換成「${current.next.name}」` : ''}`);
+    lines.push(`天生技 ${describeAbility(current.power, describeName)}${current.next ? `；用完換成「${current.next.name}」` : ''}`);
   }
-  return `<div class="hero-info"><span class="hi-hand">手牌 ${side.handCount}</span>${lines.map((line) => `<p>${esc(line)}</p>`).join('')}</div>`;
+  return `<div class="hero-info"><span class="hi-hand">手牌 ${side.handCount}</span>${lines.map((line) => `<p>${rich(line)}</p>`).join('')}</div>`;
 }
 
 /** 目前的天生技，以及輪流的話下一次換成哪一個（跟引擎的 heroPower 同一套規則）。 */
@@ -852,10 +856,7 @@ function attackReason(cv: CreatureView): string {
   return '沒有可以攻擊的目標';
 }
 
-function lines(texts: string[]): string {
-  const [head, ...body] = texts;
-  return `<p class="d-head">${esc(head ?? '')}</p>${body.map((t) => `<p class="d-line">${esc(t)}</p>`).join('')}`;
-}
+const lines = detailLines;
 
 /** 現在輪到你做決定。 */
 const myMove = (view: PlayerView) => view.phase === 'main' && view.activePlayer === YOU && !app.busy && !app.pending;
@@ -863,9 +864,10 @@ const myMove = (view: PlayerView) => view.phase === 'main' && view.activePlayer 
 function creatureStatus(cv: CreatureView): string {
   const tags: string[] = [`⚔ ${cv.attack}${cv.attackBonus ? `（含加成 +${cv.attackBonus}）` : ''}`, `♥ ${cv.hp} / ${cv.maxHp}`];
   const def = card(cv.cardId);
-  if (def.kind === 'creature' && def.race) {
+  const trait = def.kind === 'creature' ? describeTrait(def) : null;
+  if (def.kind === 'creature' && def.race && trait) {
     const used = def.race === 'undead' && cv.undyingUsed ? '（已經用過）' : '';
-    tags.push(`${RACE_NAMES[def.race]}・${RACE_TRAITS[def.race]}${used}${cv.silenced ? '（沉默中失效）' : ''}`);
+    tags.push(`${RACE_NAMES[def.race]}・${trait}${used}${cv.silenced ? '（沉默中失效）' : ''}`);
   }
   if (cv.damageReduction) tags.push(`受到傷害 −${cv.damageReduction}`);
   if (cv.item) tags.push(`道具：${nameOf(cv.item)}`);
@@ -876,7 +878,7 @@ function creatureStatus(cv: CreatureView): string {
   if (cv.silenced) tags.push('沉默：不能發動技能，吸血與再生失效');
   if (cv.weakened) tags.push('虛弱：不能攻擊，也不會反擊');
   if (cv.evolutionChain.length > 1) tags.push(`進化：${cv.evolutionChain.map(nameOf).join(' → ')}`);
-  return `<ul class="tags">${tags.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>`;
+  return `<ul class="tags">${tags.map((t) => `<li>${rich(t)}</li>`).join('')}</ul>`;
 }
 
 function detail(view: PlayerView): string {
@@ -924,7 +926,7 @@ function detail(view: PlayerView): string {
     else if (acts.some((a) => a.type === 'evolveHero')) hint = '<button class="primary" data-do="direct">進化英雄</button>';
     else if (acts.some((a) => a.type === 'castSpell' && !a.target)) hint = '<button class="primary" data-do="direct">施放</button>';
     else hint = '<p class="hint">點選法術的目標。</p>';
-    return toast + lines(describeCard(def, nameOf)) + hint + cancel;
+    return toast + lines(describeCard(def, describeName)) + hint + cancel;
   }
 
   if (sel.kind === 'creature') {
@@ -932,7 +934,7 @@ function detail(view: PlayerView): string {
     const cv = side.zones[sel.zone];
     if (!cv) return toast;
     const def = card(cv.cardId);
-    let body = lines(describeCard(def, nameOf)) + creatureStatus(cv);
+    let body = lines(describeCard(def, describeName)) + creatureStatus(cv);
     if (sel.player === YOU && def.kind === 'creature') {
       const attacks = actsForAttack(sel.zone);
       const orSkill = skillsOf(cv).length > 0 ? '技能另外算，每回合也可以發動一次（花能量，不會被反擊）。' : '';
@@ -947,7 +949,7 @@ function detail(view: PlayerView): string {
         const acts = actsForSkill(sel.zone, index);
         const reason = myTurn && acts.length === 0 ? skillReason(cv, skill, view.you) : '';
         body += `<button class="skill" data-skill="${sel.zone}:${index}" ${acts.length === 0 ? 'disabled' : ''}>
-          ${costBadge(skill)}<span class="skill-text">${esc(`${skill.name}：${describeEffects(skill, nameOf)}`)}</span>
+          ${costBadge(skill)}<span class="skill-text">${rich(`${skill.name}：${describeEffects(skill, describeName)}`)}</span>
           ${reason ? `<span class="skill-why">${esc(reason)}</span>` : ''}</button>`;
       });
       body += '</div>';
@@ -971,24 +973,24 @@ function detail(view: PlayerView): string {
     return (
       toast +
       `<p class="d-head">選擇進場效果的目標</p><p class="d-line">${esc(def!.name)} 放在 ${ZONE[sel.zone]}</p>
-       <p class="d-line">${esc(describeEntry(entry, nameOf))}</p><p class="hint">發光的就是可以選的目標。</p>` +
+       <p class="d-line">${rich(describeEntry(entry, describeName))}</p><p class="hint">發光的就是可以選的目標。</p>` +
       cancel
     );
   }
 
   if (sel.kind === 'skill' || sel.kind === 'heroPower') {
     const ability = sel.kind === 'skill' ? skillsOf(view.you.zones[sel.zone]!)[sel.skill]! : powerOf(view.you)!.power;
-    return toast + `<p class="d-head">選擇目標</p><p class="d-line">${esc(describeAbility(ability, nameOf))}</p><p class="hint">發光的就是可以選的目標。</p>` + cancel;
+    return toast + `<p class="d-head">選擇目標</p><p class="d-line">${rich(describeAbility(ability, describeName))}</p><p class="hint">發光的就是可以選的目標。</p>` + cancel;
   }
 
   if (sel.kind === 'hero') {
     const side = sel.player === YOU ? view.you : view.opponent;
-    const evolved = side.heroEvolution ? lines(describeCard(card(side.heroEvolution), nameOf)) : '';
-    return toast + lines(describeHero(hero(side.heroId))) + evolved + `<ul class="tags"><li>♥ ${side.heroHp} / ${side.heroMaxHp}</li></ul>` + cancel;
+    const evolved = side.heroEvolution ? lines(describeCard(card(side.heroEvolution), describeName)) : '';
+    return toast + lines(describeHero(hero(side.heroId), describeName)) + evolved + `<ul class="tags"><li>♥ ${side.heroHp} / ${side.heroMaxHp}</li></ul>` + cancel;
   }
 
   const side = sel.player === YOU ? view.you : view.opponent;
-  return toast + (side.field ? lines(describeCard(card(side.field), nameOf)) : '<p class="d-head">場地區是空的</p>') + cancel;
+  return toast + (side.field ? lines(describeCard(card(side.field), describeName)) : '<p class="d-head">場地區是空的</p>') + cancel;
 }
 
 // ─── 牌桌 ────────────────────────────────────────────────────────────────────
@@ -1018,6 +1020,8 @@ function zone(cv: CreatureView | null, player: PlayerId, index: number, picks: M
   if (cv.damageReduction) badges.push(`<i class="badge def">減${cv.damageReduction}</i>`);
   if (cv.item) badges.push(`<i class="badge item">${esc(nameOf(cv.item))}</i>`);
   if (cv.taunting) badges.push('<i class="badge taunt">挑釁</i>');
+  if (def.kind === 'creature' && def.triggers?.length && !cv.silenced) badges.push('<i class="badge death">持續</i>');
+  if (def.kind === 'creature' && def.death && !cv.silenced) badges.push('<i class="badge death">遺言</i>');
   if (cv.poison) badges.push(`<i class="badge poison">毒${cv.poison}</i>`);
   if (cv.burn) badges.push(`<i class="badge burn">燒${cv.burn}</i>`);
   if (cv.paralyzed) badges.push('<i class="badge para">麻痺</i>');
@@ -1154,7 +1158,7 @@ function overlay(view: PlayerView): string {
       })
       .join('');
     const plate = (id: string, label: string) =>
-      `<div class="vs-hero"><span class="vs-label">${label}</span>${lines(describeHero(hero(id)))}</div>`;
+      `<div class="vs-hero"><span class="vs-label">${label}</span>${lines(describeHero(hero(id), describeName))}</div>`;
     return `<div class="overlay"><div class="dialog" role="dialog" aria-label="起手">
       <h2>起手</h2>
       <p class="d-line">你是<b>${first ? '先攻' : '後攻'}</b>，${first ? '第一回合 1 點能量' : '第一回合 2 點能量'}。先看對手是誰，再決定要不要重抽。</p>
@@ -1204,6 +1208,10 @@ function rewardLines(): string {
   return `<div class="reward">${lines.map((line) => `<p class="d-line">${line}</p>`).join('')}</div>`;
 }
 
+/** 背景音樂的開關。 */
+const musicButton = () =>
+  `<button class="ghost small" data-do="music" aria-pressed="${music.enabled}">${music.enabled ? '♪ 音樂：開' : '♪ 音樂：關'}</button>`;
+
 function playScreen(): string {
   const view = app.view!;
   const picks = choices();
@@ -1231,6 +1239,7 @@ function playScreen(): string {
         <button class="ghost small" data-do="concede" ${view.phase === 'main' ? '' : 'disabled'}>投降</button>
         <button class="ghost small" data-do="density" aria-pressed="${compact()}">${compact() ? '放大卡牌' : '縮小卡牌'}</button>
         ${document.fullscreenEnabled ? `<button class="ghost small" data-do="fullscreen">${document.fullscreenElement ? '離開全螢幕' : '全螢幕'}</button>` : ''}
+        ${musicButton()}
       </div>
     </aside>
   </div>${overlay(view)}`;
@@ -1281,7 +1290,7 @@ function loginScreen(): string {
 function setupScreen(): string {
   // 基礎英雄每個人都有；多色的 UR 英雄沒抽到就鎖著，看得到但不能選。
   const heroes = SAMPLE_HEROES.map((h) => {
-    const [head, ...body] = describeHero(h);
+    const [head, ...body] = describeHero(h, describeName);
     const evolution = SAMPLE_CARDS.find((c) => c.kind === 'heroEvolution' && c.evolvesFrom === h.id);
     if (evolution) body.push(`可進化為 ${evolution.name}（${evolution.cost}）`);
     const chosen = h.id === app.heroId;
@@ -1289,7 +1298,7 @@ function setupScreen(): string {
     return `<button class="hero-pick${chosen ? ' chosen' : ''}${locked ? ' locked' : ''}" data-hero="${h.id}" aria-pressed="${chosen}" ${locked ? 'disabled' : ''}>
       <span class="hp-big">${h.hp}</span><span class="hp-unit">♥${h.rarity ? '<b class="hp-ur">UR</b>' : ''}</span>
       <span class="hp-name">${pips(h.colors)}${esc(h.name)}</span>
-      <span class="hp-text">${esc(body.join('　'))}</span>${locked ? '<span class="hp-lock">還沒有：卡包抽到或用 UR 兌換卷換</span>' : ''}
+      <span class="hp-text">${rich(body.join('　'))}</span>${locked ? '<span class="hp-lock">還沒有：卡包抽到或用 UR 兌換卷換</span>' : ''}
       <span class="sr">${esc(head ?? '')}</span></button>`;
   }).join('');
   const custom = app.decks[app.heroId];
@@ -1310,7 +1319,7 @@ function setupScreen(): string {
       ${who ? `<div class="who">${who.account.picture ? `<img src="${esc(who.account.picture)}" alt="" referrerpolicy="no-referrer">` : ''}
         <span>${esc(who.account.name)}${who.kind === 'google' ? '<small>Google</small>' : ''}</span>
         ${who.kind === 'test' ? '<button class="ghost small" data-do="reset-test">重設</button>' : ''}
-        <button class="ghost small" data-do="logout">登出</button></div>` : ''}
+        ${musicButton()}<button class="ghost small" data-do="logout">登出</button></div>` : ''}
     </header>
     ${walletBar(app.profile)}
     <div class="heroes">${heroes}</div>
@@ -1337,7 +1346,9 @@ function setupScreen(): string {
         <li>對手的生物在挑釁時，打得到牠的攻擊只能打牠；選得到牠的技能也必須打牠，只打英雄的技能不受影響。</li>
         <li>手牌上限 10 張，滿手時抽到的牌直接進棄牌區。場地卡放在自己的場地區，只強化自己的生物。</li>
         <li>有些英雄有英雄進化卡：血量上限增加、天生技變強，每局只能進化一次。</li>
-        <li>每隻生物有種族，各有一個特色：人類同袍（有其他人類時 ⚔ +1）、野獸猛撲（召喚當回合就能攻擊生物）、亡靈不死（第一次倒下留 1♥）、元素之力（技能傷害 +1）、植物扎根（回合開始回復 1♥）、龍鱗（不中異常狀態）、構造體堅固（受到傷害 −1）、天使光輝（召喚時英雄回復 3♥）。沉默時種族特色也失效。</li>
+        <li>每隻生物有種族，大多有種族特色，數字是強度：人類<b>同袍 N</b>（有其他人類時 ⚔ +N）、野獸<b>猛撲</b>（召喚當回合就能攻擊生物）、亡靈<b>不死 N</b>（第一次倒下留 N♥）、元素<b>元素之力 N</b>（技能傷害 +N）、植物<b>扎根 N</b>（回合開始回復 N♥）、龍<b>龍鱗</b>（不中異常狀態）、機械<b>堅固 N</b>（受到傷害 −N）、天使<b>光輝 N</b>（召喚時英雄回復 N♥）。沉默時種族特色也失效。</li>
+        <li>卡上的粗體字是關鍵字，點卡片看說明時，下面會用小字解釋。</li>
+        <li>有<b>遺言</b>的生物死掉時（被打倒或被消滅）會發動效果，例如召喚衍生物、抽牌、回血或範圍傷害。有持續效果（<b>回合開始</b>、<b>回合結束</b>、<b>每當回復</b>）的生物，在場上時每當條件成立就自動發動。沉默中都不發動。</li>
         <li>異常狀態只會中在生物身上：中毒（施放者的回合結束時失去血量，減傷擋不住）、灼燒（施放者的回合結束時受到傷害）、麻痺（不能攻擊也不能發動技能）、沉默（不能發動技能、吸血與再生失效，身上的增益與挑釁直接消失）、虛弱（不能攻擊，也不會反擊）。後面三種都到牠的下個回合結束，進化會解除全部。</li>
         <li>英雄的血量沒有上限：回復可以把英雄補到比開局還高（例如 40 補到 48）。生物的血量還是有上限。</li>
         <li>把對手英雄的血量打到 0 就贏了。要抽牌但牌庫已經空了就輸（卡牌效果的抽牌也算）。</li>
@@ -1509,6 +1520,7 @@ function render(): void {
           : app.screen === 'lobby'
             ? lobbyScreen()
             : playScreen();
+  music.setScene(app.screen === 'play' && app.session ? 'battle' : 'menu');
   const googleSlot = document.getElementById('google-button');
   // 教學：把這一步要點的地方標亮。
   if (app.mode === 'tutorial' && app.tutorial && app.state && app.screen === 'play') {
@@ -1737,6 +1749,9 @@ root.addEventListener('click', (event) => {
       // 存不了就只在這次開著的頁面有效。
     }
     applyDensity();
+    render();
+  } else if (command === 'music') {
+    music.toggle();
     render();
   } else if (command === 'fullscreen') {
     const request = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();

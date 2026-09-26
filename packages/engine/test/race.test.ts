@@ -99,7 +99,7 @@ describe('龍：龍鱗', () => {
   });
 });
 
-describe('構造體：堅固', () => {
+describe('機械：堅固', () => {
   it('受到的傷害 −1，攻擊與技能都是', () => {
     let { state, a, b } = start();
     place(state, a, 0, 'brute');
@@ -118,5 +118,37 @@ describe('天使：光輝', () => {
     state.players[a].energy = 5;
     state = act(state, { type: 'summon', player: a, card: give(state, a, 'cherub'), zone: 2 });
     expect(state.players[a].heroDamage).toBe(7);
+  });
+});
+
+describe('種族特色的強度', () => {
+  it('同袍 2：有其他人類時 ⚔ +2；沒有種族特色的人類不加，但會被別的人類算進去', () => {
+    const { state, a } = start();
+    const veteran = place(state, a, 0, 'veteran');
+    const peasant = place(state, a, 1, 'peasant');
+    expect(attackPower(engine.db, state, veteran)).toBe(4);
+    expect(attackPower(engine.db, state, peasant)).toBe(2);
+  });
+
+  it('扎根 3：回合開始回復 3', () => {
+    let { state, a } = start();
+    const oak = place(state, a, 0, 'old-oak');
+    oak.damage = 5;
+    state = endTurn(endTurn(state));
+    expect(at(state, a, 0)!.damage).toBe(2);
+  });
+
+  it('不死 3：第一次倒下留 3♥', () => {
+    let { state, a, b } = start();
+    place(state, a, 0, 'brute');
+    place(state, b, 0, 'lich');
+    state = act(state, { type: 'attack', player: a, zone: 0, target: creatureAt(b, 0) });
+    expect(currentHp(engine.db, state, at(state, b, 0)!)).toBe(3);
+  });
+
+  it('光輝 5：召喚時英雄回復 5', () => {
+    let { state, a } = start();
+    state = act(state, { type: 'summon', player: a, card: give(state, a, 'seraph'), zone: 0 });
+    expect(state.players[a].heroDamage).toBe(-5);
   });
 });

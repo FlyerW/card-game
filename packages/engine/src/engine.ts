@@ -1,7 +1,6 @@
 import { validateDeck } from './deck';
 import { fail, RuleError, type ErrorCode } from './errors';
 import {
-  activeRace,
   attackPower,
   cardDef,
   ceiling,
@@ -18,6 +17,8 @@ import {
   isToken,
   opponentTurnHp,
   other,
+  raceTrait,
+  traitOf,
 } from './queries';
 import {
   cleanup,
@@ -25,6 +26,7 @@ import {
   combat,
   drawCards,
   drawTaken,
+  fireTriggers,
   newCreature,
   endGame,
   randomInt,
@@ -213,6 +215,7 @@ function startTurn(ctx: Ctx, player: PlayerId): void {
   p.energy = p.maxEnergy + (isFirstTurn && !isFirstPlayer ? rules.secondPlayerBonusEnergy : 0);
   tickRegenerate(ctx, player);
   tickField(ctx, player);
+  if (state.phase === 'main') fireTriggers(ctx, player, 'turnStart');
 }
 
 // ─── 各個動作 ────────────────────────────────────────────────────────────────
@@ -255,8 +258,8 @@ function summon(ctx: Ctx, a: ActionOf<'summon'>): void {
   removeFromHand(p, card.uid);
   p.zones[a.zone] = newCreature(card.uid, a.player, card.cardId, state.turn);
   ctx.events.push({ type: 'summoned', player: a.player, zone: a.zone, cardId: card.cardId });
-  // 天使的「光輝」：召喚時你的英雄回復 3。
-  if (def.race === 'angel') healHero(ctx, a.player, ANGEL_HEAL);
+  // 天使的「光輝 N」：召喚時你的英雄回復 N。
+  if (def.race === 'angel' && traitOf(def) > 0) healHero(ctx, a.player, traitOf(def));
   triggerEntry(ctx, def, a.player, a.zone, a.target);
 }
 
@@ -291,7 +294,7 @@ function checkCanAct(ctx: Ctx, creature: Creature, what: string, target?: Target
   const def = creatureDef(db, creature);
   if (summoningSick(ctx, creature)) {
     // 野獸的「猛撲」：召喚當回合就能攻擊生物，但不能打英雄。
-    const pounce = target !== undefined && activeRace(db, state, creature) === 'beast';
+    const pounce = target !== undefined && raceTrait(db, state, creature, 'beast') > 0;
     if (!pounce) fail('SUMMONED_THIS_TURN', `召喚當回合不能${what}`);
     if (target.kind !== 'creature') fail('POUNCE_CREATURES_ONLY', `${def.name} 是野獸，召喚當回合只能攻擊生物，不能打英雄`);
   }
@@ -302,8 +305,6 @@ function checkCanAct(ctx: Ctx, creature: Creature, what: string, target?: Target
 const pierces = (db: CardDb, state: GameState, player: PlayerId): boolean =>
   heroPassives(db, state, player).some((passive) => passive.pierce === true);
 
-/** 天使的「光輝」召喚時回復多少。 */
-const ANGEL_HEAL = 3;
 
 /** 召喚當回合還不能行動：不是進化來的，也沒有速攻。 */
 function summoningSick(ctx: Ctx, creature: Creature): boolean {
@@ -495,6 +496,8 @@ function choose(ctx: Ctx, a: ActionOf<'choose'>): void {
 
 /** 回合結束：施放者的回合結束時觸發，所以是對手那邊中毒、灼燒的生物扣血；然後換對手。 */
 function endTurn(ctx: Ctx, a: ActionOf<'endTurn'>): void {
+  fireTriggers(ctx, a.player, 'turnEnd');
+  if (ctx.state.phase !== 'main') return;
   tickPoison(ctx, other(a.player));
   if (ctx.state.phase === 'main') tickBurn(ctx, other(a.player));
   if (ctx.state.phase !== 'main') return;

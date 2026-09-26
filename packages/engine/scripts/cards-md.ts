@@ -2,13 +2,12 @@
 // 用法：npm run cards
 
 import { writeFileSync } from 'node:fs';
-import { describeCard, describeColors, describeHero } from '../src/describe';
+import { cardNames, describeCard, describeColors, describeHero, KEYWORDS } from '../src/describe';
 import { RARITIES, type CreatureDef, type DeckCardDef } from '../src/types';
-import { SAMPLE_CARDS, SAMPLE_HEROES } from '../src/cards/sample';
+import { SAMPLE_CARDS, SAMPLE_HEROES, sampleDb } from '../src/cards/sample';
 
 const byId = new Map(SAMPLE_CARDS.map((card) => [card.id, card]));
-const heroNames = new Map(SAMPLE_HEROES.map((hero) => [hero.id, hero.name]));
-const nameOf = (id: string) => byId.get(id)?.name ?? heroNames.get(id) ?? id;
+const nameOf = cardNames(sampleDb());
 const rank = (card: DeckCardDef) => RARITIES.indexOf(card.rarity);
 
 function section(title: string, cards: DeckCardDef[]): string[] {
@@ -42,6 +41,14 @@ const lines = [
   '> 這份文件由 `npm run cards` 從 [`packages/engine/src/cards/sample.ts`](../packages/engine/src/cards/sample.ts) 產生，',
   '> 請改程式碼裡的卡牌資料，不要直接改這份。名字與數值都是暫定。',
   '',
+  '## 關鍵字',
+  '',
+  '卡上的粗體字是關鍵字，N 是卡上寫的數字。',
+  '',
+  '| 關鍵字 | 意思 |',
+  '|---|---|',
+  ...Object.entries(KEYWORDS).map(([word, text]) => `| **${word}${text.includes('N') ? ' N' : ''}** | ${text} |`),
+  '',
   '## 英雄',
   '',
   '單色的五個是基礎英雄，每個人都有；雙色以上的是 UR 英雄，要從卡包抽到。',
@@ -49,7 +56,7 @@ const lines = [
   '| 英雄 | 稀有度 | 顏色 | HP | 效果 |',
   '|---|---|---|---|---|',
   ...SAMPLE_HEROES.map((hero) => {
-    const effects = describeHero(hero).slice(1).join('<br>');
+    const effects = describeHero(hero, nameOf).slice(1).join('<br>');
     return `| **${hero.name}** | ${hero.rarity ?? '基礎'} | ${describeColors(hero.colors)} | ${hero.hp} | ${effects} |`;
   }),
   '',

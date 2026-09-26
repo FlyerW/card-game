@@ -173,7 +173,7 @@ export const TEST_CARDS: DeckCardDef[] = [
   creature('sprite', [hit('zap', ANY, 2)], { race: 'elemental', hp: 4 }),
   creature('sapling', [], { rarity: 'N', race: 'plant', attack: 1, hp: 5 }),
   creature('drake', [], { rarity: 'N', race: 'dragon', attack: 3, hp: 6 }),
-  creature('golem', [], { rarity: 'N', race: 'construct', attack: 2, hp: 6 }),
+  creature('golem', [], { rarity: 'N', race: 'machine', attack: 2, hp: 6 }),
   creature('cherub', [], { rarity: 'N', race: 'angel', attack: 2, hp: 3 }),
   creature('burnout', [
     { name: 'sacrifice', cost: 0, maxEnergyCost: 2, target: ANY, effects: [{ type: 'damage', amount: 4 }] },
@@ -183,6 +183,25 @@ export const TEST_CARDS: DeckCardDef[] = [
     kind: 'spell', id: 'doom', name: 'doom', rarity: 'R', colors: [], cost: 1,
     target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'destroyCreature' }],
   },
+
+  // 遺言
+  creature('martyr', [], { rarity: 'N', attack: 1, hp: 2, death: { name: 'rise', effects: [{ type: 'summonToken', token: 'imp-token', count: 2 }] } }),
+  creature('mourner', [], { rarity: 'N', attack: 1, hp: 2, death: { name: 'farewell', effects: [{ type: 'healHero', amount: 5 }, { type: 'draw', count: 1 }] } }),
+  creature('bomber', [], { rarity: 'N', attack: 1, hp: 2, death: { name: 'boom', effects: [{ type: 'damageEnemyCreatures', amount: 2 }] } }),
+  creature('bone-ghoul', [], { rarity: 'N', race: 'undead', attack: 1, hp: 2, death: { name: 'last', effects: [{ type: 'draw', count: 1 }] } }),
+
+  // 種族特色的強度
+  creature('veteran', [], { rarity: 'N', race: 'human', trait: 2, attack: 2, hp: 4 }),
+  creature('peasant', [], { rarity: 'N', race: 'human', trait: 0, attack: 2, hp: 4 }),
+  creature('old-oak', [], { rarity: 'N', race: 'plant', trait: 3, attack: 1, hp: 9 }),
+  creature('lich', [], { rarity: 'N', race: 'undead', trait: 3, attack: 2, hp: 5 }),
+  creature('seraph', [], { rarity: 'N', race: 'angel', trait: 5, attack: 2, hp: 3 }),
+
+  // 持續效果
+  creature('idol', [], { rarity: 'N', attack: 1, hp: 4, triggers: [{ when: 'heroHealed', name: 'grace', effects: [{ type: 'buff', attack: 1, hp: 1, on: 'self' }] }] }),
+  creature('stargazer', [], { rarity: 'N', attack: 1, hp: 4, triggers: [{ when: 'turnEnd', name: 'gaze', effects: [{ type: 'draw', count: 1 }] }] }),
+  creature('ember', [], { rarity: 'N', attack: 1, hp: 4, triggers: [{ when: 'turnEnd', name: 'embers', effects: [{ type: 'damageEnemyCreatures', amount: 1 }] }] }),
+  creature('spring', [], { rarity: 'N', attack: 1, hp: 4, triggers: [{ when: 'turnStart', name: 'well', effects: [{ type: 'healHero', amount: 2 }] }] }),
 
   // 顏色測試
   creature('red-imp', [hit('x', ANY, 1), hit('y', ANY, 1)], { colors: ['red'] }),

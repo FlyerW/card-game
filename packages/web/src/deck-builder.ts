@@ -1,4 +1,5 @@
 import {
+  cardNames,
   copyLimit,
   DEFAULT_RULES,
   deckPool,
@@ -10,7 +11,7 @@ import {
   type DeckCardDef,
 } from '@card-game/engine';
 import { buildDeck } from '@card-game/sim/deck';
-import { cardFace, esc, pips } from './ui';
+import { cardFace, detailLines, esc, pips } from './ui';
 
 // 組牌：照正式規則，30 張、同名最多 2 張、UR 最多 1 張、只能放英雄顏色內的卡與無色卡；
 // 而且只能放收藏裡有的卡，張數不超過擁有的。
@@ -201,9 +202,7 @@ export function deckScreen(db: CardDb, b: Builder, deck: readonly string[], cust
   const { problems, tips } = deckIssues(db, b.heroId, deck, owned);
   const focus = b.focus ? db.cards.get(b.focus) : undefined;
   const focusBox = focus
-    ? `<div class="focus">${describeCard(focus, (id) => db.cards.get(id)?.name ?? id)
-        .map((line, i) => (i === 0 ? `<p class="d-head">${esc(line)}</p>` : `<p class="d-line">${esc(line)}</p>`))
-        .join('')}
+    ? `<div class="focus">${detailLines(describeCard(focus, cardNames(db)))}
         <div class="respond"><button class="ghost" data-remove="${focus.id}" ${count(deck, focus.id) === 0 ? 'disabled' : ''}>拿掉一張</button>
         <button class="primary" data-add="${focus.id}" ${addProblem(db, deck, focus.id, owned) ? 'disabled' : ''}>加一張（${count(deck, focus.id)}/${owned(focus)}）</button></div>
         ${owned(focus) === 0 ? '<p class="d-line warn">還沒有這張卡：開卡包，或用 3 張同稀有度的兌換卷換。</p>' : ''}</div>`
