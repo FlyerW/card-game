@@ -98,9 +98,9 @@ describe('麻痺', () => {
 describe('沉默', () => {
   it('不能發動技能，攻擊照常；到擁有者的下一個回合結束', () => {
     let { state, a, b } = start({ deckSize: 60 });
-    place(state, a, 0, 'mesmer');
+    place(state, a, 4, 'mesmer'); // 放在對面生物打不到的格子，攻擊才打得到英雄
     place(state, b, 0, 'taunter');
-    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 1, target: creatureAt(b, 0) });
+    state = act(state, { type: 'useSkill', player: a, zone: 4, skill: 1, target: creatureAt(b, 0) });
     state = endTurn(state); // b 的回合
     expect(reject(state, { type: 'useSkill', player: b, zone: 0, skill: 0 })).toBe('SILENCED');
     act(state, { type: 'attack', player: b, zone: 0, target: hero(a) });
@@ -128,14 +128,14 @@ describe('沉默', () => {
 
   it('卡上的吸血與再生在沉默時失效，沉默結束就恢復', () => {
     let { state, a, b } = start({ deckSize: 60 });
-    place(state, a, 0, 'mesmer');
+    place(state, a, 4, 'mesmer');
     place(state, b, 0, 'leech');
     place(state, b, 1, 'moss', { damage: 4 });
     state.players[b].heroDamage = 10;
-    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 1, target: creatureAt(b, 0) });
-    state.players[a].zones[0]!.skillUsedTurn = null;
+    state = act(state, { type: 'useSkill', player: a, zone: 4, skill: 1, target: creatureAt(b, 0) });
+    state.players[a].zones[4]!.skillUsedTurn = null;
     state.players[a].energy += 1;
-    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 1, target: creatureAt(b, 1) });
+    state = act(state, { type: 'useSkill', player: a, zone: 4, skill: 1, target: creatureAt(b, 1) });
     state = endTurn(state); // b 的回合：苔蘚沒有再生
     expect(at(state, b, 1)!.damage).toBe(4);
     state = act(state, { type: 'attack', player: b, zone: 0, target: hero(a) });
@@ -160,7 +160,9 @@ describe('虛弱', () => {
     expect(reject(state, { type: 'attack', player: b, zone: 0, target: hero(a) })).toBe('WEAKENED');
     state = act(state, { type: 'useSkill', player: b, zone: 0, skill: 0, target: hero(a) });
     expect(state.players[a].heroDamage).toBe(4);
-    state = act(endTurn(endTurn(state)), { type: 'attack', player: b, zone: 0, target: hero(a) });
+    state = endTurn(endTurn(state));
+    state.players[a].zones = state.players[a].zones.map(() => null); // 清掉擋在前面的生物，攻擊才打得到英雄
+    state = act(state, { type: 'attack', player: b, zone: 0, target: hero(a) });
     expect(state.players[a].heroDamage).toBe(4 + 5);
   });
 });

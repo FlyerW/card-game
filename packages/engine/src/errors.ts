@@ -36,6 +36,7 @@ export type ErrorCode =
   | 'NO_LEGAL_TARGET'
   | 'ILLEGAL_TARGET'
   | 'MUST_TARGET_TAUNT'
+  | 'OUT_OF_RANGE'
   | 'ITEM_SLOT_TAKEN'
   | 'FIELD_ALREADY_PLAYED';
 

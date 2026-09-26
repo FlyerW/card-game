@@ -35,7 +35,7 @@ import {
   type Ctx,
 } from './resolve';
 import { DEFAULT_RULES } from './rules';
-import { attackTargets, baseTargets, legalTargets, sameTarget, type AbilitySource } from './targeting';
+import { attackTargets, attackZones, baseTargets, legalTargets, sameTarget, type AbilitySource } from './targeting';
 import { viewFor } from './view';
 import type {
   Ability,
@@ -303,12 +303,15 @@ function attack(ctx: Ctx, a: ActionOf<'attack'>): void {
   if (creature.attackedTurn === state.turn) fail('ALREADY_ATTACKED', `${def.name} 這回合已經攻擊過（或休息了）`);
   if (isWeakened(state, creature)) fail('WEAKENED', `${def.name} 虛弱中，不能攻擊`);
   if (attackPower(db, state, creature) <= 0) fail('NO_ATTACK', `${def.name} 的攻擊力是 0，不能攻擊`);
-  const legal = attackTargets(state, a.player);
+  const legal = attackTargets(state, a.player, a.zone);
   if (!legal.some((t) => sameTarget(t, a.target))) {
     const enemy = other(a.player);
-    const wouldBeLegal = a.target.player === enemy && a.target.kind !== 'field' && (a.target.kind === 'hero' || state.players[enemy].zones[a.target.zone] != null);
-    if (wouldBeLegal) fail('MUST_TARGET_TAUNT', '對手有挑釁中的生物，必須先攻擊牠');
-    fail('ILLEGAL_TARGET', '只能攻擊對手的生物或英雄');
+    const target = a.target;
+    if (target.player !== enemy || target.kind === 'field') fail('ILLEGAL_TARGET', '只能攻擊對手的生物或英雄');
+    if (target.kind === 'creature' && state.players[enemy].zones[target.zone] == null) fail('ILLEGAL_TARGET', '那一格沒有生物');
+    if (target.kind === 'hero') fail('OUT_OF_RANGE', '正前方或斜對角還有對手的生物，要先打倒牠們才打得到英雄');
+    if (!attackZones(state, a.zone).includes(target.zone)) fail('OUT_OF_RANGE', '只能攻擊正前方與左右兩個斜對角');
+    fail('MUST_TARGET_TAUNT', '打得到的範圍裡有挑釁中的生物，必須先攻擊牠');
   }
   creature.attackedTurn = state.turn;
   combat(ctx, a.player, a.zone, a.target);
@@ -677,7 +680,7 @@ export function createEngine(db: CardDb) {
     }
     p.zones.forEach((creature, zone) => {
       if (creature === null) return;
-      for (const target of attackTargets(state, player)) candidates.push({ type: 'attack', player, zone, target });
+      for (const target of attackTargets(state, player, zone)) candidates.push({ type: 'attack', player, zone, target });
       creatureSkills(db, creature).forEach((skill, index) => {
         const ref: AbilityRef = { kind: 'skill', zone, skill: index };
         withTargets({ type: 'useSkill', player, zone, skill: index }, skill, targetsFor(state, player, ref));

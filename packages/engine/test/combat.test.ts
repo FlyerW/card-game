@@ -27,10 +27,10 @@ describe('傷害與擊倒', () => {
     let { state, a, b } = start();
     place(state, a, 0, 'hitter', { item: { uid: 900, cardId: 'blade' } });
     place(state, a, 1, 'hitter', { item: { uid: 901, cardId: 'blade' } });
-    place(state, b, 0, 'taunter', { item: { uid: 902, cardId: 'armor' } });
+    place(state, b, 4, 'taunter', { item: { uid: 902, cardId: 'armor' } }); // 在 1 號格攻擊範圍外
     state.players[a].energy = 5;
-    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0, target: creatureAt(b, 0) });
-    expect(at(state, b, 0)?.damage).toBe(3); // 5 − 2，利爪不加技能傷害
+    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0, target: creatureAt(b, 4) });
+    expect(at(state, b, 4)?.damage).toBe(3); // 5 − 2，利爪不加技能傷害
     state = act(state, { type: 'attack', player: a, zone: 1, target: hero(b) });
     expect(state.players[b].heroDamage).toBe(4); // 攻擊 2 + 利爪 2，英雄沒有減傷
   });

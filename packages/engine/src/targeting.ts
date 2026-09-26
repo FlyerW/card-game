@@ -69,18 +69,26 @@ export function baseTargets(state: GameState, ability: Ability, source: AbilityS
   }
 }
 
+/** 生物攻擊打得到的格子：正前方與左右兩個斜對角。 */
+export const attackZones = (state: GameState, zone: number): number[] =>
+  [zone - 1, zone, zone + 1].filter((z) => z >= 0 && z < state.rules.zones);
+
 /**
- * 生物攻擊能選的目標：對手的每隻生物與英雄，不管格子位置。
- * 對手有挑釁中的生物時，只能攻擊挑釁的生物。
+ * 生物攻擊能選的目標：跟位置技能一樣，只打得到正前方與兩個斜對角。
+ * 那幾格有生物就只能打生物；全都空著才打得到後面的英雄。
+ * 打得到的生物裡有挑釁中的，就只能打挑釁的；挑釁的生物不在範圍內就不受影響。
  */
-export function attackTargets(state: GameState, player: PlayerId): Target[] {
+export function attackTargets(state: GameState, player: PlayerId, zone: number): Target[] {
   const enemy = other(player);
-  const creatures = creatureTargets(state, enemy);
-  const taunting = creatures.filter((target) => {
+  const inReach = attackZones(state, zone)
+    .filter((z) => state.players[enemy].zones[z] != null)
+    .map((z): Target => ({ kind: 'creature', player: enemy, zone: z }));
+  if (inReach.length === 0) return [{ kind: 'hero', player: enemy }];
+  const taunting = inReach.filter((target) => {
     const creature = target.kind === 'creature' ? state.players[enemy].zones[target.zone] : null;
     return creature != null && isTaunting(state, creature);
   });
-  return taunting.length > 0 ? taunting : [...creatures, { kind: 'hero', player: enemy }];
+  return taunting.length > 0 ? taunting : inReach;
 }
 
 /**

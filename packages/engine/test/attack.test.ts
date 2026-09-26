@@ -71,14 +71,16 @@ describe('攻擊', () => {
     act(state, { type: 'attack', player: a, zone: 1, target: hero(b) });
   });
 
-  it('對手有挑釁的生物時，只能攻擊牠', () => {
+  it('打得到的範圍裡有挑釁的生物時，只能攻擊牠；挑釁的生物不在範圍內就不受影響', () => {
     let { state, a, b } = start();
     place(state, a, 0, 'brute');
+    place(state, a, 4, 'brute');
     place(state, b, 0, 'hitter');
     place(state, b, 1, 'taunter', { tauntUntilTurn: 99 });
-    expect(reject(state, { type: 'attack', player: a, zone: 0, target: hero(b) })).toBe('MUST_TARGET_TAUNT');
+    place(state, b, 4, 'hitter');
     expect(reject(state, { type: 'attack', player: a, zone: 0, target: creatureAt(b, 0) })).toBe('MUST_TARGET_TAUNT');
     act(state, { type: 'attack', player: a, zone: 0, target: creatureAt(b, 1) });
+    act(state, { type: 'attack', player: a, zone: 4, target: creatureAt(b, 4) }); // 4 號格打不到挑釁的 1 號格
   });
 
   it('不能攻擊自己的單位，也不能攻擊空格', () => {
@@ -122,14 +124,15 @@ describe('攻擊', () => {
     expect(state.players[a].heroDamage).toBe(6);
   });
 
-  it('合法動作列出每隻能動的生物對每個目標的攻擊', () => {
+  it('合法動作列出每隻能動的生物在範圍內的每個目標', () => {
     const { state, a, b } = start();
     place(state, a, 0, 'brute');
+    place(state, a, 3, 'brute');
     place(state, b, 2, 'hitter');
     const attacks = engine.legalActions(state, a).filter((action) => action.type === 'attack');
     expect(attacks).toEqual([
-      { type: 'attack', player: a, zone: 0, target: creatureAt(b, 2) },
-      { type: 'attack', player: a, zone: 0, target: hero(b) },
+      { type: 'attack', player: a, zone: 0, target: hero(b) }, // 0 號格打得到 0、1 號格，都空著
+      { type: 'attack', player: a, zone: 3, target: creatureAt(b, 2) },
     ]);
   });
 });
@@ -148,12 +151,14 @@ describe('只在某一方回合生效的被動', () => {
     let { state } = game;
     const { a, b } = game;
     place(state, a, 0, 'brute'); // 攻擊 5
-    place(state, b, 0, 'hitter'); // 攻擊 2
+    place(state, b, 3, 'hitter'); // 攻擊 2，在 0 號格的攻擊範圍外
     state = act(state, { type: 'attack', player: a, zone: 0, target: hero(b) });
     expect(state.players[b].heroDamage).toBe(6);
-    state = act(endTurn(state), { type: 'attack', player: b, zone: 0, target: creatureAt(a, 0) });
+    state = endTurn(state);
+    place(state, b, 1, 'hitter');
+    state = act(state, { type: 'attack', player: b, zone: 1, target: creatureAt(a, 0) });
     expect(at(state, a, 0)!.damage).toBe(3); // b 的回合：b 的生物 +1，a 的反擊不加
-    expect(at(state, b, 0)!.damage).toBe(5);
+    expect(at(state, b, 1)!.damage).toBe(5);
   });
 
   it('對方回合 HP 上限 +2：先吸收傷害，回到自己的回合加成消失，不會因此被擊倒', () => {
@@ -304,5 +309,30 @@ describe('我方每隻生物增益', () => {
     state = act(state, { type: 'heroPower', player: a });
     for (const zone of [0, 3]) expect(at(state, a, zone)).toMatchObject({ attackCounters: 1, hpCounters: 1 });
     expect(at(state, b, 0)).toMatchObject({ attackCounters: 0, hpCounters: 0 });
+  });
+});
+
+describe('攻擊範圍', () => {
+  it('只打得到正前方與左右兩個斜對角；邊邊的格子只有兩格', () => {
+    const { state, a, b } = start();
+    place(state, a, 2, 'brute');
+    place(state, a, 0, 'brute');
+    for (const zone of [0, 1, 2, 3, 4]) place(state, b, zone, 'wall');
+    const targets = (zone: number) =>
+      engine.legalActions(state, a).flatMap((action) => (action.type === 'attack' && action.zone === zone ? [action.target] : []));
+    expect(targets(2)).toEqual([creatureAt(b, 1), creatureAt(b, 2), creatureAt(b, 3)]);
+    expect(targets(0)).toEqual([creatureAt(b, 0), creatureAt(b, 1)]);
+    expect(reject(state, { type: 'attack', player: a, zone: 2, target: creatureAt(b, 4) })).toBe('OUT_OF_RANGE');
+  });
+
+  it('範圍裡有生物就打不到英雄；範圍裡都空著才打得到', () => {
+    let { state, a, b } = start();
+    place(state, a, 0, 'brute');
+    place(state, b, 1, 'wall');
+    expect(reject(state, { type: 'attack', player: a, zone: 0, target: hero(b) })).toBe('OUT_OF_RANGE');
+    state.players[b].zones[1] = null;
+    place(state, b, 2, 'wall'); // 2 號格不在 0 號格的範圍內
+    state = act(state, { type: 'attack', player: a, zone: 0, target: hero(b) });
+    expect(state.players[b].heroDamage).toBe(5);
   });
 });
