@@ -1053,7 +1053,8 @@ function heroPlate(side: SideView, player: PlayerId, picks: Map<string, Action>)
   const key = `h${player}`;
   // 打倒時可能扣到負的，畫面上寫 0。
   const hp = Math.max(0, side.heroHp);
-  const pct = Math.round((hp / side.heroMaxHp) * 100);
+  // 英雄 HP 沒有上限：回復超過起始 HP 時，血條滿格。
+  const pct = Math.min(100, Math.round((hp / side.heroMaxHp) * 100));
   const classes = ['hero', side.heroHp < side.heroMaxHp ? 'hurt' : 'full'];
   if (picks.has(key)) classes.push('pick');
   if (app.selection?.kind === 'hero' && app.selection.player === player) classes.push('selected');
@@ -1156,7 +1157,7 @@ function overlay(view: PlayerView): string {
       `<div class="vs-hero"><span class="vs-label">${label}</span>${lines(describeHero(hero(id)))}</div>`;
     return `<div class="overlay"><div class="dialog" role="dialog" aria-label="起手">
       <h2>起手</h2>
-      <p class="d-line">你是<b>${first ? '先攻' : '後攻'}</b>，${first ? '第一回合 1 點能量' : '第一回合 3 點能量（能量上限 2，後攻多補 1 點）'}。先看對手是誰，再決定要不要重抽。</p>
+      <p class="d-line">你是<b>${first ? '先攻' : '後攻'}</b>，${first ? '第一回合 1 點能量' : '第一回合 2 點能量'}。先看對手是誰，再決定要不要重抽。</p>
       <div class="versus">${plate(view.you.heroId, '你')}${plate(view.opponent.heroId, '對手')}</div>
       <p class="d-line">點選要洗回牌庫重抽的牌，可以選任意張，只能重抽一次。</p>
       <div class="mull-hand">${cards}</div>
@@ -1327,7 +1328,7 @@ function setupScreen(): string {
     <section class="howto">
       <h2>怎麼玩</h2>
       <ul>
-        <li>能量：先攻第一回合 1 點、後攻 2 點（後攻第一回合再多補 1 點），之後每回合上限 +2，最高 12。每個回合開始時補滿。</li>
+        <li>能量：先攻第一回合 1 點、後攻 2 點，之後每回合上限 +2，最高 12。每個回合開始時補滿。</li>
         <li>點手牌出牌。生物要選一個空格召喚；道具要選自己的生物；進化卡要點場上對應的生物。</li>
         <li>每隻生物有攻擊力（⚔）和血量（♥）。血量滿的是綠色，受過傷的是紅色。</li>
         <li>點你的生物，再點發光的對手生物或英雄就是攻擊：不花能量，只打得到正前方與左右兩個斜對角的生物，那幾格有一格空著就能打到英雄。打生物時對方會用牠的攻擊力反擊，打英雄不會被反擊。技能要花能量，不會被反擊。攻擊和技能每隻每回合各一次，可以都用；召喚當回合都不行（有【速攻】的例外；進化卡都算有速攻，召喚當回合就能進化、進化完馬上能動）。</li>
@@ -1338,6 +1339,7 @@ function setupScreen(): string {
         <li>有些英雄有英雄進化卡：血量上限增加、天生技變強，每局只能進化一次。</li>
         <li>每隻生物有種族，各有一個特色：人類同袍（有其他人類時 ⚔ +1）、野獸猛撲（召喚當回合就能攻擊生物）、亡靈不死（第一次倒下留 1♥）、元素之力（技能傷害 +1）、植物扎根（回合開始回復 1♥）、龍鱗（不中異常狀態）、構造體堅固（受到傷害 −1）、天使光輝（召喚時英雄回復 3♥）。沉默時種族特色也失效。</li>
         <li>異常狀態只會中在生物身上：中毒（施放者的回合結束時失去血量，減傷擋不住）、灼燒（施放者的回合結束時受到傷害）、麻痺（不能攻擊也不能發動技能）、沉默（不能發動技能、吸血與再生失效，身上的增益與挑釁直接消失）、虛弱（不能攻擊，也不會反擊）。後面三種都到牠的下個回合結束，進化會解除全部。</li>
+        <li>英雄的血量沒有上限：回復可以把英雄補到比開局還高（例如 40 補到 48）。生物的血量還是有上限。</li>
         <li>把對手英雄的血量打到 0 就贏了。要抽牌但牌庫已經空了就輸（卡牌效果的抽牌也算）。</li>
       </ul>
       <p class="note">試玩說明：範例卡有 ${SAMPLE_CARDS.length} 張，牌組照正式規則：${DEFAULT_RULES.deckSize} 張、同名最多 ${DEFAULT_RULES.maxCopies} 張、UR 最多 ${DEFAULT_RULES.maxUrCopies} 張、只能放英雄顏色內的卡與無色卡。

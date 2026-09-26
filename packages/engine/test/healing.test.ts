@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { heroHp } from '../src/queries';
 import { act, at, creatureAt, endTurn, engine, give, hero, place, reject, start } from './helpers';
 
 // 吸血、再生、全體回復，以及直接消滅生物。
@@ -23,11 +24,13 @@ describe('吸血', () => {
     expect(state.players[a].heroDamage).toBe(20 - (1 + 3));
   });
 
-  it('英雄滿血時不會超過上限', () => {
+  it('英雄的 HP 沒有上限：滿血時吸血也會回復到超過起始 HP', () => {
     let { state, a, b } = start();
     place(state, a, 0, 'leech');
+    const before = heroHp(engine.db, state, a);
     state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0, target: hero(b) });
-    expect(state.players[a].heroDamage).toBe(0);
+    expect(state.players[a].heroDamage).toBe(-4);
+    expect(heroHp(engine.db, state, a)).toBe(before + 4);
   });
 
   it('沒有吸血的生物不會回復英雄', () => {
@@ -86,7 +89,7 @@ describe('全體回復', () => {
     place(state, b, 0, 'wolf', { damage: 5 });
     state.players[a].heroDamage = 3;
     state = act(state, { type: 'castSpell', player: a, card: give(state, a, 'bloom') });
-    expect(state.players[a].heroDamage).toBe(0);
+    expect(state.players[a].heroDamage).toBe(-1); // 英雄回復 4，沒有上限
     expect(at(state, a, 0)!.damage).toBe(1);
     expect(at(state, a, 1)!.damage).toBe(0);
     expect(at(state, b, 0)!.damage).toBe(5);

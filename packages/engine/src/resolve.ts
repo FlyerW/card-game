@@ -180,11 +180,11 @@ function dealDamage(ctx: Ctx, target: Target, creature: Creature | null, amount:
   return 0;
 }
 
+/** 英雄回復：英雄的 HP 沒有上限，可以回到比起始 HP 還多（heroDamage 會變成負的）。 */
 export function healHero(ctx: Ctx, player: PlayerId, amount: number): void {
   const owner = ctx.state.players[player];
-  const healed = Math.min(amount, owner.heroDamage);
-  owner.heroDamage -= healed;
-  ctx.events.push({ type: 'healed', target: { kind: 'hero', player }, amount: healed });
+  owner.heroDamage -= amount;
+  ctx.events.push({ type: 'healed', target: { kind: 'hero', player }, amount });
 }
 
 function healCreature(ctx: Ctx, creature: Creature, target: Target, amount: number): void {

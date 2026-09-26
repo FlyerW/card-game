@@ -16,7 +16,7 @@ export const DEFAULT_RULES: Rules = {
   startingMaxEnergy: [1, 2],
   energyGrowth: 2,
   baseCeiling: 12,
-  secondPlayerBonusEnergy: 1,
+  secondPlayerBonusEnergy: 0,
   secondPlayerBonusCards: 0,
 };
 

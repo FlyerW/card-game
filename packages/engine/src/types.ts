@@ -339,6 +339,7 @@ export interface Creature {
 
 export interface PlayerState {
   heroId: string;
+  /** 英雄受到的傷害減掉回復的量；英雄 HP 沒有上限，回復得比受傷多時是負的。 */
   heroDamage: number;
   heroPowerUsedTurn: number | null;
   /** 目前這個天生技這局用了幾次；英雄進化換成新的天生技時重新算。 */

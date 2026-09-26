@@ -107,7 +107,7 @@ describe('HP 減半與回復', () => {
     expect(at(state, a, 1)?.damage).toBe(0);
   });
 
-  it('回復不超過 HP 上限', () => {
+  it('生物回復不超過 HP 上限；英雄沒有上限', () => {
     let { state, a } = start();
     place(state, a, 0, 'wolf', { damage: 2 });
     state.players[a].heroDamage = 1;
@@ -115,7 +115,7 @@ describe('HP 減半與回復', () => {
     state = act(state, { type: 'castSpell', player: a, card: give(state, a, 'mend'), target: creatureAt(a, 0) });
     expect(at(state, a, 0)?.damage).toBe(0);
     state = act(state, { type: 'castSpell', player: a, card: give(state, a, 'mend'), target: hero(a) });
-    expect(state.players[a].heroDamage).toBe(0);
+    expect(state.players[a].heroDamage).toBeLessThan(0);
   });
 });
 

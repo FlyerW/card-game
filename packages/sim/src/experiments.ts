@@ -24,8 +24,8 @@ import { buildDeck } from './deck';
 
 const ALL_COLORS: Color[] = ['white', 'blue', 'black', 'red', 'green'];
 /** 英雄基準 HP。 */
-export const BASE_HP = 55;
-export const HERO_HPS = [35, 45, 55, 65, 75] as const;
+export const BASE_HP = 40;
+export const HERO_HPS = [30, 35, 40, 45, 50] as const;
 const simHero = (hp: number): HeroDef => ({ kind: 'hero', id: `sim-${hp}`, name: `模擬英雄 ${hp}`, colors: ALL_COLORS, hp });
 
 export const db = buildCardDb(SAMPLE_CARDS, [...SAMPLE_HEROES, ...HERO_HPS.map(simHero)]);
@@ -52,8 +52,8 @@ const ENERGY_SYSTEMS = [
 ];
 
 /**
- * 1. 三種能量制度 × 三種打法（英雄 35 HP）：先後手平衡，以及結論會不會因打法而變。
- * 2. 新制 × 英雄 25–50 HP（均衡打法）：英雄血量怎麼影響對局長度。
+ * 1. 三種能量制度 × 三種打法（英雄 40 HP）：先後手平衡，以及結論會不會因打法而變。
+ * 2. 新制 × 英雄 30–50 HP（均衡打法）：英雄血量怎麼影響對局長度。
  * 3. 新制 × 範例卡的每個英雄（均衡打法）：用他自己能用的卡組牌，看實際的對局長度與先後手。
  * 4. 範例卡的英雄兩兩對戰（均衡打法、各自的卡池）：看哪個英雄、哪個顏色太強或太弱。局數是其他組的一半。
  */

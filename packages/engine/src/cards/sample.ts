@@ -31,41 +31,41 @@ const hit = (name: string, cost: number, target: TargetSpec, amount: number): Ab
 });
 
 export const SAMPLE_HEROES: HeroDef[] = [
-  // 英雄 HP 的起點是 55 − 3 ×（顏色數 − 1）− 效果強度，再照模擬調整。
+  // 英雄 HP 在 35–45 之間（快攻比較打得死），再用困難電腦的英雄對戰模擬調技能與 HP。
   // 單色的五個是基礎英雄，每個人都有；雙色以上的是 UR，要從卡包抽到。
   {
-    kind: 'hero', id: 'nameless-swordsman', name: '無名劍士', colors: ['white'], hp: 50,
-    passive: { name: '劍士之道', creatures: { attack: 1 }, pierce: true },
+    kind: 'hero', id: 'nameless-swordsman', name: '無名劍士', colors: ['white'], hp: 45,
+    passive: { name: '劍士之道', creatures: { attack: 1 }, ownTurn: { attack: 1 }, pierce: true },
   },
   {
-    kind: 'hero', id: 'deep-seer', name: '深海先知', colors: ['blue'], hp: 55,
+    kind: 'hero', id: 'deep-seer', name: '深海先知', colors: ['blue'], hp: 41,
     power: { name: '預見', cost: 3, target: NONE, effects: [{ type: 'draw', count: 1 }] },
   },
   {
-    kind: 'hero', id: 'underworld-priest', name: '冥府祭司', colors: ['black'], hp: 44,
-    power: { name: '蝕心', cost: 4, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
+    kind: 'hero', id: 'underworld-priest', name: '冥府祭司', colors: ['black'], hp: 37,
+    power: { name: '蝕心', cost: 5, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
   },
   {
-    kind: 'hero', id: 'flame-lord', name: '烈焰領主', colors: ['red'], hp: 66,
-    power: hit('燃燼', 1, ANY, 1),
+    kind: 'hero', id: 'flame-lord', name: '烈焰領主', colors: ['red'], hp: 45,
+    power: hit('燃燼', 2, ANY, 2),
   },
   {
-    kind: 'hero', id: 'forest-king', name: '林海之王', colors: ['green'], hp: 54,
-    power: { name: '萌發', cost: 3, target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }] },
+    kind: 'hero', id: 'forest-king', name: '林海之王', colors: ['green'], hp: 44,
+    power: { name: '萌發', cost: 2, target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }, { type: 'healAll', amount: 2 }] },
   },
   // ── UR 英雄：多色。技能盡量不跟別的英雄重複 ──
   {
-    kind: 'hero', id: 'grove-saint', name: '翠林聖女', rarity: 'UR', colors: ['white', 'green'], hp: 58,
-    passive: { name: '豐饒', creatures: { hp: 1 } },
+    kind: 'hero', id: 'grove-saint', name: '翠林聖女', rarity: 'UR', colors: ['white', 'green'], hp: 40,
+    passive: { name: '豐饒', creatures: { hp: 2 } },
   },
   {
     // 潮與影輪流：抽牌用完變成棄牌，棄牌用完又變回抽牌。
-    kind: 'hero', id: 'tide-shadow-twins', name: '潮影雙生', rarity: 'UR', colors: ['blue', 'black'], hp: 36,
-    power: { name: '潮之面', cost: 3, target: NONE, effects: [{ type: 'draw', count: 1 }] },
+    kind: 'hero', id: 'tide-shadow-twins', name: '潮影雙生', rarity: 'UR', colors: ['blue', 'black'], hp: 35,
+    power: { name: '潮之面', cost: 4, target: NONE, effects: [{ type: 'draw', count: 1 }] },
     alternatePower: { name: '影之面', cost: 4, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
   },
   {
-    kind: 'hero', id: 'prism-sage', name: '虹彩賢者', rarity: 'UR', colors: ['white', 'blue', 'black', 'red', 'green'], hp: 43,
+    kind: 'hero', id: 'prism-sage', name: '虹彩賢者', rarity: 'UR', colors: ['white', 'blue', 'black', 'red', 'green'], hp: 37,
     power: { name: '稜光', cost: 3, target: NONE, effects: [{ type: 'buff', attack: 1, hp: 1, on: 'all' }] },
   },
 ];
@@ -564,14 +564,14 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     kind: 'heroEvolution', id: 'underworld-lord', name: '冥府之主', rarity: 'UR', colors: ['black'],
     cost: 6, evolvesFrom: 'underworld-priest', hpBonus: 10,
     entry: { name: '亡者之潮', target: NONE, effects: [{ type: 'poison', amount: 2, all: true }] },
-    power: { name: '奪心', cost: 3, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
+    power: { name: '奪心', cost: 4, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
   },
   {
     kind: 'heroEvolution', id: 'tide-shadow-sovereign', name: '潮影君主', rarity: 'UR', colors: ['blue', 'black'],
     cost: 6, evolvesFrom: 'tide-shadow-twins', hpBonus: 11,
     entry: { name: '潮汐吞噬', target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 2 }] },
     power: {
-      name: '深淵低語', cost: 3, target: NONE,
+      name: '深淵低語', cost: 5, target: NONE,
       effects: [{ type: 'opponentDiscardRandom', count: 1 }, { type: 'draw', count: 1 }],
     },
   },

@@ -1,5 +1,11 @@
 import type { Engine, GameConfig, GameResult, PlayerId } from '@card-game/engine';
-import { chooseAction, type BotStyle } from './bot';
+import { chooseAction, chooseActionSmart, type BotStyle } from './bot';
+
+/**
+ * 模擬用哪一種電腦：預設普通（貪婪，快）；環境變數 BOT=hard 用困難的電腦（規劃整回合、模擬對手回應，
+ * 比較接近真人，但慢很多）。例如 BOT=hard npm run sim -- --games 200。
+ */
+const think = process.env.BOT === 'hard' ? chooseActionSmart : chooseAction;
 
 export interface MatchOutcome {
   firstPlayer: PlayerId;
@@ -28,7 +34,7 @@ export function playMatch(engine: Engine, config: GameConfig, style: BotStyle, m
   let plays = 0;
   let attacks = 0;
   for (let i = 0; i < maxActions && state.phase !== 'over'; i++) {
-    const pick = chooseAction(engine, state, engine.actor(state), style);
+    const pick = think(engine, state, engine.actor(state), style);
     if (pick.action.type === 'attack') attacks++;
     else if (pick.action.type !== 'endTurn') plays++;
     state = pick.state;
