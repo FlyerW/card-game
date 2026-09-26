@@ -37,7 +37,7 @@ import {
   type GameTally,
   type Profile,
 } from '@card-game/economy';
-import { chooseAction, STYLES } from '@card-game/sim/bot';
+import { chooseAction, chooseActionSmart, STYLES } from '@card-game/sim/bot';
 import { describeEvents, ZONE, type LogLine } from './log';
 import {
   addProblem,
@@ -153,6 +153,8 @@ interface App extends Saved {
   backend: Backend | null;
   /** 正在登入（等 Google 或伺服器回覆）。 */
   loggingIn: boolean;
+  /** 電腦難度：普通是只看一步的貪婪策略，困難會規劃整回合、提防對手下回合。 */
+  difficulty: Difficulty;
   /** 金幣、收藏、每日任務。 */
   profile: Profile;
   shop: Shop;
@@ -186,6 +188,7 @@ const app: App = {
   loggingIn: false,
   profile: newProfile(today(), []),
   shop: newShop(),
+  difficulty: loadDifficulty(),
 };
 
 /** 登入成功：記住帳號、換成這個帳號的資料與牌組。 */
@@ -285,6 +288,17 @@ function settle(view: PlayerView): void {
       render();
     },
   );
+}
+
+type Difficulty = 'normal' | 'hard';
+const DIFFICULTY_KEY = 'card-game.difficulty';
+
+function loadDifficulty(): Difficulty {
+  try {
+    return localStorage.getItem(DIFFICULTY_KEY) === 'normal' ? 'normal' : 'hard';
+  } catch {
+    return 'hard';
+  }
 }
 
 function loadName(): string {
@@ -516,7 +530,8 @@ async function advance(): Promise<void> {
     if (engine.actor(before) === BOT) {
       await sleep(BOT_STEP_MS);
       if (app.state !== before) break;
-      const pick = chooseAction(engine, before, BOT, STYLES.balanced);
+      const think = app.difficulty === 'hard' ? chooseActionSmart : chooseAction;
+      const pick = think(engine, before, BOT, STYLES.balanced);
       localStep(pick.state, pick.events);
     } else {
       break;
@@ -1080,6 +1095,11 @@ function setupScreen(): string {
       <div><p class="d-head">牌組</p><p class="d-line${problems.length ? ' warn' : ''}">${esc(deckText)}</p></div>
       <button class="ghost" data-do="builder">${custom ? '編輯牌組' : '自己組牌'}</button>
     </section>
+    <section class="difficulty" aria-label="電腦難度"><span class="w-label">電腦難度</span>
+      ${(['normal', 'hard'] as const)
+        .map((d) => `<button class="chip${app.difficulty === d ? ' on' : ''}" data-difficulty="${d}" aria-pressed="${app.difficulty === d}">${d === 'normal' ? '普通' : '困難'}</button>`)
+        .join('')}
+      <span class="d-line">${app.difficulty === 'normal' ? '只看眼前這一步，適合剛上手' : '會規劃整個回合、提防你下回合的攻擊'}</span></section>
     ${ONLINE_AVAILABLE ? onlineSetup(problems.length > 0) : `<button class="primary big" data-do="start" ${problems.length ? 'disabled' : ''}>開始對戰</button>`}
     ${app.toast ? `<p class="toast" role="alert">${esc(app.toast)}</p>` : ''}
     <section class="howto">
@@ -1255,7 +1275,7 @@ function builderClick(el: HTMLElement, command: string | undefined): boolean {
 
 root.addEventListener('click', (event) => {
   const el = (event.target as HTMLElement).closest<HTMLElement>(
-    '[data-do],[data-key],[data-hand],[data-skill],[data-hero],[data-mull],[data-pick],[data-add],[data-remove],[data-focus],[data-filter],[data-rarity],[data-color],[data-missing],[data-exchange]',
+    '[data-do],[data-key],[data-hand],[data-skill],[data-hero],[data-mull],[data-pick],[data-add],[data-remove],[data-focus],[data-filter],[data-rarity],[data-color],[data-missing],[data-exchange],[data-difficulty]',
   );
   if (!el) {
     if (app.selection) {
@@ -1264,14 +1284,22 @@ root.addEventListener('click', (event) => {
     }
     return;
   }
-  const { do: command, key, hand: handUid, skill, hero: heroId, mull, pick } = el.dataset;
+  const { do: command, key, hand: handUid, skill, hero: heroId, mull, pick, difficulty } = el.dataset;
   if (app.screen === 'deck' && builderClick(el, command)) return;
   if (app.screen === 'shop' && app.backend && shopClick(db, app, app.backend, el, command, render)) {
     render();
     return;
   }
 
-  if (heroId) {
+  if (difficulty) {
+    app.difficulty = difficulty === 'normal' ? 'normal' : 'hard';
+    try {
+      localStorage.setItem(DIFFICULTY_KEY, app.difficulty);
+    } catch {
+      // 存不了就只在這次開著的頁面有效。
+    }
+    render();
+  } else if (heroId) {
     if (ownsHero(app.profile, db, heroId)) app.heroId = heroId;
     render();
   } else if (mull) {

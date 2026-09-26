@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chooseAction, evaluate, STYLES } from '../src/bot';
+import { chooseAction, chooseActionSmart, evaluate, incomingDamage, STYLES } from '../src/bot';
 import { DEFAULT_RULES, deckPool, SAMPLE_CARDS, SAMPLE_HEROES, validateDeck, type Creature, type GameState, type PlayerId } from '@card-game/engine';
 import { buildDeck, evolutionLines } from '../src/deck';
 import { EXPERIMENTS, engine, gameConfig, mirrorDeck } from '../src/experiments';
@@ -113,3 +113,27 @@ describe('機器人', () => {
     }
   });
 });
+
+describe('困難的電腦', () => {
+  it('會把生物放在擋得住對手大生物的格子，貪婪策略不會', () => {
+    const state = opening();
+    const a = state.activePlayer;
+    const b: PlayerId = a === 0 ? 1 : 0;
+    put(state, b, 4, 'siege-colossus'); // 攻擊 9，在最右邊，只打得到 3、4 號格
+    put(state, a, 3, 'gray-wolf');
+    state.players[a].heroDamage = heroMax(state, a) - 8; // 剩 8 HP，4 號格空著就會被打死
+    state.players[a].energy = 3;
+    state.players[a].hand = [{ uid: state.nextUid++, cardId: 'wandering-mercenary' }];
+    expect(incomingDamage(engine, state, a)).toBe(9);
+
+    const smart = chooseActionSmart(engine, state, a, STYLES.balanced);
+    expect(smart.action).toMatchObject({ type: 'summon', zone: 4 });
+    expect(incomingDamage(engine, smart.state, a)).toBe(0);
+    const greedy = chooseAction(engine, state, a, STYLES.balanced);
+    expect(greedy.action).not.toMatchObject({ zone: 4 });
+  });
+});
+
+function heroMax(state: GameState, player: PlayerId): number {
+  return engine.db.heroes.get(state.players[player].heroId)!.hp;
+}

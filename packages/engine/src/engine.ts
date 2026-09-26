@@ -753,5 +753,7 @@ export function createEngine(db: CardDb) {
     actor,
     replay,
     viewFor: (state: GameState, player: PlayerId) => viewFor(db, state, player),
+    /** 這位玩家的生物攻擊時，被擋住也打得到英雄（英雄被動「突破」）。 */
+    pierces: (state: GameState, player: PlayerId) => pierces(db, state, player),
   };
 }

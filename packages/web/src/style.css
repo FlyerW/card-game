@@ -333,6 +333,8 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .notice { margin: 0; padding: 8px 10px; border-radius: 6px; background: #1f3a26; color: #c9f2d2; }
 .primary:disabled { filter: grayscale(1) brightness(.6); cursor: default; }
 
+.difficulty { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
 /* ─── 登入 ─── */
 .login-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
 .login-card {

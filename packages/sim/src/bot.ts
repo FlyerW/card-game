@@ -111,3 +111,94 @@ export function chooseAction(engine: Engine, state: GameState, me: PlayerId, sty
   }
   return best ?? fallback ?? options[0]!;
 }
+
+// ─── 困難：規劃整個回合，並提防對手下回合 ──────────────────────────────────────
+
+/** 對手下回合的攻擊能打到 player 的英雄多少：打得到英雄的生物（範圍內有空格、或對手英雄有突破）的攻擊力加總。 */
+export function incomingDamage(engine: Engine, state: GameState, player: PlayerId): number {
+  const { db } = engine;
+  const enemy = other(player);
+  const pierce = engine.pierces(state, enemy);
+  let total = 0;
+  state.players[enemy].zones.forEach((creature, zone) => {
+    if (creature === null || isWeakened(state, creature) || isParalyzed(state, creature)) return;
+    const lanes = [zone - 1, zone, zone + 1].filter((z) => z >= 0 && z < state.rules.zones);
+    const open = pierce || lanes.some((z) => state.players[player].zones[z] === null);
+    if (open) total += attackPower(db, state, creature);
+  });
+  return total;
+}
+
+/**
+ * 回合結束時的局面分數：一般的評分，再扣掉對手下回合打得到英雄的傷害；
+ * 那些傷害夠打死英雄的話，幾乎等於輸了。
+ */
+export function evaluateEndOfTurn(engine: Engine, state: GameState, me: PlayerId, style: BotStyle): number {
+  const base = evaluate(engine.db, state, me, style);
+  if (state.result !== null) return base;
+  const incoming = incomingDamage(engine, state, me);
+  const hp = heroHp(engine.db, state, me);
+  if (incoming >= hp) return base - 1e5;
+  // 我方下回合打得到對手英雄的傷害也算一點：鼓勵把路打開、準備斬殺。
+  const outgoing = incomingDamage(engine, state, other(me));
+  return base - style.ownHero * incoming * 0.5 + style.enemyHero * outgoing * 0.25;
+}
+
+/** 照貪婪策略把這個回合打完，回傳宣告結束回合之前的局面。 */
+function playOutTurn(engine: Engine, state: GameState, me: PlayerId, style: BotStyle, maxSteps = 25): GameState {
+  let current = state;
+  for (let step = 0; step < maxSteps; step++) {
+    if (current.result !== null || engine.actor(current) !== me) return current;
+    const pick = chooseAction(engine, current, me, style);
+    if (pick.action.type === 'endTurn') return current;
+    current = pick.state;
+  }
+  return current;
+}
+
+/**
+ * 模擬對手下回合怎麼回應：結束回合，把對手的手牌拿掉（看不到，不偷看），讓他只用場上的生物與天生技
+ * 照貪婪策略打一回合。回傳對手打完、準備結束回合時的局面。
+ */
+function opponentReply(engine: Engine, state: GameState, me: PlayerId, style: BotStyle): GameState {
+  const ended = engine.apply(state, { type: 'endTurn', player: me });
+  if (!ended.ok) return state;
+  if (ended.state.result !== null) return ended.state;
+  const blind = ended.state;
+  blind.players[other(me)].hand = [];
+  return playOutTurn(engine, blind, other(me), style);
+}
+
+/** 回合結束的局面分數：模擬對手用場上的東西回應之後再評分，再加上提防與進攻的估計。 */
+function scoreAfterReply(engine: Engine, state: GameState, me: PlayerId, style: BotStyle): number {
+  if (state.result !== null) return evaluate(engine.db, state, me, style);
+  const reply = opponentReply(engine, state, me, style);
+  return evaluate(engine.db, reply, me, style) * 0.6 + evaluateEndOfTurn(engine, state, me, style) * 0.4;
+}
+
+/**
+ * 困難的電腦：挑一步看起來最好的幾個候選，每個都把這回合剩下的部分打完，
+ * 再模擬對手下回合用場上的生物回應，比最後的局面。比貪婪策略慢，但會卡位置、會找連續技、會留生物擋。
+ */
+export function chooseActionSmart(engine: Engine, state: GameState, me: PlayerId, style: BotStyle, breadth = 8): Successor {
+  const options = engine.successors(state, me);
+  const endTurn = options.find((option) => option.action.type === 'endTurn');
+  // 選牌（看牌庫頂）這種不是一般動作的決定，照貪婪策略。
+  if (!endTurn) return chooseAction(engine, state, me, style);
+  const ranked = options
+    .filter((option) => option !== endTurn)
+    .map((option) => ({ option, quick: evaluate(engine.db, option.state, me, style) }))
+    .sort((x, y) => y.quick - x.quick)
+    .slice(0, breadth);
+  let best: Successor = endTurn;
+  let bestScore = scoreAfterReply(engine, state, me, style) + 1e-9;
+  for (const { option } of ranked) {
+    const final = option.state.result !== null ? option.state : playOutTurn(engine, option.state, me, style);
+    const score = scoreAfterReply(engine, final, me, style);
+    if (score > bestScore) {
+      best = option;
+      bestScore = score;
+    }
+  }
+  return best;
+}
