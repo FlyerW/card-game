@@ -116,6 +116,7 @@ describe('卡面文字', () => {
     const hound = db.cards.get('hound')!;
     expect(describeCard(hound, (id) => db.cards.get(id)!.name)).toEqual([
       'hound　R・無色・由pup進化｜能量 2｜⚔ 2｜♥ 10',
+      '速攻（進化卡都有）：召喚當回合也能進化，進化完馬上能攻擊或發動技能',
       'bite2（能量 1）：〔任意目標〕造成 2 傷害',
       'sniff（能量 1）：抽 1 張牌',
     ]);

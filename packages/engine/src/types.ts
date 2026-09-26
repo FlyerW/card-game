@@ -115,6 +115,8 @@ export interface Ability {
   effects: Effect[];
   /** 每局最多發動幾次；沒有就不限。目前用在天生技上。 */
   uses?: number;
+  /** 【休息】生物技能：這回合還沒攻擊才能發動，發動後這回合不能攻擊。通常不花能量。 */
+  rest?: boolean;
 }
 
 interface CardBase {
@@ -289,8 +291,10 @@ export interface Creature {
   item: CardRef | null;
   summonedTurn: number;
   evolvedTurn: number | null;
-  /** 這回合攻擊過或發動過技能：兩者每回合合計一次。 */
-  actedTurn: number | null;
+  /** 這回合攻擊過（或發動了【休息】技能）。攻擊每回合一次。 */
+  attackedTurn: number | null;
+  /** 這回合發動過技能。技能每回合一次，跟攻擊分開算。 */
+  skillUsedTurn: number | null;
   /** 挑釁持續到這個回合結束（含）。 */
   tauntUntilTurn: number | null;
   /** 中毒的數字，0 表示沒有中毒。 */

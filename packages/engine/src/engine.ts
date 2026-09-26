@@ -258,7 +258,6 @@ function evolve(ctx: Ctx, a: ActionOf<'evolve'>): void {
   if (def.evolvesFrom !== from) {
     fail('EVOLUTION_MISMATCH', `${def.name} 要由 ${cardDef(db, def.evolvesFrom!).name} 進化，這格是 ${cardDef(db, from).name}`);
   }
-  if (creature.summonedTurn === state.turn) fail('SUMMONED_THIS_TURN', '召喚當回合不能進化');
   if (creature.evolvedTurn === state.turn) fail('ALREADY_EVOLVED', '同一隻生物一回合只能進化一次');
 
   pay(p, def.cost);
@@ -271,23 +270,27 @@ function evolve(ctx: Ctx, a: ActionOf<'evolve'>): void {
   triggerEntry(ctx, def, a.player, a.zone, a.target);
 }
 
-/** 攻擊與發動技能共用的檢查：每回合合計一次、召喚當回合不行（速攻例外）、麻痺不行。 */
+/**
+ * 攻擊與發動技能共用的檢查：召喚當回合不行，但有速攻或進化過的可以（進化卡都算有速攻）；麻痺不行。
+ * 攻擊與技能每回合各一次，分開算。
+ */
 function checkCanAct(ctx: Ctx, creature: Creature, what: string): void {
   const { db, state } = ctx;
   const def = creatureDef(db, creature);
-  if (creature.actedTurn === state.turn) fail('ALREADY_ACTED', `${def.name} 這回合已經攻擊或發動過技能`);
-  if (creature.summonedTurn === state.turn && !def.keywords?.includes('haste')) {
+  const evolved = creature.cards.length > 1;
+  if (creature.summonedTurn === state.turn && !evolved && !def.keywords?.includes('haste')) {
     fail('SUMMONED_THIS_TURN', `召喚當回合不能${what}`);
   }
   if (isParalyzed(state, creature)) fail('PARALYZED', `${def.name} 麻痺中，不能${what}`);
 }
 
-/** 生物攻擊：不花能量，每回合跟技能合計一次。 */
+/** 生物攻擊：不花能量，每回合一次；發動了【休息】技能就不能攻擊。 */
 function attack(ctx: Ctx, a: ActionOf<'attack'>): void {
   const { db, state } = ctx;
   const creature = ownCreature(state, a.player, a.zone);
   const def = creatureDef(db, creature);
   checkCanAct(ctx, creature, '攻擊');
+  if (creature.attackedTurn === state.turn) fail('ALREADY_ATTACKED', `${def.name} 這回合已經攻擊過（或休息了）`);
   if (isDisarmed(state, creature)) fail('DISARMED', `${def.name} 被繳械，不能攻擊`);
   if (attackPower(db, state, creature) <= 0) fail('NO_ATTACK', `${def.name} 的攻擊力是 0，不能攻擊`);
   const legal = attackTargets(state, a.player);
@@ -297,7 +300,7 @@ function attack(ctx: Ctx, a: ActionOf<'attack'>): void {
     if (wouldBeLegal) fail('MUST_TARGET_TAUNT', '對手有挑釁中的生物，必須先攻擊牠');
     fail('ILLEGAL_TARGET', '只能攻擊對手的生物或英雄');
   }
-  creature.actedTurn = state.turn;
+  creature.attackedTurn = state.turn;
   combat(ctx, a.player, a.zone, a.target);
 }
 
@@ -308,12 +311,15 @@ function useSkill(ctx: Ctx, a: ActionOf<'useSkill'>): void {
   const def = creatureDef(db, creature);
   const skill = creatureSkills(db, creature)[a.skill] ?? fail('INVALID_SKILL', `${def.name} 沒有第 ${a.skill + 1} 個技能`);
   checkCanAct(ctx, creature, '發動技能');
+  if (creature.skillUsedTurn === state.turn) fail('SKILL_ALREADY_USED', `${def.name} 這回合已經發動過技能`);
   if (isSilenced(state, creature)) fail('SILENCED', `${def.name} 沉默中，不能發動技能`);
+  if (skill.rest && creature.attackedTurn === state.turn) fail('MUST_REST', `「${skill.name}」要休息才能發動：${def.name} 這回合已經攻擊過了`);
 
   const source: AbilitySource = { kind: 'creature', player: a.player, zone: a.zone };
   const target = chooseTarget(ctx, skill, source, a.target);
   pay(p, skill.cost);
-  creature.actedTurn = state.turn;
+  creature.skillUsedTurn = state.turn;
+  if (skill.rest) creature.attackedTurn = state.turn; // 休息了，這回合不能攻擊
   ctx.events.push({ type: 'abilityUsed', player: a.player, source: 'creature', cardId: def.id, ability: skill.name });
   resolveAbility(ctx, skill, source, target);
 }

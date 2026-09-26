@@ -152,6 +152,8 @@ export const TEST_CARDS: DeckCardDef[] = [
 
   // 攻擊：數值各不相同的生物
   creature('brute', [hit('smash', ANY, 4)], { attack: 5, hp: 6 }),
+  // 【休息】技能：不花能量，這回合沒攻擊才能用，用了就不能攻擊
+  creature('guard', [{ name: 'brace', cost: 0, rest: true, target: NONE, effects: [{ type: 'taunt' }] }], { attack: 3, hp: 8 }),
   creature('relic', [hit('x', ANY, 1), hit('y', ANY, 1)], { rarity: 'UR' }),
   creature('wall', [], { rarity: 'N', attack: 0, hp: 8 }),
   // 道具給的技能；場地卡在回合開始時的效果

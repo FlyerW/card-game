@@ -94,8 +94,11 @@ export function describeEffects(ability: Omit<Ability, 'cost'>, names: Names = i
 }
 
 /** 技能與天生技：「火花（能量 2）：〔斜對角〕造成 7 傷害」。 */
-export const describeAbility = (ability: Ability, names: Names = ids): string =>
-  `${ability.name}（能量 ${ability.cost}${ability.uses ? `，每局 ${ability.uses} 次` : ''}）：${describeEffects(ability, names)}`;
+export function describeAbility(ability: Ability, names: Names = ids): string {
+  // 【休息】技能：不花能量的只寫「休息」。
+  const cost = ability.rest ? (ability.cost > 0 ? `能量 ${ability.cost}，休息` : '休息') : `能量 ${ability.cost}`;
+  return `${ability.name}（${cost}${ability.uses ? `，每局 ${ability.uses} 次` : ''}）：${describeEffects(ability, names)}`;
+}
 
 /** 進場效果：「進場 火星：〔任意目標〕造成 2 傷害」。 */
 export const describeEntry = (entry: Omit<Ability, 'cost'>, names: Names = ids): string =>
@@ -105,6 +108,7 @@ export const describeEntry = (entry: Omit<Ability, 'cost'>, names: Names = ids):
 function describeTraits(card: CreatureDef): string[] {
   const lines: string[] = [];
   if (card.keywords?.includes('haste')) lines.push('速攻：召喚當回合就能攻擊或發動技能');
+  else if (card.evolvesFrom !== undefined) lines.push('速攻（進化卡都有）：召喚當回合也能進化，進化完馬上能攻擊或發動技能');
   if (card.keywords?.includes('lifesteal')) lines.push('吸血：牠造成傷害時（攻擊、反擊、技能），你的英雄回復等量的 ♥');
   if (card.regenerate) lines.push(`再生 ${card.regenerate}：你的回合開始時，牠回復 ${card.regenerate}♥`);
   return lines;

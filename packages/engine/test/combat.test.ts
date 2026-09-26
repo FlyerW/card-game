@@ -152,11 +152,23 @@ describe('進化', () => {
     expect(reject(state, { type: 'evolve', player: a, card: give(state, a, 'hound'), zone: 1 })).toBe('EVOLUTION_MISMATCH');
   });
 
-  it('召喚當回合不能進化', () => {
-    let { state, a } = start();
+  it('進化卡都算有速攻：召喚當回合就能進化，進化後馬上可以攻擊與發動技能', () => {
+    let { state, a, b } = start();
     state.players[a].energy = 10;
     state = act(state, { type: 'summon', player: a, card: give(state, a, 'pup'), zone: 0 });
-    expect(reject(state, { type: 'evolve', player: a, card: give(state, a, 'hound'), zone: 0 })).toBe('SUMMONED_THIS_TURN');
+    expect(reject(state, { type: 'attack', player: a, zone: 0, target: hero(b) })).toBe('SUMMONED_THIS_TURN');
+    state = act(state, { type: 'evolve', player: a, card: give(state, a, 'hound'), zone: 0 });
+    state = act(state, { type: 'attack', player: a, zone: 0, target: hero(b) });
+    act(state, { type: 'useSkill', player: a, zone: 0, skill: 0, target: hero(b) });
+  });
+
+  it('已經攻擊過的生物進化，這回合不會多一次攻擊', () => {
+    let { state, a, b } = start();
+    place(state, a, 0, 'pup');
+    state.players[a].energy = 10;
+    state = act(state, { type: 'attack', player: a, zone: 0, target: hero(b) });
+    state = act(state, { type: 'evolve', player: a, card: give(state, a, 'hound'), zone: 0 });
+    expect(reject(state, { type: 'attack', player: a, zone: 0, target: hero(b) })).toBe('ALREADY_ATTACKED');
   });
 
   it('進化當回合可以發動技能；已經發動過的話，進化不會多給一次', () => {
@@ -170,7 +182,7 @@ describe('進化', () => {
 
     state = act(state, { type: 'useSkill', player: a, zone: 1, skill: 0, target: hero(b) });
     state = act(state, { type: 'evolve', player: a, card: give(state, a, 'hound'), zone: 1 });
-    expect(reject(state, { type: 'useSkill', player: a, zone: 1, skill: 0, target: hero(b) })).toBe('ALREADY_ACTED');
+    expect(reject(state, { type: 'useSkill', player: a, zone: 1, skill: 0, target: hero(b) })).toBe('SKILL_ALREADY_USED');
   });
 
   it('指示物與道具在進化後保留', () => {

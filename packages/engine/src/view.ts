@@ -42,7 +42,9 @@ export interface CreatureView {
   disarmed: boolean;
   weakened: boolean;
   cursed: boolean;
-  actedThisTurn: boolean;
+  /** 這回合攻擊過（或休息了）。 */
+  attackedThisTurn: boolean;
+  skillUsedThisTurn: boolean;
   summonedThisTurn: boolean;
 }
 
@@ -108,7 +110,8 @@ function creatureView(db: CardDb, state: GameState, creature: Creature): Creatur
     disarmed: isDisarmed(state, creature),
     weakened: isWeakened(state, creature),
     cursed: isCursed(state, creature),
-    actedThisTurn: creature.actedTurn === state.turn,
+    attackedThisTurn: creature.attackedTurn === state.turn,
+    skillUsedThisTurn: creature.skillUsedTurn === state.turn,
     summonedThisTurn: creature.summonedTurn === state.turn,
   };
 }

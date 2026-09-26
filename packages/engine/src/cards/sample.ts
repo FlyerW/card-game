@@ -72,15 +72,15 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   // ── 無色：比同費用有顏色的卡少 1 點數值 ──
   { kind: 'creature', id: 'gray-wolf', name: '灰狼', rarity: 'N', colors: [], stage: 0, cost: 1, attack: 1, hp: 1, skills: [] },
   {
-    // 用攻擊力換 HP：打不了人，但能挑釁擋刀。
+    // 用攻擊力換 HP：打不了人，但能休息挑釁擋刀。
     kind: 'creature', id: 'rock-turtle', name: '岩殼龜', rarity: 'R', colors: [],
     stage: 0, cost: 2, attack: 0, hp: 5,
-    skills: [{ name: '縮殼', cost: 1, target: NONE, effects: [{ type: 'taunt' }] }],
+    skills: [{ name: '縮殼', cost: 0, rest: true, target: NONE, effects: [{ type: 'taunt' }] }],
   },
   {
     kind: 'creature', id: 'wandering-mercenary', name: '流浪傭兵', rarity: 'R', colors: [],
     stage: 0, cost: 3, attack: 3, hp: 3,
-    skills: [{ name: '磨刀', cost: 1, target: NONE, effects: [{ type: 'buff', attack: 2, hp: 0, on: 'self' }] }],
+    skills: [{ name: '磨刀', cost: 0, rest: true, target: NONE, effects: [{ type: 'buff', attack: 2, hp: 0, on: 'self' }] }],
   },
   { kind: 'creature', id: 'gargoyle', name: '石像鬼', rarity: 'N', colors: [], stage: 0, cost: 4, attack: 4, hp: 4, skills: [] },
   {
@@ -107,7 +107,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   {
     kind: 'creature', id: 'paladin', name: '聖騎士', rarity: 'R', colors: ['white'],
     stage: 1, evolvesFrom: 'squire', cost: 3, attack: 5, hp: 6,
-    skills: [{ name: '守護', cost: 1, target: NONE, effects: [{ type: 'taunt' }] }],
+    skills: [{ name: '守護', cost: 0, rest: true, target: NONE, effects: [{ type: 'taunt' }] }],
   },
   {
     // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物。
@@ -118,7 +118,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   {
     kind: 'creature', id: 'shield-knight', name: '盾衛騎士', rarity: 'R', colors: ['white'],
     stage: 0, cost: 3, attack: 3, hp: 4,
-    skills: [{ name: '挑釁', cost: 1, target: NONE, effects: [{ type: 'taunt' }] }],
+    skills: [{ name: '挑釁', cost: 0, rest: true, target: NONE, effects: [{ type: 'taunt' }] }],
   },
   {
     kind: 'creature', id: 'spring-nun', name: '聖泉修女', rarity: 'R', colors: ['white'],
@@ -155,7 +155,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     kind: 'creature', id: 'titan-of-light', name: '光之巨神', rarity: 'SR', colors: ['white'],
     stage: 0, cost: 11, attack: 11, hp: 14,
     entry: { name: '神聖光輝', target: NONE, effects: [{ type: 'silence', all: true }] },
-    skills: [{ name: '聖盾', cost: 2, target: NONE, effects: [{ type: 'taunt' }, { type: 'buff', attack: 0, hp: 2, on: 'self' }] }],
+    skills: [{ name: '聖盾', cost: 0, rest: true, target: NONE, effects: [{ type: 'taunt' }, { type: 'buff', attack: 0, hp: 2, on: 'self' }] }],
   },
   {
     kind: 'spell', id: 'healing-light', name: '治癒之光', rarity: 'N', colors: ['white'], cost: 1,
@@ -418,7 +418,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     kind: 'creature', id: 'sapling-guard', name: '樹苗守衛', rarity: 'R', colors: ['green'],
     stage: 0, cost: 2, attack: 2, hp: 2,
     entry: { name: '萌芽', target: ALLY_CREATURE, effects: [{ type: 'buff', attack: 2, hp: 2, on: 'target' }] },
-    skills: [{ name: '扎根', cost: 1, target: NONE, effects: [{ type: 'buff', attack: 0, hp: 2, on: 'self' }] }],
+    skills: [{ name: '扎根', cost: 0, rest: true, target: NONE, effects: [{ type: 'buff', attack: 0, hp: 2, on: 'self' }] }],
   },
   {
     kind: 'creature', id: 'strangler-vine', name: '絞殺藤', rarity: 'R', colors: ['green'],
@@ -443,7 +443,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   {
     kind: 'creature', id: 'elder-treant', name: '萬年樹人', rarity: 'SR', colors: ['green'],
     stage: 0, cost: 7, attack: 7, hp: 10, regenerate: 2,
-    skills: [{ name: '年輪', cost: 2, target: NONE, effects: [{ type: 'buff', attack: 0, hp: 4, on: 'self' }] }],
+    skills: [{ name: '年輪', cost: 0, rest: true, target: NONE, effects: [{ type: 'buff', attack: 0, hp: 4, on: 'self' }] }],
   },
   {
     // 原本進場是能量上限 +1，但打得出 10 費時下回合就到上限 12 了，沒有用；改成全體回復。

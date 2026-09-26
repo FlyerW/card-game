@@ -32,18 +32,33 @@ describe('攻擊', () => {
     expect(at(state, b, 0)).toBeNull();
   });
 
-  it('攻擊和技能每回合合計一次，兩種順序都一樣', () => {
+  it('攻擊與技能每回合各一次，分開算，順序不拘', () => {
     let { state, a, b } = start();
     place(state, a, 0, 'brute');
     place(state, a, 1, 'brute');
     state.players[a].energy = 10;
     const attacked = act(state, { type: 'attack', player: a, zone: 0, target: hero(b) });
-    expect(reject(attacked, { type: 'useSkill', player: a, zone: 0, skill: 0, target: hero(b) })).toBe('ALREADY_ACTED');
-    expect(reject(attacked, { type: 'attack', player: a, zone: 0, target: hero(b) })).toBe('ALREADY_ACTED');
+    expect(reject(attacked, { type: 'attack', player: a, zone: 0, target: hero(b) })).toBe('ALREADY_ATTACKED');
+    const both = act(attacked, { type: 'useSkill', player: a, zone: 0, skill: 0, target: hero(b) });
+    expect(both.players[b].heroDamage).toBe(5 + 4);
+    expect(reject(both, { type: 'useSkill', player: a, zone: 0, skill: 0, target: hero(b) })).toBe('SKILL_ALREADY_USED');
+
     const skilled = act(state, { type: 'useSkill', player: a, zone: 1, skill: 0, target: hero(b) });
-    expect(reject(skilled, { type: 'attack', player: a, zone: 1, target: hero(b) })).toBe('ALREADY_ACTED');
-    state = endTurn(endTurn(attacked));
+    act(skilled, { type: 'attack', player: a, zone: 1, target: hero(b) });
+    state = endTurn(endTurn(both));
     act(state, { type: 'attack', player: a, zone: 0, target: hero(b) });
+  });
+
+  it('【休息】技能不花能量，這回合攻擊過就不能用，用了就不能攻擊', () => {
+    let { state, a, b } = start();
+    place(state, a, 0, 'guard');
+    place(state, a, 1, 'guard');
+    state.players[a].energy = 0;
+    const attacked = act(state, { type: 'attack', player: a, zone: 0, target: hero(b) });
+    expect(reject(attacked, { type: 'useSkill', player: a, zone: 0, skill: 0 })).toBe('MUST_REST');
+    state = act(state, { type: 'useSkill', player: a, zone: 1, skill: 0 });
+    expect(at(state, a, 1)!.tauntUntilTurn).not.toBeNull();
+    expect(reject(state, { type: 'attack', player: a, zone: 1, target: hero(b) })).toBe('ALREADY_ATTACKED');
   });
 
   it('召喚當回合不能攻擊，速攻可以', () => {
@@ -174,13 +189,14 @@ describe('有次數限制的天生技', () => {
 });
 
 describe('道具給的技能', () => {
-  it('排在生物自己的技能後面，一樣算這隻生物這回合的行動', () => {
+  it('排在生物自己的技能後面，跟自己的技能合計每回合一次', () => {
     let { state, a, b } = start();
     place(state, a, 0, 'brute', { item: { uid: 900, cardId: 'wand' } });
     state.players[a].energy = 5;
     state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 1, target: hero(b) });
     expect(state.players[b].heroDamage).toBe(3);
-    expect(reject(state, { type: 'attack', player: a, zone: 0, target: hero(b) })).toBe('ALREADY_ACTED');
+    expect(reject(state, { type: 'useSkill', player: a, zone: 0, skill: 0, target: hero(b) })).toBe('SKILL_ALREADY_USED');
+    act(state, { type: 'attack', player: a, zone: 0, target: hero(b) }); // 攻擊另外算
   });
 
   it('道具被破壞就沒有這個技能了', () => {

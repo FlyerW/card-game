@@ -50,7 +50,7 @@ const THEM = (): PlayerId => other(YOU);
 const BOT: PlayerId = 1;
 const BOT_STEP_MS = 750;
 /** 存檔格式。引擎的狀態改了就加一，舊版存下來的對局就不接著打。 */
-const SAVE_FORMAT = 5;
+const SAVE_FORMAT = 6;
 
 // ─── 狀態 ────────────────────────────────────────────────────────────────────
 
@@ -399,7 +399,7 @@ function handReason(def: DeckCardDef, you: SideView): string {
     case 'creature':
       return def.stage === 0
         ? '生物區已滿'
-        : `場上沒有可以進化的${nameOf(def.evolvesFrom!)}（召喚當回合不能進化，一回合只能進化一次）`;
+        : `場上沒有可以進化的${nameOf(def.evolvesFrom!)}（每隻最多進化一次）`;
     case 'spell':
       return '目前沒有可以指定的目標';
     case 'item':
@@ -414,17 +414,19 @@ function handReason(def: DeckCardDef, you: SideView): string {
 /** 攻擊與技能共用的限制；沒有就是 null。 */
 function actReason(cv: CreatureView): string | null {
   const def = card(cv.cardId);
-  const haste = def.kind === 'creature' && def.keywords?.includes('haste');
+  // 有速攻，或進化過（進化卡都算有速攻），召喚當回合就能行動。
+  const haste = (def.kind === 'creature' && def.keywords?.includes('haste')) || cv.evolutionChain.length > 1;
   if (cv.paralyzed) return '麻痺中，不能攻擊、不能發動技能';
-  if (cv.actedThisTurn) return '這回合已經攻擊或發動過技能';
   if (cv.summonedThisTurn && !haste) return '召喚當回合不能攻擊、不能發動技能';
   return null;
 }
 
-function skillReason(cv: CreatureView, cost: number, energy: number): string {
+function skillReason(cv: CreatureView, cost: number, energy: number, rest: boolean): string {
   const reason = actReason(cv);
   if (reason) return reason;
+  if (cv.skillUsedThisTurn) return '這回合已經發動過技能';
   if (cv.silenced) return '沉默中，不能發動技能';
+  if (rest && cv.attackedThisTurn) return '這回合攻擊過了，不能休息';
   if (cost > energy) return `能量不足：需要 ${cost}`;
   return '目前沒有可以指定的目標';
 }
@@ -432,6 +434,7 @@ function skillReason(cv: CreatureView, cost: number, energy: number): string {
 function attackReason(cv: CreatureView): string {
   const reason = actReason(cv);
   if (reason) return reason;
+  if (cv.attackedThisTurn) return '這回合已經攻擊過（或休息了）';
   if (cv.disarmed) return '被繳械，不能攻擊';
   if (cv.attack <= 0) return '攻擊力是 0，不能攻擊';
   return '沒有可以攻擊的目標';
@@ -517,7 +520,7 @@ function detail(view: PlayerView): string {
     let body = lines(describeCard(def, nameOf)) + creatureStatus(cv);
     if (sel.player === YOU && def.kind === 'creature') {
       const attacks = actsForAttack(sel.zone);
-      const orSkill = skillsOf(cv).length > 0 ? '或選一個技能發動（花能量，不會被反擊）。' : '';
+      const orSkill = skillsOf(cv).length > 0 ? '技能另外算，每回合也可以發動一次（花能量，不會被反擊）。' : '';
       body +=
         attacks.length > 0
           ? `<p class="hint">點發光的對手生物或英雄攻擊：不花能量，打生物時對方會反擊。${orSkill}</p>`
@@ -527,7 +530,7 @@ function detail(view: PlayerView): string {
       body += '<div class="skills">';
       skillsOf(cv).forEach((skill, index) => {
         const acts = actsForSkill(sel.zone, index);
-        const reason = myTurn && acts.length === 0 ? skillReason(cv, skill.cost, view.you.energy) : '';
+        const reason = myTurn && acts.length === 0 ? skillReason(cv, skill.cost, view.you.energy, skill.rest === true) : '';
         body += `<button class="skill" data-skill="${sel.zone}:${index}" ${acts.length === 0 ? 'disabled' : ''}>
           <span class="skill-cost">${skill.cost}</span><span class="skill-text">${esc(`${skill.name}：${describeEffects(skill, nameOf)}`)}</span>
           ${reason ? `<span class="skill-why">${esc(reason)}</span>` : ''}</button>`;
@@ -590,7 +593,10 @@ function zone(cv: CreatureView | null, player: PlayerId, index: number, picks: M
   if (player === YOU && myTurn && (actsForAttack(index).length > 0 || skillsOf(cv).some((_, i) => actsForSkill(index, i).length > 0))) {
     classes.push('ready');
   }
-  if (player === YOU && (cv.actedThisTurn || cv.summonedThisTurn) && view.activePlayer === YOU) classes.push('spent');
+  // 這回合什麼都不能做了（剛召喚，或攻擊與技能都用過）就變淡。
+  const sick = cv.summonedThisTurn && actReason(cv) !== null;
+  const done = sick || (cv.attackedThisTurn && (cv.skillUsedThisTurn || skillsOf(cv).length === 0));
+  if (player === YOU && done && view.activePlayer === YOU) classes.push('spent');
   if (cv.taunting) classes.push('taunt');
   const badges: string[] = [];
 
@@ -832,7 +838,8 @@ function setupScreen(): string {
         <li>能量：先攻第一回合 1 點、後攻 2 點，之後每回合上限 +2，最高 12。每個回合開始時補滿。</li>
         <li>點手牌出牌。生物要選一個空格召喚；道具要選自己的生物；進化卡要點場上對應的生物。</li>
         <li>每隻生物有攻擊力（⚔）和血量（♥）。血量滿的是綠色，受過傷的是紅色。</li>
-        <li>點你的生物，再點發光的對手生物或英雄就是攻擊：不花能量，打生物時對方會用牠的攻擊力反擊，打英雄不會被反擊。也可以改成發動一個技能：要花能量，不會被反擊。攻擊和技能每隻每回合合計一次，召喚當回合都不行（有【速攻】的例外）。</li>
+        <li>點你的生物，再點發光的對手生物或英雄就是攻擊：不花能量，打生物時對方會用牠的攻擊力反擊，打英雄不會被反擊。技能要花能量，不會被反擊。攻擊和技能每隻每回合各一次，可以都用；召喚當回合都不行（有【速攻】的例外；進化卡都算有速攻，召喚當回合就能進化、進化完馬上能動）。</li>
+        <li>標「休息」的技能不花能量，但這回合還沒攻擊才能用，用了這回合就不能攻擊（例如挑釁）。</li>
         <li>正對面、斜對角的技能，目標格空著就會打到後面的英雄。</li>
         <li>對手的生物在挑釁時，只能攻擊牠；選得到牠的技能也必須打牠，只打英雄的技能不受影響。</li>
         <li>手牌上限 10 張，滿手時抽到的牌直接進棄牌區。場地卡放在自己的場地區，只強化自己的生物。</li>
