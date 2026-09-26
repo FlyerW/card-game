@@ -85,8 +85,21 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
 
       case 'GET /api/me': {
         const { account } = authed();
-        return send(response, 200, { account: accountInfo(account), profile: account.profile }), true;
+        const rank = store.rankOf(account);
+        const seasonReward = account.seasonReward ?? null;
+        if (seasonReward) await store.clearSeasonReward(account);
+        return send(response, 200, { account: accountInfo(account), profile: account.profile, rank, seasonReward }), true;
       }
+
+      case 'POST /api/login/guest': {
+        const { name } = await readJson(request);
+        if (typeof name !== 'string' || name.trim() === '') throw new HttpError(400, '取個名字吧');
+        const { token, account } = await store.loginGuest(name);
+        return send(response, 200, { token, account: accountInfo(account), profile: account.profile, rank: store.rankOf(account) }), true;
+      }
+
+      case 'GET /api/leaderboard':
+        return send(response, 200, { rows: store.leaderboard() }), true;
 
       case 'POST /api/logout': {
         const token = bearer(request);

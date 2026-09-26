@@ -32,11 +32,15 @@ import {
   newProfile,
   ownsHero,
   questDef,
+  rankLabel,
   refreshDay,
   tallyEvents,
+  TIERS,
   type GameTally,
   type Profile,
+  type RankState,
 } from '@card-game/economy';
+import type { RankedReport } from '@card-game/server/protocol';
 import { chooseAction, chooseActionSmart, STYLES } from '@card-game/sim/bot';
 import { describeEvents, ZONE, type LogLine } from './log';
 import {
@@ -53,9 +57,11 @@ import {
 } from './deck-builder';
 import {
   backendFor,
+  fetchLeaderboard,
   fetchMe,
   GOOGLE_CLIENT_ID,
   googleLogin,
+  guestLogin,
   loadSession,
   logout,
   mountGoogleButton,
@@ -65,6 +71,8 @@ import {
   testProfile,
   today,
   type Backend,
+  type LeaderboardRow,
+  type ServerMe,
   type Session,
 } from './account';
 import { ONLINE_AVAILABLE, OnlineClient } from './online';
@@ -112,7 +120,7 @@ interface Reward {
 
 interface Saved {
   format: number;
-  screen: 'login' | 'setup' | 'deck' | 'lobby' | 'play' | 'shop';
+  screen: 'login' | 'setup' | 'deck' | 'lobby' | 'play' | 'shop' | 'queue';
   heroId: string;
   /** 每個英雄的自訂牌組；沒有就每局自動組。 */
   decks: Record<string, string[]>;
@@ -132,6 +140,17 @@ interface App extends Saved {
   mode: 'bot' | 'online' | 'tutorial';
   /** 新手教學進行到第幾步、對手照劇本打到第幾回合；不在教學就是 null。 */
   tutorial: { step: number; round: number } | null;
+  /** 伺服器帳號這季的牌位；測試帳號沒有。 */
+  rank: RankState | null;
+  /** 排位賽排隊中：開始排的時間、隊伍裡幾個人。 */
+  queue: { since: number; waiting: number } | null;
+  /** 現在這個房間是排位賽（結果由伺服器記，不用瀏覽器回報）。 */
+  rankedRoom: boolean;
+  /** 這場排位賽的結果。 */
+  rankedReport: RankedReport | null;
+  leaderboard: LeaderboardRow[] | null;
+  /** 登入畫面輸入的訪客名字。 */
+  guestName: string;
   /** 畫面上的局面：你的視角。跟電腦打時由 state 算出來，連線時由伺服器送來。 */
   view: PlayerView | null;
   /** 你現在能做的動作。 */
@@ -193,15 +212,22 @@ const app: App = {
   shop: newShop(),
   difficulty: loadDifficulty(),
   tutorial: null,
+  rank: null,
+  queue: null,
+  rankedRoom: false,
+  rankedReport: null,
+  leaderboard: null,
+  guestName: loadName(),
 };
 
-/** 登入成功：記住帳號、換成這個帳號的資料與牌組。 */
-function signIn(session: Session, profile: Profile): void {
+/** 登入成功：記住帳號、換成這個帳號的資料與牌組。伺服器帳號另外帶牌位。 */
+function signIn(session: Session, profile: Profile, me?: ServerMe): void {
   saveSession(session);
   Object.assign(app, {
     session,
     backend: backendFor(session, db),
     profile,
+    rank: me?.rank ?? null,
     decks: loadDecks(db, session.account.id),
     loggingIn: false,
     toast: null,
@@ -210,7 +236,41 @@ function signIn(session: Session, profile: Profile): void {
   // 換到沒有這個 UR 英雄的帳號：改選第一個基礎英雄。
   if (!ownsHero(profile, db, app.heroId)) app.heroId = SAMPLE_HEROES.find((hero) => hero.rarity === undefined)!.id;
   if (app.screen === 'login') app.screen = 'setup';
+  if (me?.seasonReward) {
+    app.toast = `上一季（${me.seasonReward.season}）排位最高到${TIERS[me.seasonReward.best]}，獎勵 ${me.seasonReward.gold} 金幣`;
+  }
   render();
+  if (session.kind !== 'test') refreshLeaderboard();
+}
+
+function refreshLeaderboard(): void {
+  fetchLeaderboard().then(
+    ({ rows }) => {
+      app.leaderboard = rows;
+      render();
+    },
+    () => undefined,
+  );
+}
+
+/** 開一個訪客帳號（存在伺服器上）。 */
+function onGuestLogin(): void {
+  const name = app.guestName.trim();
+  if (!name) {
+    app.toast = '取個名字吧，對手會看到';
+    render();
+    return;
+  }
+  app.loggingIn = true;
+  render();
+  guestLogin(name).then(
+    ({ session }) =>
+      fetchMe(session as Extract<Session, { token: string }>).then((me) => (me ? signIn(session, me.profile, me) : Promise.reject(new Error('登入失敗')))),
+    (error: unknown) => {
+      Object.assign(app, { loggingIn: false, toast: error instanceof Error ? error.message : '開不了訪客帳號' });
+      render();
+    },
+  );
 }
 
 async function signOut(): Promise<void> {
@@ -224,7 +284,8 @@ function onGoogleCredential(credential: string): void {
   app.loggingIn = true;
   render();
   googleLogin(credential).then(
-    ({ session, profile }) => signIn(session, profile),
+    ({ session, profile }) =>
+      fetchMe(session as Extract<Session, { token: string }>).then((me) => signIn(session, me?.profile ?? profile, me ?? undefined)),
     (error: unknown) => {
       Object.assign(app, { loggingIn: false, toast: error instanceof Error ? error.message : 'Google 登入失敗' });
       render();
@@ -237,12 +298,12 @@ function restoreSession(): void {
   const session = loadSession();
   if (session?.kind === 'test') {
     signIn(session, testProfile(db));
-  } else if (session?.kind === 'google') {
+  } else if (session?.kind === 'google' || session?.kind === 'guest') {
     if (!ONLINE_AVAILABLE) return saveSession(null);
     app.loggingIn = true;
     fetchMe(session).then(
       (me) => {
-        if (me) signIn({ ...session, account: me.account }, me.profile);
+        if (me) signIn({ ...session, account: me.account }, me.profile, me);
         else {
           saveSession(null);
           Object.assign(app, { loggingIn: false, screen: 'login', toast: '登入已經過期，請重新登入' });
@@ -268,7 +329,8 @@ let settling = false;
 
 /** 對局結束：照勝負、這局的累計與牌組發金幣、推進每日任務。每局只結算一次。 */
 function settle(view: PlayerView): void {
-  if (app.reward || settling || !view.result || !app.backend || app.mode === 'tutorial') return;
+  // 排位賽的結果由伺服器記（見 'ranked' 訊息），這裡不再回報。
+  if (app.reward || settling || !view.result || !app.backend || app.mode === 'tutorial' || app.rankedRoom) return;
   const { winner, reason } = view.result;
   const conceded = reason === 'concede' && winner !== YOU;
   const summary = gameSummary(db, app.tally, app.gameDeck, winner === YOU, conceded);
@@ -316,14 +378,37 @@ function loadName(): string {
 // ─── 連線對戰 ────────────────────────────────────────────────────────────────
 
 const online = new OnlineClient();
-online.onStatus = () => render();
+online.onStatus = () => {
+  // 排隊中斷線，伺服器那邊就把你移出隊伍了。
+  if (!online.connected && app.screen === 'queue') {
+    Object.assign(app, { queue: null, screen: 'setup', toast: '和伺服器斷線，已經離開排隊' });
+  }
+  render();
+};
 online.onMessage = (message) => {
   if (message.t === 'room') {
     app.mode = 'online';
     YOU = message.seat;
-    // 還沒開局（等朋友加入）就留在等候畫面；已經在打就只是更新對手的連線狀態。
-    if (app.screen !== 'play') app.screen = 'lobby';
+    app.rankedRoom = message.ranked;
+    // 排位賽配對成功：等局面送來就開打，不經過等候畫面。
+    if (message.ranked) {
+      app.queue = null;
+      app.rankedReport = null;
+    } else if (app.screen !== 'play') {
+      // 還沒開局（等朋友加入）就留在等候畫面；已經在打就只是更新對手的連線狀態。
+      app.screen = 'lobby';
+    }
     render();
+  } else if (message.t === 'queued') {
+    app.queue = { since: message.since, waiting: message.waiting };
+    app.screen = 'queue';
+    render();
+  } else if (message.t === 'ranked') {
+    app.rankedReport = message.report;
+    app.rank = message.report.after;
+    if (message.report.reward.profile?.version === 1) app.profile = message.report.reward.profile;
+    render();
+    refreshLeaderboard();
   } else if (message.t === 'state') {
     app.mode = 'online';
     app.pending = false;
@@ -334,9 +419,10 @@ online.onMessage = (message) => {
     }
     app.screen = 'play';
     step(app.view ?? message.view, message.view, message.legal, message.events);
-  } else {
+  } else if (message.t === 'error') {
     app.pending = false;
     app.toast = message.message;
+    if (app.screen === 'queue') Object.assign(app, { screen: 'setup', queue: null });
     if (message.fatal) {
       app.mode = 'bot';
       app.screen = 'setup';
@@ -366,7 +452,7 @@ function joinRoom(): void {
 
 function leaveRoom(): void {
   online.leave();
-  Object.assign(app, { mode: 'bot', screen: 'setup', view: null, state: null, selection: null, toast: null, pending: false });
+  Object.assign(app, { mode: 'bot', screen: 'setup', view: null, state: null, selection: null, toast: null, pending: false, rankedRoom: false });
   history.replaceState(null, '', location.pathname);
   render();
 }
@@ -1061,14 +1147,16 @@ function overlay(view: PlayerView): string {
     const title = winner === 'draw' ? '平手' : winner === YOU ? '勝利' : '落敗';
     const asked = online.room?.rematch;
     const actions =
-      app.mode === 'online'
+      app.mode === 'online' && app.rankedRoom
+        ? '<div class="end-actions"><button class="primary" data-do="requeue">再排一場</button><button class="ghost" data-do="leave-room">回到開局</button></div>'
+        : app.mode === 'online'
         ? asked?.[YOU]
           ? `<p class="d-line">等${esc(themName())}也按「再來一局」……</p><button class="ghost" data-do="leave-room">離開房間</button>`
           : `${asked?.[THEM()] ? `<p class="d-line">${esc(themName())}想再來一局</p>` : ''}
              <div class="end-actions"><button class="primary" data-do="rematch">再來一局</button><button class="ghost" data-do="leave-room">離開房間</button></div>`
         : '<div class="end-actions"><button class="primary" data-do="again">再來一局</button><button class="ghost" data-do="setup">換英雄</button><button class="ghost" data-do="shop">卡包與收藏</button></div>';
     return `<div class="overlay"><div class="dialog end ${winner === YOU ? 'won' : 'lost'}" role="dialog" aria-label="${title}">
-      <h2>${title}</h2><p class="d-line">${why}・共 ${view.turn} 回合</p>${rewardLines()}${actions}
+      <h2>${title}</h2><p class="d-line">${app.rankedRoom ? '排位賽・' : ''}${why}・共 ${view.turn} 回合</p>${app.rankedRoom ? rankedLines() : rewardLines()}${actions}
     </div></div>`;
   }
   return '';
@@ -1138,6 +1226,16 @@ function loginScreen(): string {
         <p class="d-line">一進來就有 10000 金幣、全部的卡都收滿、UR 英雄都有，方便試玩各種牌組。資料存在這個瀏覽器裡，隨時可以重設。</p>
         <button class="primary big" data-do="login-test" ${app.loggingIn ? 'disabled' : ''}>用測試帳號進入</button>
       </section>
+      ${
+        ONLINE_AVAILABLE
+          ? `<section class="login-card">
+        <p class="d-head">訪客帳號</p>
+        <p class="d-line">取個名字就能玩，金幣、收藏與牌位存在遊戲伺服器上（這個瀏覽器記得你）。可以打排位賽。新帳號送五個基礎英雄的起始牌組與 100 金幣。</p>
+        <label class="field-row"><span>名字</span><input id="guest-name" maxlength="16" placeholder="對手會看到這個名字" value="${esc(app.guestName)}" autocomplete="nickname"></label>
+        <button class="primary big" data-do="login-guest" ${app.loggingIn ? 'disabled' : ''}>用訪客帳號進入</button>
+      </section>`
+          : ''
+      }
       <section class="login-card">
         <p class="d-head">Google 帳號</p>
         <p class="d-line">金幣與收藏存在遊戲伺服器上，換電腦也還在。新帳號送五個基礎英雄的起始牌組與 100 金幣。</p>
@@ -1178,7 +1276,7 @@ function setupScreen(): string {
         : '選一名英雄，跟電腦打一局。對手的英雄隨機，開局時會先告訴你是誰。'
     }</p></div>
       ${who ? `<div class="who">${who.account.picture ? `<img src="${esc(who.account.picture)}" alt="" referrerpolicy="no-referrer">` : ''}
-        <span>${esc(who.account.name)}${who.kind === 'test' ? '' : '<small>Google</small>'}</span>
+        <span>${esc(who.account.name)}${who.kind === 'google' ? '<small>Google</small>' : who.kind === 'guest' ? '<small>訪客</small>' : ''}</span>
         ${who.kind === 'test' ? '<button class="ghost small" data-do="reset-test">重設</button>' : ''}
         <button class="ghost small" data-do="logout">登出</button></div>` : ''}
     </header>
@@ -1200,6 +1298,7 @@ function setupScreen(): string {
         .join('')}
       <span class="d-line">${app.difficulty === 'normal' ? '只看眼前這一步，適合剛上手' : '會規劃整個回合、提防你下回合的攻擊'}</span>
       ${tutorialDone() ? '<button class="ghost small tut-again" data-do="tut-start">新手教學</button>' : ''}</section>
+    ${ONLINE_AVAILABLE ? rankedPanel(problems.length > 0) : ''}
     ${ONLINE_AVAILABLE ? onlineSetup(problems.length > 0) : `<button class="primary big" data-do="start" ${problems.length ? 'disabled' : ''}>開始對戰</button>`}
     ${app.toast ? `<p class="toast" role="alert">${esc(app.toast)}</p>` : ''}
     <section class="howto">
@@ -1223,6 +1322,69 @@ function setupScreen(): string {
         測試帳號的金幣與收藏存在這個瀏覽器裡；Google 帳號的存在遊戲伺服器上。牌組都存在這個瀏覽器裡。</p>
     </section>
   </main>`;
+}
+
+/** 排位賽：牌位、這季戰績、開始排位、排行榜。只有伺服器帳號（訪客、Google）能打。 */
+function rankedPanel(blocked: boolean): string {
+  if (!app.session || app.session.kind === 'test') {
+    return `<section class="ranked"><p class="d-head">排位賽</p>
+      <p class="d-line">排位賽要用伺服器上的帳號（訪客或 Google），結果才記得住、也才公平。登出後選「訪客帳號」就能打。</p></section>`;
+  }
+  const rank = app.rank;
+  const rows = (app.leaderboard ?? [])
+    .slice(0, 10)
+    .map(
+      (row, i) => `<li><span class="lb-n">${i + 1}</span><span class="lb-name">${esc(row.name)}</span>
+        <span class="lb-rank tier-${row.tier}">${esc(rankLabel({ ...row, season: '', streak: 0, best: row.tier }))}</span><span class="lb-wl">${row.wins} 勝 ${row.losses} 敗</span></li>`,
+    )
+    .join('');
+  return `<section class="ranked">
+    <div class="rank-main">
+      <p class="d-head">排位賽${rank ? `・${esc(rank.season)} 賽季` : ''}</p>
+      ${rank ? `<p class="rank-now tier-${rank.tier}">${esc(rankLabel(rank))}</p><p class="d-line">本季 ${rank.wins} 勝 ${rank.losses} 敗${rank.streak >= 2 ? `・${rank.streak} 連勝` : ''}</p>` : ''}
+      <p class="d-line">贏 +1 星、輸 −1 星，鑽石以下 3 連勝多 +1；銅牌、銀牌不會掉段。每月換季發獎勵。牌組只能放收藏裡有的卡。</p>
+      <button class="primary big" data-do="queue" ${blocked ? 'disabled' : ''}>開始排位</button>
+    </div>
+    ${rows ? `<div class="leaderboard"><p class="d-head">本季排行</p><ol>${rows}</ol></div>` : ''}
+  </section>`;
+}
+
+/** 排位賽排隊中。 */
+function queueScreen(): string {
+  const waited = app.queue ? Math.max(0, Math.floor((Date.now() - app.queue.since) / 1000)) : 0;
+  return `<main class="setup lobby">
+    <header><h1>配對中……</h1><p>找牌位相近的對手；等越久範圍越大，30 秒後誰都配。</p></header>
+    <section class="deck-bar"><div><p class="d-head">已經等了 ${waited} 秒</p>
+      <p class="d-line">隊伍裡有 ${app.queue?.waiting ?? 1} 個人・${esc(hero(app.heroId).name)}${app.rank ? `・${esc(rankLabel(app.rank))}` : ''}</p></div>
+      <button class="ghost" data-do="unqueue">取消排隊</button></section>
+    ${app.toast ? `<p class="toast" role="alert">${esc(app.toast)}</p>` : ''}
+  </main>`;
+}
+
+/** 排位賽結束的結果：牌位變化與金幣。 */
+function rankedLines(): string {
+  const report = app.rankedReport;
+  if (!report) return '<p class="d-line reward">結算中……</p>';
+  const delta = report.starsDelta > 0 ? `+${report.starsDelta} 星` : report.starsDelta < 0 ? `${report.starsDelta} 星` : '星星不變';
+  const lines = [
+    `${esc(rankLabel(report.before))} → <b>${esc(rankLabel(report.after))}</b>（${report.after.tier >= 5 ? `分數 ${Math.round(report.after.mmr - report.before.mmr) >= 0 ? '+' : ''}${Math.round(report.after.mmr - report.before.mmr)}` : delta}）`,
+  ];
+  if (report.promoted) lines.push(`<span class="gain">升上${TIERS[report.after.tier]}！</span>`);
+  if (report.demoted) lines.push(`掉到${TIERS[report.after.tier]}了`);
+  if (report.reward.winGold > 0) lines.push(`<span class="gain">+${report.reward.winGold} 金幣</span>`);
+  if (report.reward.questGold > 0) lines.push(`<span class="gain">每日任務完成 +${report.reward.questGold} 金幣</span>`);
+  return `<div class="reward">${lines.map((line) => `<p class="d-line">${line}</p>`).join('')}</div>`;
+}
+
+/** 開始排位賽：用現在的英雄與牌組排隊。 */
+function startQueue(): void {
+  const session = app.session;
+  if (!session || session.kind === 'test') return;
+  const deck = myDeck();
+  resetGameRecord(deck);
+  Object.assign(app, { screen: 'queue', queue: { since: Date.now(), waiting: 1 }, toast: null, rankedReport: null });
+  online.send({ t: 'queue', token: session.token, heroId: app.heroId, deck });
+  render();
 }
 
 /** 開局畫面上連線對戰的部分：名字、跟電腦打、開房間、用房號加入。 */
@@ -1287,6 +1449,8 @@ function render(): void {
         ? deckScreen(db, app.builder, custom ?? [], custom !== undefined, owned())
         : app.screen === 'shop'
           ? shopScreen(db, app.profile, app.shop, app.toast)
+          : app.screen === 'queue'
+            ? queueScreen()
           : app.screen === 'lobby'
             ? lobbyScreen()
             : playScreen();
@@ -1442,6 +1606,17 @@ root.addEventListener('click', (event) => {
     app.toast = null;
     render();
     window.scrollTo(0, 0);
+  } else if (command === 'login-guest') {
+    onGuestLogin();
+  } else if (command === 'queue') {
+    startQueue();
+  } else if (command === 'unqueue') {
+    online.send({ t: 'unqueue' });
+    Object.assign(app, { screen: 'setup', queue: null });
+    render();
+  } else if (command === 'requeue') {
+    leaveRoom();
+    startQueue();
   } else if (command === 'login-test') {
     signIn({ kind: 'test', account: { id: 'test', name: '測試帳號', email: null, picture: null } }, testProfile(db));
   } else if (command === 'logout') {
@@ -1552,6 +1727,8 @@ root.addEventListener('input', (event) => {
     } catch {
       // 存不了就下次再輸入一次。
     }
+  } else if (input.id === 'guest-name') {
+    app.guestName = input.value;
   } else if (input.id === 'room-code') {
     app.roomCode = input.value.toUpperCase();
   }
@@ -1613,6 +1790,11 @@ function start(data: Partial<Saved>): void {
   render();
   void advance();
 }
+
+// 排隊時每秒更新等待時間。
+setInterval(() => {
+  if (app.screen === 'queue') render();
+}, 1000);
 
 if (hot?.ready) hot.ready(start);
 else start(hot?.data ?? {});

@@ -11,6 +11,7 @@ import {
   type GameSummary,
   type PackCard,
   type Profile,
+  type RankState,
 } from '@card-game/economy';
 
 // 登入：測試帳號或 Google 帳號。
@@ -33,7 +34,18 @@ export interface AccountInfo {
   picture: string | null;
 }
 
-export type Session = { kind: 'test'; account: AccountInfo } | { kind: 'google'; account: AccountInfo; token: string };
+/** 測試帳號存在瀏覽器；Google 帳號與訪客帳號存在遊戲伺服器上，用 token 驗證。 */
+export type Session = { kind: 'test'; account: AccountInfo } | { kind: 'google' | 'guest'; account: AccountInfo; token: string };
+export type ServerSession = Extract<Session, { token: string }>;
+
+/** 伺服器帳號登入後拿到的資料。 */
+export interface ServerMe {
+  account: AccountInfo;
+  profile: Profile;
+  rank: RankState;
+  /** 換季發的獎勵，只會出現一次。 */
+  seasonReward?: { season: string; best: number; gold: number } | null;
+}
 
 const TEST_ACCOUNT: AccountInfo = { id: 'test', name: '測試帳號', email: null, picture: null };
 
@@ -65,7 +77,7 @@ function write(key: string, value: unknown): void {
 export function loadSession(): Session | null {
   const raw = read(SESSION_KEY) as Partial<Session> | null;
   if (raw?.kind === 'test') return { kind: 'test', account: TEST_ACCOUNT };
-  if (raw?.kind === 'google' && typeof raw.token === 'string' && typeof raw.account?.id === 'string') return raw as Session;
+  if ((raw?.kind === 'google' || raw?.kind === 'guest') && typeof raw.token === 'string' && typeof raw.account?.id === 'string') return raw as Session;
   return null;
 }
 
@@ -125,10 +137,27 @@ export async function googleLogin(credential: string): Promise<{ session: Sessio
   return { session: { kind: 'google', account: result.account, token: result.token }, profile: result.profile };
 }
 
-/** 用存著的 session 拿最新的資料；session 過期回傳 null。 */
-export async function fetchMe(session: Extract<Session, { kind: 'google' }>): Promise<{ account: AccountInfo; profile: Profile } | null> {
+/** 開一個訪客帳號：不用 Google，取個名字，金幣、收藏與牌位存在伺服器上。 */
+export async function guestLogin(name: string): Promise<{ session: Session; profile: Profile }> {
+  const result = await api<{ token: string; account: AccountInfo; profile: Profile }>('/api/login/guest', null, { name });
+  return { session: { kind: 'guest', account: result.account, token: result.token }, profile: result.profile };
+}
+
+export interface LeaderboardRow {
+  name: string;
+  tier: number;
+  stars: number;
+  mmr: number;
+  wins: number;
+  losses: number;
+}
+
+export const fetchLeaderboard = (): Promise<{ rows: LeaderboardRow[] }> => api<{ rows: LeaderboardRow[] }>('/api/leaderboard', null);
+
+/** 用存著的 session 拿最新的資料（含牌位）；session 過期回傳 null。 */
+export async function fetchMe(session: ServerSession): Promise<ServerMe | null> {
   try {
-    return await api<{ account: AccountInfo; profile: Profile }>('/api/me', session.token);
+    return await api<ServerMe>('/api/me', session.token);
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) return null;
     throw error;
@@ -136,9 +165,9 @@ export async function fetchMe(session: Extract<Session, { kind: 'google' }>): Pr
 }
 
 export async function logout(session: Session): Promise<void> {
-  if (session.kind === 'google') {
+  if (session.kind !== 'test') {
     await api('/api/logout', session.token, {}).catch(() => undefined);
-    google()?.accounts.id.disableAutoSelect();
+    if (session.kind === 'google') google()?.accounts.id.disableAutoSelect();
   }
   saveSession(null);
 }

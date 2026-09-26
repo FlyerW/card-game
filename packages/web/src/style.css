@@ -351,6 +351,24 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .tut-glow { outline: 3px solid var(--heal) !important; outline-offset: 3px; animation: tut-pulse 1.2s ease-in-out infinite; }
 @keyframes tut-pulse { 50% { outline-color: #7bd88f55; } }
 
+/* ─── 排位賽 ─── */
+.ranked {
+  display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px; align-items: start;
+  background: linear-gradient(135deg, #2a2440, var(--mat) 60%); border: 1px solid #6a5a9a; border-radius: 12px; padding: 14px 18px;
+}
+.ranked > .d-head, .ranked > .d-line { grid-column: 1 / -1; }
+.rank-main { display: grid; gap: 6px; }
+.rank-main .primary.big { justify-self: start; }
+.rank-now { margin: 0; font: 700 24px var(--display); }
+.tier-0 { color: #d49a6a; } .tier-1 { color: #c9d3dc; } .tier-2 { color: var(--r-ur); }
+.tier-3 { color: #8fe0d0; } .tier-4 { color: #9fc3ff; } .tier-5 { color: var(--r-sr); }
+.leaderboard ol { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 3px; font-size: 13px; }
+.leaderboard li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto; gap: 8px; align-items: baseline; }
+.lb-n { color: var(--ink-faint); font-family: var(--num); }
+.lb-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-wl { color: var(--ink-faint); font-size: 12px; }
+@media (max-width: 700px) { .ranked { grid-template-columns: 1fr; } }
+
 /* ─── 登入 ─── */
 .login-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
 .login-card {
