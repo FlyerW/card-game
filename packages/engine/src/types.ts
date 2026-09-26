@@ -61,6 +61,8 @@ export type Effect =
   | { type: 'healAll'; amount: number }
   /** 消滅目標生物：直接送進棄牌區，不算傷害，減傷擋不住。 */
   | { type: 'destroyCreature' }
+  /** 在自己最左邊的空格召喚 count 隻衍生物（token 是衍生物卡的 id）；格子滿了就不召喚。 */
+  | { type: 'summonToken'; token: string; count: number }
   /** 看牌庫頂 look 張，選 pick 張加入手牌，其餘放回牌庫底。選的時候對局停下來等這位玩家決定。 */
   | { type: 'lookPick'; look: number; pick: number }
   /**
@@ -137,6 +139,8 @@ export interface CreatureDef extends CardBase {
   keywords?: Keyword[];
   /** 再生 N：擁有者的回合開始時，這隻生物回復 N HP。 */
   regenerate?: number;
+  /** 衍生物：只能由效果召喚，不能放進牌組；離場時直接消失，不進棄牌區。 */
+  token?: boolean;
   /**
    * 進場效果：這張卡進場時（召喚，或進化成這張）發動。
    * 不另外花能量，價值算在費用裡，所以有進場效果的生物本體數值要低一點。

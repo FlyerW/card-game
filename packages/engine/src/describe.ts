@@ -24,8 +24,14 @@ export function describeTarget(spec: TargetSpec): string | null {
   }
 }
 
-export function describeEffect(effect: Effect): string {
+/** 把卡牌 id 換成名字；召喚衍生物的說明用得到。 */
+export type Names = (id: string) => string;
+const ids: Names = (id) => id;
+
+export function describeEffect(effect: Effect, names: Names = ids): string {
   switch (effect.type) {
+    case 'summonToken':
+      return `召喚 ${effect.count} 隻${names(effect.token)}`;
     case 'damage':
       return `造成 ${effect.amount} 傷害`;
     case 'damageEnemyCreatures':
@@ -82,17 +88,18 @@ export function describeEffect(effect: Effect): string {
 }
 
 /** 目標與效果：「〔任意目標〕造成 7 傷害」。 */
-export function describeEffects(ability: Omit<Ability, 'cost'>): string {
+export function describeEffects(ability: Omit<Ability, 'cost'>, names: Names = ids): string {
   const target = describeTarget(ability.target);
-  return `${target === null ? '' : `〔${target}〕`}${ability.effects.map(describeEffect).join('，')}`;
+  return `${target === null ? '' : `〔${target}〕`}${ability.effects.map((effect) => describeEffect(effect, names)).join('，')}`;
 }
 
 /** 技能與天生技：「火花（能量 2）：〔斜對角〕造成 7 傷害」。 */
-export const describeAbility = (ability: Ability): string =>
-  `${ability.name}（能量 ${ability.cost}${ability.uses ? `，每局 ${ability.uses} 次` : ''}）：${describeEffects(ability)}`;
+export const describeAbility = (ability: Ability, names: Names = ids): string =>
+  `${ability.name}（能量 ${ability.cost}${ability.uses ? `，每局 ${ability.uses} 次` : ''}）：${describeEffects(ability, names)}`;
 
 /** 進場效果：「進場 火星：〔任意目標〕造成 2 傷害」。 */
-export const describeEntry = (entry: Omit<Ability, 'cost'>): string => `進場 ${entry.name}：${describeEffects(entry)}`;
+export const describeEntry = (entry: Omit<Ability, 'cost'>, names: Names = ids): string =>
+  `進場 ${entry.name}：${describeEffects(entry, names)}`;
 
 /** 關鍵字與再生，各自一行說明。 */
 function describeTraits(card: CreatureDef): string[] {
@@ -141,23 +148,25 @@ function describeFieldTriggers(field: Extract<DeckCardDef, { kind: 'field' }>): 
 
 
 /** 整張卡的說明，第一行是標題，其餘是效果。費用一律寫成「能量 N」；進化生物寫的是進化要花的能量。 */
-export function describeCard(card: DeckCardDef, names: (id: string) => string = (id) => id): string[] {
+export function describeCard(card: DeckCardDef, names: Names = ids): string[] {
   const tag = `${card.rarity}・${describeColors(card.colors)}`;
   const cost = `能量 ${card.cost}`;
   switch (card.kind) {
     case 'creature': {
+      if (card.token) return [`${card.name}　${tag}・衍生物（不能放進牌組）｜⚔ ${card.attack}｜♥ ${card.hp}`, ...describeTraits(card)];
       const stage = card.evolvesFrom === undefined ? '基礎' : `由${names(card.evolvesFrom)}進化`;
-      const entry = card.entry ? [describeEntry(card.entry)] : [];
-      return [`${card.name}　${tag}・${stage}｜${cost}｜⚔ ${card.attack}｜♥ ${card.hp}`, ...describeTraits(card), ...entry, ...card.skills.map(describeAbility)];
+      const entry = card.entry ? [describeEntry(card.entry, names)] : [];
+      const skills = card.skills.map((skill) => describeAbility(skill, names));
+      return [`${card.name}　${tag}・${stage}｜${cost}｜⚔ ${card.attack}｜♥ ${card.hp}`, ...describeTraits(card), ...entry, ...skills];
     }
     case 'spell':
-      return [`${card.name}　${tag}・法術｜${cost}`, describeEffects(card)];
+      return [`${card.name}　${tag}・法術｜${cost}`, describeEffects(card, names)];
     case 'item':
       const stats = describeModifier(card);
       return [
         `${card.name}　${tag}・道具｜${cost}`,
         ...(stats.length > 0 ? [`這隻生物${stats.join('、')}`] : []),
-        ...(card.skills ?? []).map((skill) => `多一個技能 ${describeAbility(skill)}`),
+        ...(card.skills ?? []).map((skill) => `多一個技能 ${describeAbility(skill, names)}`),
       ];
     case 'field': {
       const own = describeOwnEffects(card.creatures, card.ceilingBonus);
@@ -165,9 +174,9 @@ export function describeCard(card: DeckCardDef, names: (id: string) => string = 
     }
     case 'heroEvolution': {
       const lines = [`${card.name}　${tag}・英雄進化｜${cost}｜由${names(card.evolvesFrom)}進化`];
-      if (card.entry) lines.push(describeEntry(card.entry));
+      if (card.entry) lines.push(describeEntry(card.entry, names));
       lines.push(`英雄 ♥ 上限 +${card.hpBonus}`);
-      if (card.power) lines.push(`天生技換成 ${describeAbility(card.power)}`);
+      if (card.power) lines.push(`天生技換成 ${describeAbility(card.power, names)}`);
       if (card.passive) lines.push(`多一個${describePassive(card.passive)}`);
       lines.push('每局只能進化一次');
       return lines;

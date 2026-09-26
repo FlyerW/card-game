@@ -13,6 +13,7 @@ import {
   isDisarmed,
   isSilenced,
   isParalyzed,
+  isToken,
   opponentTurnHp,
   other,
 } from './queries';
@@ -22,6 +23,7 @@ import {
   combat,
   drawCards,
   drawTaken,
+  newCreature,
   endGame,
   randomInt,
   resolveAbility,
@@ -239,26 +241,7 @@ function summon(ctx: Ctx, a: ActionOf<'summon'>): void {
 
   pay(p, def.cost);
   removeFromHand(p, card.uid);
-  p.zones[a.zone] = {
-    uid: card.uid,
-    owner: a.player,
-    cards: [card],
-    damage: 0,
-    attackCounters: 0,
-    hpCounters: 0,
-    item: null,
-    summonedTurn: state.turn,
-    evolvedTurn: null,
-    actedTurn: null,
-    tauntUntilTurn: null,
-    poison: 0,
-    burn: 0,
-    paralyzedUntilTurn: null,
-    silencedUntilTurn: null,
-    disarmedUntilTurn: null,
-    weakenedUntilTurn: null,
-    cursedUntilTurn: null,
-  };
+  p.zones[a.zone] = newCreature(card.uid, a.player, card.cardId, state.turn);
   ctx.events.push({ type: 'summoned', player: a.player, zone: a.zone, cardId: card.cardId });
   triggerEntry(ctx, def, a.player, a.zone, a.target);
 }
@@ -454,7 +437,7 @@ function dismiss(ctx: Ctx, a: ActionOf<'dismiss'>): void {
   const p = ctx.state.players[a.player];
   const creature = ownCreature(ctx.state, a.player, a.zone);
   p.zones[a.zone] = null;
-  p.discard.push(...creature.cards);
+  if (!isToken(ctx.db, creature)) p.discard.push(...creature.cards);
   if (creature.item !== null) p.discard.push(creature.item);
   ctx.events.push({ type: 'dismissed', player: a.player, zone: a.zone, cardId: currentCardId(creature) });
 }

@@ -9,6 +9,7 @@ import {
   fieldDef,
   hasKeyword,
   heroHp,
+  isToken,
   isCursed,
   isWeakened,
   other,
@@ -86,13 +87,38 @@ export function endGame(ctx: Ctx, result: GameResult): void {
   ctx.events.push({ type: 'gameOver', result });
 }
 
+/** 剛進場的生物：沒有傷害、指示物與狀態，召喚當回合不能行動。 */
+export function newCreature(uid: number, owner: PlayerId, cardId: string, turn: number): Creature {
+  return {
+    uid,
+    owner,
+    cards: [{ uid, cardId }],
+    damage: 0,
+    attackCounters: 0,
+    hpCounters: 0,
+    item: null,
+    summonedTurn: turn,
+    evolvedTurn: null,
+    actedTurn: null,
+    tauntUntilTurn: null,
+    poison: 0,
+    burn: 0,
+    paralyzedUntilTurn: null,
+    silencedUntilTurn: null,
+    disarmedUntilTurn: null,
+    weakenedUntilTurn: null,
+    cursedUntilTurn: null,
+  };
+}
+
 /** 把生物連同進化堆疊與道具送進棄牌區。 */
 function removeCreature(ctx: Ctx, player: PlayerId, zone: number): void {
   const p = ctx.state.players[player];
   const creature = p.zones[zone];
   if (creature == null) return;
   p.zones[zone] = null;
-  p.discard.push(...creature.cards);
+  // 衍生物離場就消失；身上的道具照樣進棄牌區。
+  if (!isToken(ctx.db, creature)) p.discard.push(...creature.cards);
   if (creature.item !== null) p.discard.push(creature.item);
   ctx.events.push({ type: 'creatureDestroyed', player, zone, cardId: currentCardId(creature) });
 }
@@ -362,6 +388,16 @@ function applyEffect(
 
     case 'destroyCreature':
       if (creature !== null && target?.kind === 'creature') removeCreature(ctx, target.player, target.zone);
+      return;
+
+    case 'summonToken':
+      for (let i = 0; i < effect.count; i++) {
+        const zone = player.zones.findIndex((each) => each === null);
+        if (zone === -1) return;
+        const uid = state.nextUid++;
+        player.zones[zone] = newCreature(uid, me, effect.token, state.turn);
+        ctx.events.push({ type: 'summoned', player: me, zone, cardId: effect.token });
+      }
       return;
 
     case 'lookPick': {

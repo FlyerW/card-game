@@ -63,7 +63,7 @@ export const SAMPLE_HEROES: HeroDef[] = [
     id: 'prism-sage',
     name: '虹彩賢者',
     colors: ['white', 'blue', 'black', 'red', 'green'],
-    hp: 44,
+    hp: 47,
     power: { name: '稜光', cost: 3, uses: 3, target: NONE, effects: [{ type: 'draw', count: 1 }] },
   },
 ];
@@ -484,6 +484,18 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
       { name: '龍息', cost: 3, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] },
       hit('焚天', 6, OPPOSITE, 8),
     ],
+  },
+
+  // ── 衍生物（先只給白色）：只能由效果召喚，不能放進牌組，離場就消失；召喚當回合一樣不能攻擊 ──
+  { kind: 'creature', id: 'soldier-token', name: '士兵', rarity: 'N', colors: ['white'], stage: 0, cost: 0, attack: 2, hp: 2, skills: [], token: true },
+  // 衍生物照同數值的白板生物算：2 隻 2/2 ≈ 兩隻 2 費生物。
+  { kind: 'spell', id: 'rally', name: '集結號令', rarity: 'R', colors: ['white'], cost: 4, target: NONE, effects: [{ type: 'summonToken', token: 'soldier-token', count: 2 }] },
+  {
+    // 進場帶 1 隻士兵，本體扣 1 點；技能每次再叫 1 隻。
+    kind: 'creature', id: 'knight-captain', name: '騎士隊長', rarity: 'R', colors: ['white'],
+    stage: 0, cost: 5, attack: 5, hp: 5,
+    entry: { name: '隨從', target: NONE, effects: [{ type: 'summonToken', token: 'soldier-token', count: 1 }] },
+    skills: [{ name: '號召', cost: 3, target: NONE, effects: [{ type: 'summonToken', token: 'soldier-token', count: 1 }] }],
   },
 
   // ── 英雄進化：每局限一次，費用約 5–7 ──

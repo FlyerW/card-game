@@ -143,6 +143,10 @@ export const TEST_CARDS: DeckCardDef[] = [
     entry: { name: 'flare', target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'damage', amount: 4 }] },
   },
 
+  // 衍生物
+  creature('imp-token', [], { rarity: 'N', cost: 0, attack: 2, hp: 2, token: true }),
+  { kind: 'spell', id: 'spawn', name: 'spawn', rarity: 'R', colors: [], cost: 1, target: NONE, effects: [{ type: 'summonToken', token: 'imp-token', count: 2 }] },
+
   // 看牌庫頂選牌
   { kind: 'spell', id: 'peek', name: 'peek', rarity: 'R', colors: [], cost: 1, target: NONE, effects: [{ type: 'lookPick', look: 4, pick: 2 }] },
 

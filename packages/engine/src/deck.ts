@@ -11,7 +11,8 @@ export function deckPool(db: CardDb, heroId: string): DeckCardDef[] {
   return [...db.cards.values()].filter(
     (card) =>
       card.colors.every((color) => hero.colors.includes(color)) &&
-      (card.kind !== 'heroEvolution' || card.evolvesFrom === heroId),
+      (card.kind !== 'heroEvolution' || card.evolvesFrom === heroId) &&
+      !(card.kind === 'creature' && card.token),
   );
 }
 
@@ -39,6 +40,7 @@ export function validateDeck(db: CardDb, rules: Rules, heroId: string, deck: rea
       problems.push(db.heroes.has(id) ? `英雄不能放進牌組：${id}` : `找不到卡牌：${id}`);
       continue;
     }
+    if (card.kind === 'creature' && card.token) problems.push(`${card.name} 是衍生物，不能放進牌組`);
     if (card.kind === 'heroEvolution' && card.evolvesFrom !== heroId) {
       const owner = db.heroes.get(card.evolvesFrom)?.name ?? card.evolvesFrom;
       problems.push(`${card.name} 是${owner}的進化卡，不能放進${hero.name}的牌組`);

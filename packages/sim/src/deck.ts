@@ -61,7 +61,7 @@ export function buildDeck(seed: number, heroId: string | null, pool: readonly De
   for (const card of pool) {
     if (card.kind === 'heroEvolution' && card.evolvesFrom === heroId) deck.push(...Array<string>(Math.min(2, limit(card))).fill(card.id));
   }
-  const fillers = pool.filter((card) => card.kind !== 'heroEvolution' && !inLines.has(card.id));
+  const fillers = pool.filter((card) => card.kind !== 'heroEvolution' && !(card.kind === 'creature' && card.token) && !inLines.has(card.id));
   let highCost = 0;
   for (const card of shuffle(fillers.flatMap((card) => Array<DeckCardDef>(limit(card)).fill(card)), rand)) {
     if (deck.length === DECK_SIZE) break;

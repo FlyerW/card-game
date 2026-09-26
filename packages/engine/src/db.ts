@@ -55,6 +55,7 @@ function checkAbility(ability: Ability, where: string, isCreatureSkill: boolean)
   if (ability.uses !== undefined && (!Number.isInteger(ability.uses) || ability.uses <= 0)) problems.push(`${at}：次數必須是正整數`);
   if (ability.effects.length === 0) problems.push(`${at}：沒有任何效果`);
   for (const effect of ability.effects) {
+    if (effect.type === 'summonToken' && effect.count <= 0) problems.push(`${at}：召喚的數量至少 1`);
     if (effect.type === 'lookPick' && (effect.pick <= 0 || effect.pick >= effect.look)) problems.push(`${at}：選的張數要比翻開的少，而且至少 1 張`);
   }
   if (ability.target.kind === 'lane' && !isCreatureSkill) problems.push(`${at}：位置技能只能用在生物身上`);
@@ -190,6 +191,26 @@ export function buildCardDb(cards: readonly DeckCardDef[], heroes: readonly Hero
   const cardMap = new Map(cards.map((card) => [card.id, card]));
   const heroMap = new Map(heroes.map((hero) => [hero.id, hero]));
   for (const card of cards) problems.push(...checkCard(card, cardMap, heroMap));
+  // 召喚的衍生物要存在，而且標成衍生物。
+  const abilities = (card: DeckCardDef) =>
+    card.kind === 'creature'
+      ? [...card.skills, ...(card.entry ? [card.entry] : [])]
+      : card.kind === 'spell'
+        ? [card]
+        : card.kind === 'item'
+          ? (card.skills ?? [])
+          : card.kind === 'heroEvolution'
+            ? [...(card.power ? [card.power] : []), ...(card.entry ? [card.entry] : [])]
+            : [];
+  for (const card of cards) {
+    for (const ability of abilities(card)) {
+      for (const effect of ability.effects) {
+        if (effect.type !== 'summonToken') continue;
+        const token = cardMap.get(effect.token);
+        if (token?.kind !== 'creature' || !token.token) problems.push(`${card.name}（${card.id}）：召喚的 ${effect.token} 不是衍生物`);
+      }
+    }
+  }
   for (const hero of heroes) problems.push(...checkHero(hero));
   if (problems.length > 0) throw new CardDataError(problems.join('\n'));
   return { cards: cardMap, heroes: heroMap };

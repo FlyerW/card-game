@@ -4,7 +4,7 @@ import { copyLimit } from '../src/deck';
 import { createEngine, type GameConfig } from '../src/engine';
 import { DEFAULT_RULES } from '../src/rules';
 import { eventsFor } from '../src/view';
-import { currentHp } from '../src/queries';
+import { currentHp, isToken } from '../src/queries';
 import { nextRandom } from '../src/rng';
 import type { Action, GameState } from '../src/types';
 
@@ -18,7 +18,7 @@ const DECK_SIZE = DEFAULT_RULES.deckSize;
 /** 從範例卡池隨機組一副正式張數的牌（同名與 UR 照上限）。虹彩賢者是五色，全部卡都能放。 */
 function randomDeck(seed: number): string[] {
   // 虹彩賢者沒有英雄進化卡，別的英雄的進化卡不能放進牌組。
-  const pool = SAMPLE_CARDS.filter((card) => card.kind !== 'heroEvolution').flatMap((card) =>
+  const pool = SAMPLE_CARDS.filter((card) => card.kind !== 'heroEvolution' && !(card.kind === 'creature' && card.token)).flatMap((card) =>
     Array<string>(copyLimit(DEFAULT_RULES, card)).fill(card.id),
   );
   let rng = seed;
@@ -38,7 +38,7 @@ function checkInvariants(state: GameState): void {
     const cards = [...p.hand, ...p.deck, ...p.discard];
     for (const creature of p.zones) {
       if (creature === null) continue;
-      cards.push(...creature.cards);
+      if (!isToken(db, creature)) cards.push(...creature.cards); // 衍生物不是牌組裡的牌
       if (creature.item !== null) cards.push(creature.item);
       expect(currentHp(db, state, creature)).toBeGreaterThan(0);
     }

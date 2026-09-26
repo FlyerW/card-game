@@ -529,7 +529,7 @@ function detail(view: PlayerView): string {
         const acts = actsForSkill(sel.zone, index);
         const reason = myTurn && acts.length === 0 ? skillReason(cv, skill.cost, view.you.energy) : '';
         body += `<button class="skill" data-skill="${sel.zone}:${index}" ${acts.length === 0 ? 'disabled' : ''}>
-          <span class="skill-cost">${skill.cost}</span><span class="skill-text">${esc(`${skill.name}：${describeEffects(skill)}`)}</span>
+          <span class="skill-cost">${skill.cost}</span><span class="skill-text">${esc(`${skill.name}：${describeEffects(skill, nameOf)}`)}</span>
           ${reason ? `<span class="skill-why">${esc(reason)}</span>` : ''}</button>`;
       });
       body += '</div>';
@@ -553,14 +553,14 @@ function detail(view: PlayerView): string {
     return (
       toast +
       `<p class="d-head">選擇進場效果的目標</p><p class="d-line">${esc(def!.name)} 放在 ${ZONE[sel.zone]}</p>
-       <p class="d-line">${esc(describeEntry(entry))}</p><p class="hint">發光的就是可以選的目標。</p>` +
+       <p class="d-line">${esc(describeEntry(entry, nameOf))}</p><p class="hint">發光的就是可以選的目標。</p>` +
       cancel
     );
   }
 
   if (sel.kind === 'skill' || sel.kind === 'heroPower') {
     const ability = sel.kind === 'skill' ? skillsOf(view.you.zones[sel.zone]!)[sel.skill]! : powerOf(view.you)!;
-    return toast + `<p class="d-head">選擇目標</p><p class="d-line">${esc(describeAbility(ability))}</p><p class="hint">發光的就是可以選的目標。</p>` + cancel;
+    return toast + `<p class="d-head">選擇目標</p><p class="d-line">${esc(describeAbility(ability, nameOf))}</p><p class="hint">發光的就是可以選的目標。</p>` + cancel;
   }
 
   if (sel.kind === 'hero') {
@@ -608,7 +608,8 @@ function zone(cv: CreatureView | null, player: PlayerId, index: number, picks: M
   const hurt = cv.hp < cv.maxHp ? ' hurt' : ' full';
   const buffed = cv.attackBonus > 0 ? ' up' : '';
   // 左上角顯示這隻生物總共花了多少費用，進化過的顯示成 4+3，一眼看出對手在牠身上投資了多少。
-  const invested = cv.evolutionChain.map((id) => card(id).cost).join('+');
+  // 衍生物沒有費用，標成「衍」。
+  const invested = def.kind === 'creature' && def.token ? '衍' : cv.evolutionChain.map((id) => card(id).cost).join('+');
   return `<button class="${classes.join(' ')} r-${def.rarity}" data-key="${key}" aria-label="${esc(def.name)}，費用 ${invested}，攻擊 ${cv.attack}，血量 ${cv.hp}">
     <span class="z-top"><span class="z-cost">${invested}</span><span class="rarity">${def.rarity}</span>${pips(def.colors)}</span>
     <span class="z-name">${esc(def.name)}</span>

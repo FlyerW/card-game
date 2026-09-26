@@ -125,6 +125,9 @@ export const damageReduction = (db: CardDb, state: GameState, creature: Creature
 export const regeneration = (db: CardDb, state: GameState, creature: Creature): number =>
   (creatureDef(db, creature).regenerate ?? 0) + aura(db, state, creature.owner).regenerate;
 
+/** 這隻生物是衍生物（token）。 */
+export const isToken = (db: CardDb, creature: Creature): boolean => creatureDef(db, creature).token === true;
+
 export const hasKeyword = (db: CardDb, creature: Creature, keyword: Keyword): boolean =>
   creatureDef(db, creature).keywords?.includes(keyword) ?? false;
 
