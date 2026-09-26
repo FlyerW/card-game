@@ -26,7 +26,7 @@ export type ErrorCode =
   | 'NO_ATTACK'
   | 'PARALYZED'
   | 'SILENCED'
-  | 'DISARMED'
+  | 'WEAKENED'
   | 'NO_HERO_POWER'
   | 'HERO_POWER_USED'
   | 'HERO_POWER_SPENT'

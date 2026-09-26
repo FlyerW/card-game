@@ -79,17 +79,15 @@ export function place(
     hpCounters: 0,
     item: null,
     summonedTurn: 0,
-    evolvedTurn: null,
     attackedTurn: null,
     skillUsedTurn: null,
     tauntUntilTurn: null,
     poison: 0,
+    maxHpLost: 0,
     burn: 0,
     paralyzedUntilTurn: null,
     silencedUntilTurn: null,
-    disarmedUntilTurn: null,
     weakenedUntilTurn: null,
-    cursedUntilTurn: null,
     ...patch,
   };
   state.players[player].zones[zone] = creature;

@@ -71,19 +71,15 @@ export function describeEffect(effect: Effect, names: Names = ids): string {
     case 'evolveFromDeck':
       return '用牌庫裡自己的進化卡直接進化';
     case 'poison':
-      return `${effect.all ? '對手每隻生物' : ''}中毒 ${effect.amount}（牠的回合開始時失去 ${effect.amount}♥）`;
+      return `${effect.all ? '對手每隻生物' : ''}中毒 ${effect.amount}（牠的回合結束時失去 ${effect.amount}♥，♥ 上限也少 ${effect.amount}）`;
     case 'burn':
-      return `${effect.all ? '對手每隻生物' : ''}灼燒 ${effect.amount}（牠的回合結束時受到 ${effect.amount} 傷害）`;
+      return `${effect.all ? '對手每隻生物' : ''}灼燒 ${effect.amount}（牠的回合開始時受到 ${effect.amount} 傷害）`;
     case 'paralyze':
       return `${effect.all ? '對手每隻生物' : ''}麻痺（到牠的下個回合結束前不能攻擊、不能發動技能）`;
     case 'silence':
-      return `${effect.all ? '對手每隻生物' : ''}沉默（到牠的下個回合結束前不能發動技能，攻擊照常）`;
-    case 'disarm':
-      return `${effect.all ? '對手每隻生物' : ''}繳械（到牠的下個回合結束前不能攻擊，技能照常）`;
+      return `${effect.all ? '對手每隻生物' : ''}沉默（到牠的下個回合結束前不能發動技能、吸血與再生失效，攻擊照常；身上的增益與挑釁消失）`;
     case 'weaken':
-      return `${effect.all ? '對手每隻生物' : ''}虛弱（到牠的下個回合結束前，攻擊與反擊的傷害減半）`;
-    case 'curse':
-      return `${effect.all ? '對手每隻生物' : ''}詛咒（到牠的下個回合結束前，技能傷害減半）`;
+      return `${effect.all ? '對手每隻生物' : ''}虛弱（到牠的下個回合結束前不能攻擊、也不會反擊，技能照常）`;
   }
 }
 

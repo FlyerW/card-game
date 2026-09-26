@@ -49,7 +49,7 @@ export const SAMPLE_HEROES: HeroDef[] = [
     id: 'forest-king',
     name: '林海之王',
     colors: ['green'],
-    hp: 52,
+    hp: 50,
     passive: { name: '豐饒', creatures: { hp: 1 } },
   },
   {
@@ -57,7 +57,7 @@ export const SAMPLE_HEROES: HeroDef[] = [
     id: 'tide-shadow-twins',
     name: '潮影雙生',
     colors: ['blue', 'black'],
-    hp: 39,
+    hp: 42,
     power: { name: '低語', cost: 4, uses: 2, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
   },
   {
@@ -135,7 +135,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   {
     kind: 'creature', id: 'dream-herald', name: '聖光使者', rarity: 'R', colors: ['white'],
     stage: 0, cost: 3, attack: 3, hp: 3,
-    entry: { name: '聖光束縛', target: CREATURE, effects: [{ type: 'disarm' }] },
+    entry: { name: '聖光束縛', target: CREATURE, effects: [{ type: 'silence' }] },
     skills: [hit('聖光', 2, ANY, 3)],
   },
   {
@@ -168,8 +168,8 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     target: ALLY_CREATURE, effects: [{ type: 'buff', attack: 0, hp: 4, on: 'target' }],
   },
   {
-    kind: 'spell', id: 'disarm', name: '繳械', rarity: 'N', colors: ['white'], cost: 1,
-    target: CREATURE, effects: [{ type: 'disarm' }],
+    kind: 'spell', id: 'hush', name: '噤聲', rarity: 'N', colors: ['white'], cost: 1,
+    target: CREATURE, effects: [{ type: 'silence' }],
   },
   {
     kind: 'spell', id: 'lullaby-light', name: '寂靜之光', rarity: 'R', colors: ['white'], cost: 3,
@@ -297,7 +297,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   {
     kind: 'creature', id: 'hex-witch', name: '咒術巫婆', rarity: 'R', colors: ['black'],
     stage: 0, cost: 3, attack: 3, hp: 4,
-    skills: [{ name: '咒縛', cost: 1, target: CREATURE, effects: [{ type: 'curse' }] }],
+    skills: [{ name: '咒縛', cost: 1, target: CREATURE, effects: [{ type: 'poison', amount: 1 }] }],
   },
   {
     kind: 'creature', id: 'soul-eater', name: '影噬魔', rarity: 'SR', colors: ['black'],
@@ -316,7 +316,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   },
   {
     kind: 'spell', id: 'withering-curse', name: '衰敗詛咒', rarity: 'R', colors: ['black'], cost: 2,
-    target: CREATURE, effects: [{ type: 'curse' }, { type: 'poison', amount: 2 }],
+    target: CREATURE, effects: [{ type: 'poison', amount: 3 }],
   },
   { kind: 'spell', id: 'shatter', name: '裂解', rarity: 'R', colors: ['black'], cost: 2, target: { kind: 'enemyItemOrField' }, effects: [{ type: 'destroy' }] },
   { kind: 'spell', id: 'toxic-fog', name: '毒霧', rarity: 'R', colors: ['black'], cost: 3, target: NONE, effects: [{ type: 'poison', amount: 2, all: true }] },
@@ -425,7 +425,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   {
     kind: 'creature', id: 'strangler-vine', name: '絞殺藤', rarity: 'R', colors: ['green'],
     stage: 0, cost: 3, attack: 3, hp: 4,
-    skills: [{ name: '纏繞', cost: 1, target: CREATURE, effects: [{ type: 'weaken' }] }],
+    skills: [{ name: '纏繞', cost: 2, target: CREATURE, effects: [{ type: 'weaken' }] }],
   },
   {
     kind: 'creature', id: 'blood-vine', name: '吸血藤', rarity: 'R', colors: ['green'],

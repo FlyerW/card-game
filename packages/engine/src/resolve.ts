@@ -7,11 +7,11 @@ import {
   currentHp,
   damageReduction,
   fieldDef,
-  hasKeyword,
+  hasLifesteal,
   heroHp,
   isToken,
-  isCursed,
   isWeakened,
+  maxHp,
   other,
   ownersTurn,
   regeneration,
@@ -98,17 +98,15 @@ export function newCreature(uid: number, owner: PlayerId, cardId: string, turn: 
     hpCounters: 0,
     item: null,
     summonedTurn: turn,
-    evolvedTurn: null,
     attackedTurn: null,
     skillUsedTurn: null,
     tauntUntilTurn: null,
     poison: 0,
+    maxHpLost: 0,
     burn: 0,
     paralyzedUntilTurn: null,
     silencedUntilTurn: null,
-    disarmedUntilTurn: null,
     weakenedUntilTurn: null,
-    cursedUntilTurn: null,
   };
 }
 
@@ -178,7 +176,19 @@ function healCreature(ctx: Ctx, creature: Creature, target: Target, amount: numb
   ctx.events.push({ type: 'healed', target, amount: healed });
 }
 
-type StatusEffect = Extract<Effect, { type: 'poison' | 'burn' | 'paralyze' | 'silence' | 'disarm' | 'weaken' | 'curse' }>;
+type StatusEffect = Extract<Effect, { type: 'poison' | 'burn' | 'paralyze' | 'silence' | 'weaken' }>;
+
+/**
+ * 沉默時，已經發動在牠身上的效果消失：增益指示物與挑釁。拿掉 HP 增益不會讓牠死掉：
+ * 跟爐石一樣，目前的 HP 超過新的上限才壓到上限，沒超過就不變。
+ */
+function stripEffects(ctx: Ctx, creature: Creature): void {
+  const before = currentHp(ctx.db, ctx.state, creature);
+  creature.attackCounters = 0;
+  creature.hpCounters = 0;
+  creature.tauntUntilTurn = null;
+  creature.damage = Math.max(0, maxHp(ctx.db, ctx.state, creature) - Math.min(before, maxHp(ctx.db, ctx.state, creature)));
+}
 
 /** 對一隻生物施加異常狀態。 */
 function inflict(ctx: Ctx, creature: Creature, player: PlayerId, zone: number, effect: StatusEffect): void {
@@ -200,45 +210,37 @@ function inflict(ctx: Ctx, creature: Creature, player: PlayerId, zone: number, e
       break;
     case 'silence':
       creature.silencedUntilTurn = ownersTurn(state, creature.owner, 1);
+      stripEffects(ctx, creature);
       status = 'silence';
-      break;
-    case 'disarm':
-      creature.disarmedUntilTurn = ownersTurn(state, creature.owner, 1);
-      status = 'disarm';
       break;
     case 'weaken':
       creature.weakenedUntilTurn = ownersTurn(state, creature.owner, 1);
       status = 'weakness';
       break;
-    case 'curse':
-      creature.cursedUntilTurn = ownersTurn(state, creature.owner, 1);
-      status = 'curse';
-      break;
   }
   ctx.events.push({ type: 'statusApplied', player, zone, status, ...(amount === undefined ? {} : { amount }) });
 }
 
-/** 進化會解除全部異常狀態。 */
+/** 進化會解除全部異常狀態。中毒少掉的 HP 上限不會回來。 */
 export function clearStatuses(ctx: Ctx, creature: Creature, player: PlayerId, zone: number): void {
   const had =
     creature.poison > 0 ||
     creature.burn > 0 ||
     creature.paralyzedUntilTurn !== null ||
     creature.silencedUntilTurn !== null ||
-    creature.disarmedUntilTurn !== null ||
-    creature.weakenedUntilTurn !== null ||
-    creature.cursedUntilTurn !== null;
+    creature.weakenedUntilTurn !== null;
   creature.poison = 0;
   creature.burn = 0;
   creature.paralyzedUntilTurn = null;
   creature.silencedUntilTurn = null;
-  creature.disarmedUntilTurn = null;
   creature.weakenedUntilTurn = null;
-  creature.cursedUntilTurn = null;
   if (had) ctx.events.push({ type: 'statusesCleared', player, zone });
 }
 
-/** 回合開始：這位玩家中毒的生物失去 HP。失去 HP 不算傷害，所以減傷擋不住。 */
+/**
+ * 回合結束：這位玩家中毒的生物失去 HP，HP 上限也跟著少（所以回復補不回來）。
+ * 失去 HP 不算傷害，減傷擋不住。
+ */
 export function tickPoison(ctx: Ctx, player: PlayerId): void {
   const { db, state } = ctx;
   state.players[player].zones.forEach((creature, zone) => {
@@ -246,13 +248,13 @@ export function tickPoison(ctx: Ctx, player: PlayerId): void {
     const target: Target = { kind: 'creature', player, zone };
     const lost = Math.min(creature.poison, currentHp(db, state, creature));
     ctx.events.push({ type: 'statusTriggered', player, zone, status: 'poison', amount: creature.poison });
-    creature.damage += lost;
+    creature.maxHpLost += lost;
     ctx.events.push({ type: 'hpLost', target, amount: lost });
   });
   cleanup(ctx);
 }
 
-/** 回合開始：這位玩家有再生的生物回復 HP。在中毒之前，所以再生抵得掉同樣多的中毒。 */
+/** 回合開始：這位玩家有再生的生物回復 HP。在灼燒之前。 */
 export function tickRegenerate(ctx: Ctx, player: PlayerId): void {
   const { db, state } = ctx;
   state.players[player].zones.forEach((creature, zone) => {
@@ -282,38 +284,32 @@ export function tickField(ctx: Ctx, player: PlayerId): void {
   }
 }
 
-/** 吸血：這隻生物造成多少傷害，擁有者的英雄就回復多少。 */
+/** 吸血：這隻生物造成多少傷害，擁有者的英雄就回復多少。沉默時失效。 */
 function lifesteal(ctx: Ctx, creature: Creature, dealt: number): void {
-  if (dealt > 0 && hasKeyword(ctx.db, creature, 'lifesteal')) healHero(ctx, creature.owner, dealt);
+  if (dealt > 0 && hasLifesteal(ctx.db, ctx.state, creature)) healHero(ctx, creature.owner, dealt);
 }
-
-/** 攻擊或反擊打多少：攻擊力，虛弱時減半。 */
-const strikeDamage = (ctx: Ctx, creature: Creature): number => {
-  const power = attackPower(ctx.db, ctx.state, creature);
-  return isWeakened(ctx.state, creature) ? Math.floor(power / 2) : power;
-};
 
 /**
  * 生物攻擊：打英雄就只是造成傷害；打生物時，雙方同時用攻擊力打對方（被攻擊的一方反擊）。
- * 被攻擊的一方就算麻痺、沉默、繳械也會反擊，反擊不算牠的行動。
+ * 被攻擊的一方就算麻痺、沉默也會反擊，反擊不算牠的行動；虛弱的不會反擊。
  */
 export function combat(ctx: Ctx, player: PlayerId, zone: number, target: Target): void {
   const { state } = ctx;
   const attacker = state.players[player].zones[zone]!;
-  const power = strikeDamage(ctx, attacker);
+  const power = attackPower(ctx.db, state, attacker);
   ctx.events.push({ type: 'attacked', player, zone, cardId: currentCardId(attacker), target });
   if (target.kind === 'creature') {
     const defender = state.players[target.player].zones[target.zone]!;
-    const counter = strikeDamage(ctx, defender);
+    const counter = isWeakened(state, defender) ? 0 : attackPower(ctx.db, state, defender);
     lifesteal(ctx, attacker, dealDamage(ctx, target, defender, power));
-    lifesteal(ctx, defender, dealDamage(ctx, { kind: 'creature', player, zone }, attacker, counter));
+    if (counter > 0) lifesteal(ctx, defender, dealDamage(ctx, { kind: 'creature', player, zone }, attacker, counter));
   } else {
     lifesteal(ctx, attacker, dealDamage(ctx, target, null, power));
   }
   cleanup(ctx);
 }
 
-/** 回合結束：這位玩家灼燒的生物受到傷害。算傷害，減傷擋得住。 */
+/** 回合開始：這位玩家灼燒的生物受到傷害。算傷害，減傷擋得住。 */
 export function tickBurn(ctx: Ctx, player: PlayerId): void {
   ctx.state.players[player].zones.forEach((creature, zone) => {
     if (creature === null || creature.burn === 0) return;
@@ -336,9 +332,6 @@ function applyEffect(
   const me = source.player;
   const player = state.players[me];
   const creature = liveCreature(state, target, targetUid);
-  // 技能傷害就是卡上的數字，不加攻擊力；發動的生物被詛咒時減半。
-  const cursed = sourceCreature !== null && isCursed(state, sourceCreature);
-  const skillDamage = (amount: number) => (cursed ? Math.floor(amount / 2) : amount);
   const steal = (dealt: number) => {
     if (sourceCreature !== null) lifesteal(ctx, sourceCreature, dealt);
   };
@@ -346,7 +339,7 @@ function applyEffect(
   switch (effect.type) {
     case 'damage':
       if (target !== null && (target.kind === 'hero' || creature !== null)) {
-        steal(dealDamage(ctx, target, creature, skillDamage(effect.amount)));
+        steal(dealDamage(ctx, target, creature, effect.amount));
       }
       return;
 
@@ -354,7 +347,7 @@ function applyEffect(
       const enemy = other(me);
       let dealt = 0;
       state.players[enemy].zones.forEach((each, zone) => {
-        if (each !== null) dealt += dealDamage(ctx, { kind: 'creature', player: enemy, zone }, each, skillDamage(effect.amount));
+        if (each !== null) dealt += dealDamage(ctx, { kind: 'creature', player: enemy, zone }, each, effect.amount);
       });
       steal(dealt);
       return;
@@ -490,16 +483,14 @@ function applyEffect(
         const def = cardDef(db, card.cardId);
         return def.kind === 'creature' && def.evolvesFrom === from;
       });
-      // 牌庫裡沒有對應的進化卡，或這回合已經進化過，就沒有效果。
+      // 牌庫裡沒有對應的進化卡就沒有效果。
       if (index === -1) return;
-      if (effect.type === 'evolveFromDeck' && sourceCreature.evolvedTurn === state.turn) return;
       const [card] = player.deck.splice(index, 1);
       if (effect.type === 'searchEvolution') {
         ctx.events.push({ type: 'searched', player: me, cardId: card!.cardId });
         toHand(ctx, me, card!);
       } else {
         sourceCreature.cards.push(card!);
-        sourceCreature.evolvedTurn = state.turn;
         ctx.events.push({ type: 'evolved', player: me, zone: source.zone, from, to: card!.cardId });
         clearStatuses(ctx, sourceCreature, me, source.zone);
       }
@@ -511,9 +502,7 @@ function applyEffect(
     case 'burn':
     case 'paralyze':
     case 'silence':
-    case 'disarm':
     case 'weaken':
-    case 'curse':
       if (effect.all) {
         const enemy = other(me);
         state.players[enemy].zones.forEach((each, zone) => {

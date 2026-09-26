@@ -153,9 +153,7 @@ export function describeEvents(
           burn: `灼燒 ${event.amount ?? ''}`,
           paralysis: '麻痺',
           silence: '沉默',
-          disarm: '繳械',
           weakness: '虛弱',
-          curse: '詛咒',
         }[event.status];
         lines.push({ text: `　${targetText({ kind: 'creature', player: event.player, zone: event.zone })}${label.trim()}`, tone: 'turn' });
         break;

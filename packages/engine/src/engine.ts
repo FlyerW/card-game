@@ -10,8 +10,8 @@ import {
   fieldDef,
   heroDef,
   heroPower as currentHeroPower,
-  isDisarmed,
   isSilenced,
+  isWeakened,
   isParalyzed,
   isToken,
   opponentTurnHp,
@@ -199,7 +199,7 @@ function startTurn(ctx: Ctx, player: PlayerId): void {
   p.maxEnergy = Math.min(grown, ceiling(db, state, player));
   p.energy = p.maxEnergy + (isFirstTurn && !isFirstPlayer ? rules.secondPlayerBonusEnergy : 0);
   tickRegenerate(ctx, player);
-  tickPoison(ctx, player);
+  tickBurn(ctx, player);
   if (state.phase === 'main') tickField(ctx, player);
 }
 
@@ -258,13 +258,11 @@ function evolve(ctx: Ctx, a: ActionOf<'evolve'>): void {
   if (def.evolvesFrom !== from) {
     fail('EVOLUTION_MISMATCH', `${def.name} 要由 ${cardDef(db, def.evolvesFrom!).name} 進化，這格是 ${cardDef(db, from).name}`);
   }
-  if (creature.evolvedTurn === state.turn) fail('ALREADY_EVOLVED', '同一隻生物一回合只能進化一次');
 
   pay(p, def.cost);
   removeFromHand(p, card.uid);
   // 已受的傷害、指示物、道具、本回合是否發動過技能，全部保留。
   creature.cards.push(card);
-  creature.evolvedTurn = state.turn;
   ctx.events.push({ type: 'evolved', player: a.player, zone: a.zone, from, to: card.cardId });
   clearStatuses(ctx, creature, a.player, a.zone);
   triggerEntry(ctx, def, a.player, a.zone, a.target);
@@ -291,7 +289,7 @@ function attack(ctx: Ctx, a: ActionOf<'attack'>): void {
   const def = creatureDef(db, creature);
   checkCanAct(ctx, creature, '攻擊');
   if (creature.attackedTurn === state.turn) fail('ALREADY_ATTACKED', `${def.name} 這回合已經攻擊過（或休息了）`);
-  if (isDisarmed(state, creature)) fail('DISARMED', `${def.name} 被繳械，不能攻擊`);
+  if (isWeakened(state, creature)) fail('WEAKENED', `${def.name} 虛弱中，不能攻擊`);
   if (attackPower(db, state, creature) <= 0) fail('NO_ATTACK', `${def.name} 的攻擊力是 0，不能攻擊`);
   const legal = attackTargets(state, a.player);
   if (!legal.some((t) => sameTarget(t, a.target))) {
@@ -463,9 +461,9 @@ function choose(ctx: Ctx, a: ActionOf<'choose'>): void {
   ctx.events.push({ type: 'picked', player: a.player, count: chosen.length, rest: rest.length });
 }
 
-/** 回合結束：自己灼燒的生物受到傷害，然後換對手。 */
+/** 回合結束：自己中毒的生物失去 HP 與上限，然後換對手。 */
 function endTurn(ctx: Ctx, a: ActionOf<'endTurn'>): void {
-  tickBurn(ctx, a.player);
+  tickPoison(ctx, a.player);
   if (ctx.state.phase !== 'main') return;
   startTurn(ctx, other(a.player));
 }

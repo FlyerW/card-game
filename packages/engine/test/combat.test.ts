@@ -299,18 +299,20 @@ describe('從牌庫進化', () => {
     expect(state.players[a].energy).toBe(0); // 只付了技能的 1 點，沒付進化費用 5
   });
 
-  it('這回合已經進化過，或牌庫沒有對應的進化卡，就沒有效果', () => {
+  it('牌庫沒有對應的進化卡，就沒有效果', () => {
     let { state, a } = start();
-    place(state, a, 0, 'seed', { evolvedTurn: 1 });
-    state.players[a].deck.push({ uid: 900, cardId: 'sprout' });
-    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 1 });
-    expect(at(state, a, 0)?.cards).toHaveLength(1);
+    place(state, a, 0, 'seed');
+    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0 });
+    expect(state.players[a].hand.some((card) => card.cardId === 'sprout')).toBe(false);
+  });
 
-    let other = start().state;
-    const a2 = other.activePlayer;
-    place(other, a2, 0, 'seed');
-    other = act(other, { type: 'useSkill', player: a2, zone: 0, skill: 0 });
-    expect(other.players[a2].hand.some((card) => card.cardId === 'sprout')).toBe(false);
+  it('一回合可以進化很多隻生物', () => {
+    let { state, a } = start();
+    state.players[a].energy = 12;
+    place(state, a, 0, 'pup');
+    place(state, a, 1, 'pup');
+    for (const zone of [0, 1]) state = act(state, { type: 'evolve', player: a, card: give(state, a, 'hound'), zone });
+    expect([at(state, a, 0)?.cards.at(-1)?.cardId, at(state, a, 1)?.cards.at(-1)?.cardId]).toEqual(['hound', 'hound']);
   });
 });
 

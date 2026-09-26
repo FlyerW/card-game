@@ -7,8 +7,6 @@ import {
   damageReduction,
   heroHp,
   heroMaxHp,
-  isCursed,
-  isDisarmed,
   isSilenced,
   isWeakened,
   isParalyzed,
@@ -39,9 +37,9 @@ export interface CreatureView {
   burn: number;
   paralyzed: boolean;
   silenced: boolean;
-  disarmed: boolean;
   weakened: boolean;
-  cursed: boolean;
+  /** 中毒讓 HP 上限少了多少。 */
+  maxHpLost: number;
   /** 這回合攻擊過（或休息了）。 */
   attackedThisTurn: boolean;
   skillUsedThisTurn: boolean;
@@ -107,9 +105,8 @@ function creatureView(db: CardDb, state: GameState, creature: Creature): Creatur
     burn: creature.burn,
     paralyzed: isParalyzed(state, creature),
     silenced: isSilenced(state, creature),
-    disarmed: isDisarmed(state, creature),
     weakened: isWeakened(state, creature),
-    cursed: isCursed(state, creature),
+    maxHpLost: creature.maxHpLost,
     attackedThisTurn: creature.attackedTurn === state.turn,
     skillUsedThisTurn: creature.skillUsedTurn === state.turn,
     summonedThisTurn: creature.summonedTurn === state.turn,

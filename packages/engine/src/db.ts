@@ -29,9 +29,7 @@ function targetProblem(effect: Effect, spec: TargetSpec): string | null {
     case 'burn':
     case 'paralyze':
     case 'silence':
-    case 'disarm':
     case 'weaken':
-    case 'curse':
       if (effect.all) return null;
       return (spec.kind === 'enemy' && spec.allow !== 'hero') || spec.kind === 'lane'
         ? null
@@ -43,7 +41,7 @@ function targetProblem(effect: Effect, spec: TargetSpec): string | null {
 
 function usesTarget(effect: Effect): boolean {
   if (effect.type === 'buff') return effect.on === 'target';
-  const statuses = ['poison', 'burn', 'paralyze', 'silence', 'disarm', 'weaken', 'curse'];
+  const statuses = ['poison', 'burn', 'paralyze', 'silence', 'weaken'];
   if ((effect.type === 'halveHp' || statuses.includes(effect.type)) && 'all' in effect && effect.all) return false;
   return ['damage', 'heal', 'halveHp', 'destroy', 'destroyCreature', ...statuses].includes(effect.type);
 }

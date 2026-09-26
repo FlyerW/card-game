@@ -3,7 +3,7 @@ import {
   creatureSkills,
   currentHp,
   heroHp,
-  isDisarmed,
+  isWeakened,
   isParalyzed,
   isSilenced,
   isTaunting,
@@ -46,7 +46,7 @@ export const STYLES: Record<'balanced' | 'aggro' | 'control', BotStyle> = {
 
 /** 一隻生物每回合最多能打多少：攻擊力，或技能的單體、範圍傷害，取大者。沉默或繳械的那一種不算。 */
 function threat(db: CardDb, state: GameState, creature: Creature): number {
-  let best = isDisarmed(state, creature) ? 0 : attackPower(db, state, creature);
+  let best = isWeakened(state, creature) ? 0 : attackPower(db, state, creature);
   if (!isSilenced(state, creature)) {
     for (const skill of creatureSkills(db, creature)) {
       const damage = skill.effects.reduce(

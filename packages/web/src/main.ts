@@ -52,7 +52,7 @@ const THEM = (): PlayerId => other(YOU);
 const BOT: PlayerId = 1;
 const BOT_STEP_MS = 750;
 /** 存檔格式。引擎的狀態改了就加一，舊版存下來的對局就不接著打。 */
-const SAVE_FORMAT = 6;
+const SAVE_FORMAT = 7;
 
 // ─── 狀態 ────────────────────────────────────────────────────────────────────
 
@@ -498,7 +498,7 @@ function attackReason(cv: CreatureView): string {
   const reason = actReason(cv);
   if (reason) return reason;
   if (cv.attackedThisTurn) return '這回合已經攻擊過（或休息了）';
-  if (cv.disarmed) return '被繳械，不能攻擊';
+  if (cv.weakened) return '虛弱中，不能攻擊';
   if (cv.attack <= 0) return '攻擊力是 0，不能攻擊';
   return '沒有可以攻擊的目標';
 }
@@ -516,13 +516,12 @@ function creatureStatus(cv: CreatureView): string {
   if (cv.damageReduction) tags.push(`受到傷害 −${cv.damageReduction}`);
   if (cv.item) tags.push(`道具：${nameOf(cv.item)}`);
   if (cv.taunting) tags.push('挑釁中');
-  if (cv.poison) tags.push(`中毒 ${cv.poison}：牠的回合開始時失去 ${cv.poison}♥`);
-  if (cv.burn) tags.push(`灼燒 ${cv.burn}：牠的回合結束時受到 ${cv.burn} 傷害`);
+  if (cv.poison) tags.push(`中毒 ${cv.poison}：牠的回合結束時失去 ${cv.poison}♥，♥ 上限也少 ${cv.poison}`);
+  if (cv.maxHpLost) tags.push(`中毒讓 ♥ 上限少了 ${cv.maxHpLost}`);
+  if (cv.burn) tags.push(`灼燒 ${cv.burn}：牠的回合開始時受到 ${cv.burn} 傷害`);
   if (cv.paralyzed) tags.push('麻痺：不能攻擊、不能發動技能');
-  if (cv.silenced) tags.push('沉默：不能發動技能');
-  if (cv.disarmed) tags.push('繳械：不能攻擊');
-  if (cv.weakened) tags.push('虛弱：攻擊與反擊的傷害減半');
-  if (cv.cursed) tags.push('詛咒：技能傷害減半');
+  if (cv.silenced) tags.push('沉默：不能發動技能，吸血與再生失效');
+  if (cv.weakened) tags.push('虛弱：不能攻擊，也不會反擊');
   if (cv.evolutionChain.length > 1) tags.push(`進化：${cv.evolutionChain.map(nameOf).join(' → ')}`);
   return `<ul class="tags">${tags.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>`;
 }
@@ -670,9 +669,7 @@ function zone(cv: CreatureView | null, player: PlayerId, index: number, picks: M
   if (cv.burn) badges.push(`<i class="badge burn">燒${cv.burn}</i>`);
   if (cv.paralyzed) badges.push('<i class="badge para">麻痺</i>');
   if (cv.silenced) badges.push('<i class="badge silence">沉默</i>');
-  if (cv.disarmed) badges.push('<i class="badge disarm">繳械</i>');
   if (cv.weakened) badges.push('<i class="badge weak">虛弱</i>');
-  if (cv.cursed) badges.push('<i class="badge curse">詛咒</i>');
   // 滿血是綠色，受過傷是紅色；攻擊力有加成時標成金色。
   const hurt = cv.hp < cv.maxHp ? ' hurt' : ' full';
   const buffed = cv.attackBonus > 0 ? ' up' : '';
@@ -924,7 +921,7 @@ function setupScreen(): string {
         <li>對手的生物在挑釁時，只能攻擊牠；選得到牠的技能也必須打牠，只打英雄的技能不受影響。</li>
         <li>手牌上限 10 張，滿手時抽到的牌直接進棄牌區。場地卡放在自己的場地區，只強化自己的生物。</li>
         <li>有些英雄有英雄進化卡：血量上限增加、天生技變強，每局只能進化一次。</li>
-        <li>異常狀態只會中在生物身上：中毒（回合開始時失去血量）、灼燒（回合結束時受到傷害）、麻痺（不能攻擊也不能發動技能）、沉默（不能發動技能）、繳械（不能攻擊）、虛弱（攻擊傷害減半）、詛咒（技能傷害減半）。後面五種都到牠的下個回合結束，進化會解除全部。</li>
+        <li>異常狀態只會中在生物身上：中毒（牠的回合結束時失去血量，血量上限也跟著少）、灼燒（牠的回合開始時受到傷害）、麻痺（不能攻擊也不能發動技能）、沉默（不能發動技能、吸血與再生失效，身上的增益與挑釁直接消失）、虛弱（不能攻擊，也不會反擊）。後面三種都到牠的下個回合結束，進化會解除全部（中毒少掉的上限不會回來）。</li>
         <li>把對手英雄的血量打到 0 就贏了。</li>
       </ul>
       <p class="note">試玩說明：範例卡有 ${SAMPLE_CARDS.length} 張，牌組照正式規則：${DEFAULT_RULES.deckSize} 張、同名最多 ${DEFAULT_RULES.maxCopies} 張、UR 最多 ${DEFAULT_RULES.maxUrCopies} 張、只能放英雄顏色內的卡與無色卡。

@@ -85,27 +85,26 @@ export type Effect =
   | { type: 'destroy' }
   /** 從牌庫把發動者的進化卡加入手牌，然後洗牌。只能用在生物技能上。 */
   | { type: 'searchEvolution' }
-  /** 用牌庫裡發動者的進化卡直接進化，不另付進化費用；一回合仍只能進化一次。只能用在生物技能上。 */
+  /** 用牌庫裡發動者的進化卡直接進化，不另付進化費用。只能用在生物技能上。 */
   | { type: 'evolveFromDeck' }
   // 異常狀態：只作用在生物身上，打到英雄沒有效果；進化會解除全部。
   // all 為 true 時不選目標，對手每隻生物都中。
-  /** 中毒 N：牠的擁有者回合開始時失去 N HP（不算傷害）。再中一次數字相加。 */
+  /** 中毒 N：牠的擁有者回合結束時失去 N HP，HP 上限也跟著少 N（不算傷害，回復補不回來）。再中一次數字相加。 */
   | { type: 'poison'; amount: number; all?: boolean }
-  /** 灼燒 N：牠的擁有者回合結束時受到 N 傷害（算傷害，減傷擋得住）。再中一次取大的。 */
+  /** 灼燒 N：牠的擁有者回合開始時受到 N 傷害（算傷害，減傷擋得住）。再中一次取大的。 */
   | { type: 'burn'; amount: number; all?: boolean }
   /** 麻痺：不能攻擊、不能發動技能，直到擁有者的下一個回合結束。 */
   | { type: 'paralyze'; all?: boolean }
-  /** 沉默：不能發動技能（攻擊照常），直到擁有者的下一個回合結束。 */
+  /**
+   * 沉默：直到擁有者的下一個回合結束，不能發動技能，卡上的吸血與再生失效（攻擊照常）；
+   * 已經發動在牠身上的效果（增益指示物、挑釁）直接消失，沉默結束也不會回來。
+   */
   | { type: 'silence'; all?: boolean }
-  /** 繳械：不能攻擊（技能照常，被攻擊時照樣反擊），直到擁有者的下一個回合結束。 */
-  | { type: 'disarm'; all?: boolean }
-  /** 虛弱：攻擊與反擊的傷害減半（無條件捨去），直到擁有者的下一個回合結束。 */
-  | { type: 'weaken'; all?: boolean }
-  /** 詛咒：技能與進場效果的傷害減半（無條件捨去），直到擁有者的下一個回合結束。 */
-  | { type: 'curse'; all?: boolean };
+  /** 虛弱：不能攻擊，被攻擊時也不會反擊（技能照常），直到擁有者的下一個回合結束。 */
+  | { type: 'weaken'; all?: boolean };
 
 /** 異常狀態的種類。 */
-export type StatusKind = 'poison' | 'burn' | 'paralysis' | 'silence' | 'disarm' | 'weakness' | 'curse';
+export type StatusKind = 'poison' | 'burn' | 'paralysis' | 'silence' | 'weakness';
 
 /** 生物技能、英雄天生技，以及法術的效果部分，都是 Ability。 */
 export interface Ability {
@@ -290,7 +289,6 @@ export interface Creature {
   hpCounters: number;
   item: CardRef | null;
   summonedTurn: number;
-  evolvedTurn: number | null;
   /** 這回合攻擊過（或發動了【休息】技能）。攻擊每回合一次。 */
   attackedTurn: number | null;
   /** 這回合發動過技能。技能每回合一次，跟攻擊分開算。 */
@@ -299,18 +297,16 @@ export interface Creature {
   tauntUntilTurn: number | null;
   /** 中毒的數字，0 表示沒有中毒。 */
   poison: number;
+  /** 中毒讓 HP 上限少了多少。進化解除中毒，但少掉的上限不會回來。 */
+  maxHpLost: number;
   /** 灼燒的數字，0 表示沒有灼燒。 */
   burn: number;
   /** 麻痺到這個回合結束（含）。 */
   paralyzedUntilTurn: number | null;
   /** 沉默到這個回合結束（含）。 */
   silencedUntilTurn: number | null;
-  /** 繳械到這個回合結束（含）。 */
-  disarmedUntilTurn: number | null;
   /** 虛弱到這個回合結束（含）。 */
   weakenedUntilTurn: number | null;
-  /** 詛咒到這個回合結束（含）。 */
-  cursedUntilTurn: number | null;
 }
 
 export interface PlayerState {

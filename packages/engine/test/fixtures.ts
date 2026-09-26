@@ -109,9 +109,7 @@ export const TEST_CARDS: DeckCardDef[] = [
   creature('mesmer', [
     { name: 'stun', cost: 1, target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'paralyze' }] },
     { name: 'hush', cost: 1, target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'silence' }] },
-    { name: 'unarm', cost: 1, target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'disarm' }] },
     { name: 'sap', cost: 1, target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'weaken' }] },
-    { name: 'hex', cost: 1, target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'curse' }] },
   ]),
   {
     kind: 'spell', id: 'dart', name: 'dart', rarity: 'N', colors: [], cost: 1,

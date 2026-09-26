@@ -1,37 +1,53 @@
 import { describe, expect, it } from 'vitest';
-import { ownersTurn } from '../src/queries';
+import { currentHp, maxHp, ownersTurn } from '../src/queries';
 import { act, at, creatureAt, endTurn, engine, give, hero, place, reject, start } from './helpers';
 
 // 異常狀態：只作用在生物身上，進化會解除全部。
 
 describe('中毒', () => {
-  it('擁有者的回合開始時失去 N HP；減傷擋不住；再中一次數字相加', () => {
+  it('擁有者的回合結束時失去 N HP，HP 上限也少 N；減傷擋不住；再中一次數字相加', () => {
     let { state, a, b } = start();
     place(state, a, 0, 'venom');
     const target = place(state, b, 0, 'hitter', { item: { uid: 900, cardId: 'armor' } });
     state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0, target: creatureAt(b, 0) });
     expect(at(state, b, 0)!.poison).toBe(2);
-    expect(at(state, b, 0)!.damage).toBe(0); // 施加當下不扣
+    const full = maxHp(engine.db, state, at(state, b, 0)!);
 
-    state = endTurn(state); // b 的回合開始：失去 2（鐵甲減 2 也擋不住）
-    expect(at(state, b, 0)!.damage).toBe(2);
+    state = endTurn(state); // a 的回合結束：中毒的是 b 的生物，不發作
+    expect(currentHp(engine.db, state, at(state, b, 0)!)).toBe(full);
+    state = endTurn(state); // b 的回合結束：失去 2（鐵甲減 2 也擋不住），上限也少 2
     expect(target.uid).toBe(at(state, b, 0)!.uid);
+    expect(maxHp(engine.db, state, at(state, b, 0)!)).toBe(full - 2);
+    expect(currentHp(engine.db, state, at(state, b, 0)!)).toBe(full - 2);
+    expect(at(state, b, 0)!.damage).toBe(0);
 
-    state = endTurn(state);
     state.players[a].energy = 5;
     state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0, target: creatureAt(b, 0) });
     expect(at(state, b, 0)!.poison).toBe(4);
+    state = endTurn(endTurn(state));
+    expect(maxHp(engine.db, state, at(state, b, 0)!)).toBe(full - 6);
+  });
+
+  it('少掉的上限回復補不回來，進化解除中毒後也不會回來', () => {
+    let { state, a } = start();
+    place(state, a, 0, 'pup', { poison: 2 });
     state = endTurn(state);
-    expect(at(state, b, 0)!.damage).toBe(6);
+    const pup = at(state, a, 0)!;
+    expect(pup.maxHpLost).toBe(2);
+    state = endTurn(state); // a 的回合
+    state.players[a].energy = 5;
+    state = act(state, { type: 'castSpell', player: a, card: give(state, a, 'bloom') });
+    expect(currentHp(engine.db, state, at(state, a, 0)!)).toBe(6 - 2);
+    state = act(state, { type: 'evolve', player: a, card: give(state, a, 'hound'), zone: 0 });
+    expect(at(state, a, 0)).toMatchObject({ poison: 0, maxHpLost: 2 });
   });
 
   it('扣到 0 就被擊倒', () => {
     let { state, a, b } = start();
-    place(state, b, 0, 'wolf', { damage: 5, poison: 2 });
+    place(state, a, 0, 'wolf', { damage: 5, poison: 2 });
     state = endTurn(state);
     expect(state.activePlayer).toBe(b);
-    expect(at(state, b, 0)).toBeNull();
-    expect(state.players[a].zones.every((z) => z === null)).toBe(true);
+    expect(at(state, a, 0)).toBeNull();
   });
 
   it('打到英雄沒有效果，同一個法術的傷害照樣結算', () => {
@@ -43,16 +59,17 @@ describe('中毒', () => {
 });
 
 describe('灼燒', () => {
-  it('擁有者的回合結束時受到 N 傷害；減傷擋得住；再中一次取大的', () => {
+  it('擁有者的回合開始時受到 N 傷害；減傷擋得住；再中一次取大的', () => {
     let { state, a, b } = start();
     place(state, a, 0, 'venom');
     place(state, b, 0, 'hitter', { item: { uid: 900, cardId: 'armor' } });
     state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 1, target: creatureAt(b, 0) });
     expect(at(state, b, 0)!.burn).toBe(3);
-
-    state = endTurn(state); // a 的回合結束：灼燒的是 b 的生物，不發作
     expect(at(state, b, 0)!.damage).toBe(0);
-    state = endTurn(state); // b 的回合結束：3 − 鐵甲 2 = 1
+
+    state = endTurn(state); // b 的回合開始：3 − 鐵甲 2 = 1
+    expect(at(state, b, 0)!.damage).toBe(1);
+    state = endTurn(state); // a 的回合開始：灼燒的是 b 的生物，不發作
     expect(at(state, b, 0)!.damage).toBe(1);
 
     at(state, b, 0)!.burn = 5;
@@ -97,51 +114,61 @@ describe('沉默', () => {
     state = endTurn(endTurn(state)); // b 的下一個回合：解除
     act(state, { type: 'useSkill', player: b, zone: 0, skill: 0 });
   });
-});
 
-describe('繳械', () => {
-  it('不能攻擊，技能照常；被攻擊時照樣反擊', () => {
-    let { state, a, b } = start();
+  it('身上的增益與挑釁直接消失，不會回來；拿掉 HP 增益不會讓牠死掉', () => {
+    let { state, a, b } = start({ deckSize: 60 });
     place(state, a, 0, 'mesmer');
-    place(state, a, 1, 'brute');
-    place(state, b, 0, 'hitter'); // 攻擊 2
-    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 2, target: creatureAt(b, 0) });
-    state = act(state, { type: 'attack', player: a, zone: 1, target: creatureAt(b, 0) });
-    expect(at(state, a, 1)!.damage).toBe(2); // 繳械的生物還是會反擊
-    state = endTurn(state);
-    expect(reject(state, { type: 'attack', player: b, zone: 0, target: hero(a) })).toBe('DISARMED');
-    act(state, { type: 'useSkill', player: b, zone: 0, skill: 0, target: hero(a) });
+    // bruiser 10 HP，增益 +3/+3 之後受了 11 傷害：剩 2。拿掉增益後上限 10，剩的 2 不變。
+    place(state, b, 0, 'bruiser', { attackCounters: 3, hpCounters: 3, damage: 11, tauntUntilTurn: 9 });
+    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 1, target: creatureAt(b, 0) });
+    const bruiser = at(state, b, 0)!;
+    expect(bruiser).toMatchObject({ attackCounters: 0, hpCounters: 0, tauntUntilTurn: null });
+    expect(currentHp(engine.db, state, bruiser)).toBe(2);
+    expect(maxHp(engine.db, state, bruiser)).toBe(10);
+    // 沒受傷的：HP 跟著上限降回去
+    place(state, b, 1, 'bruiser', { hpCounters: 3 });
+    state.players[a].zones[0]!.skillUsedTurn = null;
+    state.players[a].energy += 1;
+    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 1, target: creatureAt(b, 1) });
+    expect(currentHp(engine.db, state, at(state, b, 1)!)).toBe(10);
+  });
+
+  it('卡上的吸血與再生在沉默時失效，沉默結束就恢復', () => {
+    let { state, a, b } = start({ deckSize: 60 });
+    place(state, a, 0, 'mesmer');
+    place(state, b, 0, 'leech');
+    place(state, b, 1, 'moss', { damage: 4 });
+    state.players[b].heroDamage = 10;
+    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 1, target: creatureAt(b, 0) });
+    state.players[a].zones[0]!.skillUsedTurn = null;
+    state.players[a].energy += 1;
+    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 1, target: creatureAt(b, 1) });
+    state = endTurn(state); // b 的回合：苔蘚沒有再生
+    expect(at(state, b, 1)!.damage).toBe(4);
+    state = act(state, { type: 'attack', player: b, zone: 0, target: hero(a) });
+    expect(state.players[b].heroDamage).toBe(10); // 沒有吸血
+    state = endTurn(endTurn(state)); // b 的再下一個回合：沉默結束，恢復再生
+    expect(at(state, b, 1)!.damage).toBe(2);
   });
 });
 
 describe('虛弱', () => {
-  it('攻擊與反擊的傷害減半，技能傷害不變', () => {
+  it('不能攻擊，被攻擊時也不會反擊；技能照常', () => {
     let { state, a, b } = start();
     place(state, a, 0, 'mesmer');
     place(state, a, 1, 'hitter');
     place(state, b, 0, 'brute'); // 攻擊 5
-    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 3, target: creatureAt(b, 0) });
+    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 2, target: creatureAt(b, 0) });
+    expect(engine.viewFor(state, a).opponent.zones[0]!.weakened).toBe(true);
     state = act(state, { type: 'attack', player: a, zone: 1, target: creatureAt(b, 0) });
-    expect(at(state, a, 1)!.damage).toBe(2); // 反擊 5 減半捨去
+    expect(at(state, a, 1)!.damage).toBe(0); // 沒有反擊
+    expect(at(state, b, 0)!.damage).toBe(2);
     state = endTurn(state);
-    state = act(state, { type: 'attack', player: b, zone: 0, target: hero(a) });
-    expect(state.players[a].heroDamage).toBe(2);
-    state = act(endTurn(endTurn(state)), { type: 'useSkill', player: b, zone: 0, skill: 0, target: hero(a) });
-    expect(state.players[a].heroDamage).toBe(2 + 4);
-  });
-});
-
-describe('詛咒', () => {
-  it('技能傷害減半，攻擊照常', () => {
-    let { state, a, b } = start();
-    place(state, a, 0, 'mesmer');
-    place(state, b, 0, 'brute');
-    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 4, target: creatureAt(b, 0) });
-    state = endTurn(state);
+    expect(reject(state, { type: 'attack', player: b, zone: 0, target: hero(a) })).toBe('WEAKENED');
     state = act(state, { type: 'useSkill', player: b, zone: 0, skill: 0, target: hero(a) });
-    expect(state.players[a].heroDamage).toBe(2); // 4 減半
+    expect(state.players[a].heroDamage).toBe(4);
     state = act(endTurn(endTurn(state)), { type: 'attack', player: b, zone: 0, target: hero(a) });
-    expect(state.players[a].heroDamage).toBe(2 + 5);
+    expect(state.players[a].heroDamage).toBe(4 + 5);
   });
 });
 
