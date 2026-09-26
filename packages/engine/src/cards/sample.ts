@@ -32,41 +32,39 @@ const hit = (name: string, cost: number, target: TargetSpec, amount: number): Ab
 
 export const SAMPLE_HEROES: HeroDef[] = [
   // 英雄 HP 的起點是 55 − 3 ×（顏色數 − 1）− 效果強度，再照模擬調整。
+  // 單色的五個是基礎英雄，每個人都有；雙色以上的是 UR，要從卡包抽到。
   {
     kind: 'hero', id: 'nameless-swordsman', name: '無名劍士', colors: ['white'], hp: 59,
     passive: { name: '劍士之道', creatures: { attack: 1 } },
   },
   {
-    kind: 'hero',
-    id: 'flame-lord',
-    name: '烈焰領主',
-    colors: ['red'],
-    hp: 51,
+    kind: 'hero', id: 'deep-seer', name: '深海先知', colors: ['blue'], hp: 42,
+    power: { name: '預見', cost: 3, target: NONE, effects: [{ type: 'draw', count: 1 }] },
+  },
+  {
+    kind: 'hero', id: 'underworld-priest', name: '冥府祭司', colors: ['black'], hp: 54,
+    power: { name: '蝕心', cost: 4, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
+  },
+  {
+    kind: 'hero', id: 'flame-lord', name: '烈焰領主', colors: ['red'], hp: 51,
     power: hit('燃燼', 1, ANY, 1),
   },
   {
-    kind: 'hero',
-    id: 'forest-king',
-    name: '林海之王',
-    colors: ['green'],
-    hp: 50,
+    kind: 'hero', id: 'forest-king', name: '林海之王', colors: ['green'], hp: 58,
+    power: { name: '萌發', cost: 3, target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }] },
+  },
+  // ── UR 英雄：多色，技能之後再設計，先沿用 ──
+  {
+    kind: 'hero', id: 'grove-saint', name: '翠林聖女', rarity: 'UR', colors: ['white', 'green'], hp: 58,
     passive: { name: '豐饒', creatures: { hp: 1 } },
   },
   {
-    kind: 'hero',
-    id: 'tide-shadow-twins',
-    name: '潮影雙生',
-    colors: ['blue', 'black'],
-    hp: 42,
-    power: { name: '低語', cost: 4, uses: 2, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
+    kind: 'hero', id: 'tide-shadow-twins', name: '潮影雙生', rarity: 'UR', colors: ['blue', 'black'], hp: 42,
+    power: { name: '低語', cost: 4, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
   },
   {
-    kind: 'hero',
-    id: 'prism-sage',
-    name: '虹彩賢者',
-    colors: ['white', 'blue', 'black', 'red', 'green'],
-    hp: 47,
-    power: { name: '稜光', cost: 3, uses: 3, target: NONE, effects: [{ type: 'draw', count: 1 }] },
+    kind: 'hero', id: 'prism-sage', name: '虹彩賢者', rarity: 'UR', colors: ['white', 'blue', 'black', 'red', 'green'], hp: 47,
+    power: { name: '稜光', cost: 3, target: NONE, effects: [{ type: 'draw', count: 1 }] },
   },
 ];
 
@@ -540,7 +538,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     kind: 'heroEvolution', id: 'world-tree-king', name: '萬木之王', rarity: 'SR', colors: ['green'],
     cost: 5, evolvesFrom: 'forest-king', hpBonus: 11,
     entry: { name: '萬木回春', target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }] },
-    passive: { name: '萬木', creatures: { hp: 2 } },
+    power: { name: '萬木生長', cost: 3, target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }, { type: 'draw', count: 1 }] },
   },
   {
     kind: 'heroEvolution', id: 'sword-saint', name: '無名劍聖', rarity: 'SR', colors: ['white'],
@@ -553,7 +551,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     cost: 6, evolvesFrom: 'tide-shadow-twins', hpBonus: 11,
     entry: { name: '潮汐吞噬', target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 2 }] },
     power: {
-      name: '深淵低語', cost: 3, uses: 2, target: NONE,
+      name: '深淵低語', cost: 3, target: NONE,
       effects: [{ type: 'opponentDiscardRandom', count: 1 }, { type: 'draw', count: 1 }],
     },
   },

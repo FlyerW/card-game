@@ -7,6 +7,7 @@ import {
   fullProfile,
   newProfile,
   openPack,
+  ownsHero,
   ownedDeck,
   ownershipProblems,
   packableCards,
@@ -32,9 +33,15 @@ const game = (patch: Partial<GameSummary> = {}): GameSummary => ({ won: false, c
 const withQuest = (profile: Profile, id: string): Profile => ({ ...profile, quest: { id, progress: 0, done: false } });
 
 describe('新玩家', () => {
-  it('收藏裡有每個英雄的起始牌組，所以每個英雄都組得出合法的牌組', () => {
+  it('基礎英雄每個人都有，UR 英雄要抽到才有', () => {
     const profile = fresh();
-    for (const hero of SAMPLE_HEROES) {
+    for (const hero of SAMPLE_HEROES) expect(ownsHero(profile, db, hero.id), hero.name).toBe(hero.rarity === undefined);
+    expect(ownsHero({ ...profile, collection: { ...profile.collection, 'prism-sage': 1 } }, db, 'prism-sage')).toBe(true);
+  });
+
+  it('收藏裡有每個基礎英雄的起始牌組，所以每個基礎英雄都組得出合法的牌組', () => {
+    const profile = fresh();
+    for (const hero of SAMPLE_HEROES.filter((each) => each.rarity === undefined)) {
       const deck = ownedDeck(profile, db, DEFAULT_RULES, hero.id, 7);
       expect(validateDeck(db, DEFAULT_RULES, hero.id, deck), hero.name).toEqual([]);
       expect(ownershipProblems(profile, db, deck), hero.name).toEqual([]);
@@ -180,6 +187,10 @@ describe('卡包', () => {
       const opened = openPack(profile, db, DEFAULT_RULES, random);
       if (!opened.ok) throw new Error(opened.reason);
       for (const card of opened.cards) {
+        if (card.hero) {
+          expect(db.heroes.get(card.cardId)!.rarity).toBe('UR');
+          continue;
+        }
         const def = db.cards.get(card.cardId)!;
         expect(def.rarity).toBe(card.rarity);
         expect(def.kind === 'creature' && def.token).toBeFalsy();
@@ -203,6 +214,32 @@ describe('卡包', () => {
     }
     expect(profile.collection).toEqual(full);
     expect(Object.values(profile.vouchers).reduce((a, b) => a + b, 0)).toBe(duplicates);
+  });
+});
+
+describe('UR 英雄', () => {
+  it('卡包開得到；已經有了再開到換成 UR 兌換卷', () => {
+    const random = seededRandom(3);
+    let profile: Profile = { ...fresh(), gold: 3000 * ECONOMY.packPrice };
+    const heroes = new Map<string, number>();
+    for (let i = 0; i < 3000; i++) {
+      const opened = openPack(profile, db, DEFAULT_RULES, random);
+      if (!opened.ok) throw new Error(opened.reason);
+      for (const card of opened.cards) if (card.hero) heroes.set(card.cardId, (heroes.get(card.cardId) ?? 0) + 1);
+      profile = opened.profile;
+    }
+    const urHeroes = SAMPLE_HEROES.filter((hero) => hero.rarity === 'UR');
+    expect([...heroes.keys()].sort()).toEqual(urHeroes.map((hero) => hero.id).sort());
+    for (const hero of urHeroes) expect(profile.collection[hero.id]).toBe(1);
+  });
+
+  it('3 張 UR 兌換卷換一個英雄；有了就不能再換', () => {
+    const profile: Profile = { ...fresh(), vouchers: { N: 0, R: 0, SR: 0, UR: 6 } };
+    const swapped = exchange(profile, db, DEFAULT_RULES, 'tide-shadow-twins');
+    if (!swapped.ok) throw new Error(swapped.reason);
+    expect(ownsHero(swapped.profile, db, 'tide-shadow-twins')).toBe(true);
+    expect(exchange(swapped.profile, db, DEFAULT_RULES, 'tide-shadow-twins')).toMatchObject({ ok: false });
+    expect(exchange(profile, db, DEFAULT_RULES, 'flame-lord')).toMatchObject({ ok: false }); // 基礎英雄不用換
   });
 });
 
@@ -249,10 +286,11 @@ describe('收藏與牌組', () => {
 });
 
 describe('測試帳號與伺服器', () => {
-  it('測試帳號每張卡都收滿，有 10000 金幣', () => {
+  it('測試帳號每張卡都收滿、UR 英雄都有，有 10000 金幣', () => {
     const profile = fullProfile(db, DEFAULT_RULES, DAY);
     expect(profile.gold).toBe(10000);
     for (const card of packableCards(db)) expect(profile.collection[card.id], card.id).toBe(copyLimit(DEFAULT_RULES, card));
+    for (const hero of SAMPLE_HEROES) expect(ownsHero(profile, db, hero.id), hero.name).toBe(true);
     for (const hero of SAMPLE_HEROES) expect(ownershipProblems(profile, db, ownedDeck(profile, db, DEFAULT_RULES, hero.id, 3))).toEqual([]);
   });
 

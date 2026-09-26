@@ -106,11 +106,19 @@ export const questDef = (id: string): QuestDef | undefined => QUESTS.find((quest
 /** 起始牌組用的種子；改了卡池之後，新玩家拿到的起始卡也會跟著變。 */
 const STARTER_SEED = 1;
 
-/** 每個英雄一副起始牌組，組法跟自動組牌一樣。 */
+/** 每個基礎英雄（單色、每個人都有）一副起始牌組，組法跟自動組牌一樣。UR 英雄要抽到才有，不送牌組。 */
 export const starterDecks = (db: CardDb): string[][] =>
-  [...db.heroes.keys()].map((heroId) => buildDeck(STARTER_SEED, heroId, deckPool(db, heroId)));
+  [...db.heroes.values()]
+    .filter((hero) => hero.rarity === undefined)
+    .map((hero) => buildDeck(STARTER_SEED, hero.id, deckPool(db, hero.id)));
 
-/** 新玩家：收藏是每個英雄一副起始牌組用到的卡（同一張取最多的那副），保證每個英雄都組得出牌。 */
+/** 能不能用這個英雄：基礎英雄每個人都有，UR 英雄要在收藏裡。 */
+export const ownsHero = (profile: Profile, db: CardDb, heroId: string): boolean => {
+  const hero = db.heroes.get(heroId);
+  return hero !== undefined && (hero.rarity === undefined || (profile.collection[heroId] ?? 0) > 0);
+};
+
+/** 新玩家：收藏是每個基礎英雄一副起始牌組用到的卡（同一張取最多的那副），保證每個基礎英雄都組得出牌。 */
 export function newProfile(day: string, starterDecks: readonly (readonly string[])[]): Profile {
   const collection: Record<string, number> = {};
   for (const deck of starterDecks) {
@@ -129,9 +137,9 @@ export function newProfile(day: string, starterDecks: readonly (readonly string[
   };
 }
 
-/** 測試帳號：每張卡都收滿（2 張，UR 1 張），另外給一大筆金幣。 */
+/** 測試帳號：每張卡都收滿（2 張，UR 1 張）、UR 英雄都有，另外給一大筆金幣。 */
 export function fullProfile(db: CardDb, rules: Rules, day: string, gold = 10000): Profile {
-  const collection = Object.fromEntries(packableCards(db).map((card) => [card.id, copyLimit(rules, card)]));
+  const collection = Object.fromEntries(packItems(db, rules).map((item) => [item.id, item.limit]));
   return { ...newProfile(day, []), gold, collection };
 }
 
@@ -216,9 +224,28 @@ export const ownedDeck = (profile: Profile, db: CardDb, rules: Rules, heroId: st
 export const packableCards = (db: CardDb): DeckCardDef[] =>
   [...db.cards.values()].filter((card) => !(card.kind === 'creature' && card.token));
 
+/** 卡包裡開得到的東西：卡，加上 UR 英雄。limit 是最多擁有幾張（英雄 1 個）。 */
+export interface PackItem {
+  id: string;
+  name: string;
+  rarity: Rarity;
+  limit: number;
+  hero: boolean;
+}
+
+export const packItems = (db: CardDb, rules: Rules): PackItem[] => [
+  ...packableCards(db).map((card) => ({ id: card.id, name: card.name, rarity: card.rarity, limit: copyLimit(rules, card), hero: false })),
+  ...[...db.heroes.values()]
+    .filter((hero) => hero.rarity === 'UR')
+    .map((hero) => ({ id: hero.id, name: hero.name, rarity: 'UR' as const, limit: 1, hero: true })),
+];
+
 export interface PackCard {
+  /** 卡或英雄的 id。 */
   cardId: string;
   rarity: Rarity;
+  /** 開到的是 UR 英雄。 */
+  hero: boolean;
   /** 已經有滿了，換成一張同稀有度的兌換卷。 */
   duplicate: boolean;
 }
@@ -243,35 +270,35 @@ function rollGuaranteed(random: () => number): Rarity {
   return 'R';
 }
 
-/** 買一包並打開：扣 100 金幣，抽 5 張；已經有滿的換成兌換卷。 */
+/** 買一包並打開：扣 100 金幣，抽 5 張（UR 可能是英雄）；已經有滿的換成兌換卷。 */
 export function openPack(profile: Profile, db: CardDb, rules: Rules, random: () => number): EconomyResult<{ profile: Profile; cards: PackCard[] }> {
   if (profile.gold < ECONOMY.packPrice) return { ok: false, reason: `金幣不夠：一包 ${ECONOMY.packPrice}，目前 ${profile.gold}` };
-  const pool = packableCards(db);
+  const pool = packItems(db, rules);
   const rarities = Array.from({ length: ECONOMY.packSize }, () => rollRarity(random));
   if (!rarities.some((rarity) => rarity !== 'N')) rarities[rarities.length - 1] = rollGuaranteed(random);
 
   const next = structuredClone(profile);
   next.gold -= ECONOMY.packPrice;
   const cards = rarities.map((rarity): PackCard => {
-    const choices = pool.filter((card) => card.rarity === rarity);
-    const card = choices[Math.floor(random() * choices.length)]!;
-    const owned = next.collection[card.id] ?? 0;
-    if (owned >= copyLimit(rules, card)) {
+    const choices = pool.filter((item) => item.rarity === rarity);
+    const item = choices[Math.floor(random() * choices.length)]!;
+    const owned = next.collection[item.id] ?? 0;
+    if (owned >= item.limit) {
       next.vouchers[rarity] += 1;
-      return { cardId: card.id, rarity, duplicate: true };
+      return { cardId: item.id, rarity, hero: item.hero, duplicate: true };
     }
-    next.collection[card.id] = owned + 1;
-    return { cardId: card.id, rarity, duplicate: false };
+    next.collection[item.id] = owned + 1;
+    return { cardId: item.id, rarity, hero: item.hero, duplicate: false };
   });
   return { ok: true, profile: next, cards };
 }
 
-/** 用 3 張同稀有度的兌換卷換一張卡；已經有滿的不能換。 */
+/** 用 3 張同稀有度的兌換卷換一張卡（或一個 UR 英雄）；已經有滿的不能換。 */
 export function exchange(profile: Profile, db: CardDb, rules: Rules, cardId: string): EconomyResult<{ profile: Profile }> {
-  const card = packableCards(db).find((each) => each.id === cardId);
+  const card = packItems(db, rules).find((each) => each.id === cardId);
   if (!card) return { ok: false, reason: '這張卡不能兌換' };
   const owned = profile.collection[cardId] ?? 0;
-  if (owned >= copyLimit(rules, card)) return { ok: false, reason: `${card.name} 已經有 ${owned} 張了` };
+  if (owned >= card.limit) return { ok: false, reason: card.hero ? `已經有 ${card.name} 了` : `${card.name} 已經有 ${owned} 張了` };
   if (profile.vouchers[card.rarity] < ECONOMY.vouchersPerCard) {
     return { ok: false, reason: `${card.rarity} 兌換卷不夠：要 ${ECONOMY.vouchersPerCard} 張，目前 ${profile.vouchers[card.rarity]} 張` };
   }

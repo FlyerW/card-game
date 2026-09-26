@@ -44,11 +44,13 @@ const lines = [
   '',
   '## 英雄',
   '',
-  '| 英雄 | 顏色 | HP | 效果 |',
-  '|---|---|---|---|',
+  '單色的五個是基礎英雄，每個人都有；雙色以上的是 UR 英雄，要從卡包抽到。',
+  '',
+  '| 英雄 | 稀有度 | 顏色 | HP | 效果 |',
+  '|---|---|---|---|---|',
   ...SAMPLE_HEROES.map((hero) => {
     const effects = describeHero(hero).slice(1).join('<br>');
-    return `| **${hero.name}** | ${describeColors(hero.colors)} | ${hero.hp} | ${effects} |`;
+    return `| **${hero.name}** | ${hero.rarity ?? '基礎'} | ${describeColors(hero.colors)} | ${hero.hp} | ${effects} |`;
   }),
   '',
   ...section('英雄進化', SAMPLE_CARDS.filter((card) => card.kind === 'heroEvolution')),

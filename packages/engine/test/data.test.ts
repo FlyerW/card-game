@@ -51,6 +51,14 @@ describe('範例卡牌', () => {
   });
 });
 
+describe('範例英雄', () => {
+  it('五個基礎英雄各是一種顏色；雙色以上的英雄都是 UR', () => {
+    const base = SAMPLE_HEROES.filter((hero) => hero.rarity === undefined);
+    expect(base.map((hero) => hero.colors).flat().sort()).toEqual(['black', 'blue', 'green', 'red', 'white']);
+    for (const hero of SAMPLE_HEROES) expect(hero.rarity === 'UR', hero.name).toBe(hero.colors.length > 1);
+  });
+});
+
 describe('範例卡池', () => {
   const sample = sampleDb();
   const colors = ['white', 'blue', 'black', 'red', 'green'] as const;

@@ -196,7 +196,7 @@ function describePassive(passive: HeroPassive): string {
 }
 
 export function describeHero(hero: HeroDef): string[] {
-  const lines = [`${hero.name}　${describeColors(hero.colors)}｜♥ ${hero.hp}`];
+  const lines = [`${hero.name}　${hero.rarity ? `${hero.rarity} 英雄・` : ''}${describeColors(hero.colors)}｜♥ ${hero.hp}`];
   if (hero.passive) lines.push(describePassive(hero.passive));
   if (hero.power) lines.push(`天生技 ${describeAbility(hero.power)}`);
   if (!hero.passive && !hero.power) lines.push('沒有效果');

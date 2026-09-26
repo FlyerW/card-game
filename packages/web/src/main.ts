@@ -22,7 +22,18 @@ import {
   type SideView,
   type Target,
 } from '@card-game/engine';
-import { ECONOMY, emptyTally, gameSummary, newProfile, questDef, refreshDay, tallyEvents, type GameTally, type Profile } from '@card-game/economy';
+import {
+  ECONOMY,
+  emptyTally,
+  gameSummary,
+  newProfile,
+  ownsHero,
+  questDef,
+  refreshDay,
+  tallyEvents,
+  type GameTally,
+  type Profile,
+} from '@card-game/economy';
 import { chooseAction, STYLES } from '@card-game/sim/bot';
 import { describeEvents, ZONE, type LogLine } from './log';
 import {
@@ -186,6 +197,8 @@ function signIn(session: Session, profile: Profile): void {
     toast: null,
     shop: newShop(),
   });
+  // 換到沒有這個 UR 英雄的帳號：改選第一個基礎英雄。
+  if (!ownsHero(profile, db, app.heroId)) app.heroId = SAMPLE_HEROES.find((hero) => hero.rarity === undefined)!.id;
   if (app.screen === 'login') app.screen = 'setup';
   render();
 }
@@ -991,12 +1004,12 @@ function loginScreen(): string {
     <div class="login-options">
       <section class="login-card">
         <p class="d-head">測試帳號</p>
-        <p class="d-line">一進來就有 10000 金幣、全部的卡都收滿，方便試玩各種牌組。資料存在這個瀏覽器裡，隨時可以重設。</p>
+        <p class="d-line">一進來就有 10000 金幣、全部的卡都收滿、UR 英雄都有，方便試玩各種牌組。資料存在這個瀏覽器裡，隨時可以重設。</p>
         <button class="primary big" data-do="login-test" ${app.loggingIn ? 'disabled' : ''}>用測試帳號進入</button>
       </section>
       <section class="login-card">
         <p class="d-head">Google 帳號</p>
-        <p class="d-line">金幣與收藏存在遊戲伺服器上，換電腦也還在。新帳號送五個英雄的起始牌組與 100 金幣。</p>
+        <p class="d-line">金幣與收藏存在遊戲伺服器上，換電腦也還在。新帳號送五個基礎英雄的起始牌組與 100 金幣。</p>
         ${google}
       </section>
     </div>
@@ -1005,15 +1018,18 @@ function loginScreen(): string {
 }
 
 function setupScreen(): string {
+  // 基礎英雄每個人都有；多色的 UR 英雄沒抽到就鎖著，看得到但不能選。
   const heroes = SAMPLE_HEROES.map((h) => {
     const [head, ...body] = describeHero(h);
     const evolution = SAMPLE_CARDS.find((c) => c.kind === 'heroEvolution' && c.evolvesFrom === h.id);
     if (evolution) body.push(`可進化為 ${evolution.name}（${evolution.cost}）`);
     const chosen = h.id === app.heroId;
-    return `<button class="hero-pick${chosen ? ' chosen' : ''}" data-hero="${h.id}" aria-pressed="${chosen}">
-      <span class="hp-big">${h.hp}</span><span class="hp-unit">♥</span>
+    const locked = !ownsHero(app.profile, db, h.id);
+    return `<button class="hero-pick${chosen ? ' chosen' : ''}${locked ? ' locked' : ''}" data-hero="${h.id}" aria-pressed="${chosen}" ${locked ? 'disabled' : ''}>
+      <span class="hp-big">${h.hp}</span><span class="hp-unit">♥${h.rarity ? '<b class="hp-ur">UR</b>' : ''}</span>
       <span class="hp-name">${esc(h.name)}</span>${pips(h.colors)}
-      <span class="hp-text">${esc(body.join('　'))}</span><span class="sr">${esc(head ?? '')}</span></button>`;
+      <span class="hp-text">${esc(body.join('　'))}</span>${locked ? '<span class="hp-lock">還沒有：卡包抽到或用 UR 兌換卷換</span>' : ''}
+      <span class="sr">${esc(head ?? '')}</span></button>`;
   }).join('');
   const custom = app.decks[app.heroId];
   const problems = custom ? deckIssues(db, app.heroId, custom, owned()).problems : [];
@@ -1232,7 +1248,7 @@ root.addEventListener('click', (event) => {
   }
 
   if (heroId) {
-    app.heroId = heroId;
+    if (ownsHero(app.profile, db, heroId)) app.heroId = heroId;
     render();
   } else if (mull) {
     const uid = Number(mull);

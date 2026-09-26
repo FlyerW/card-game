@@ -235,6 +235,10 @@ export interface HeroDef {
   kind: 'hero';
   id: string;
   name: string;
+  /**
+   * 單色的是基礎英雄，每個人都有；雙色以上的英雄是 UR，要從卡包抽到（或用兌換卷換）才能用。
+   */
+  rarity?: 'UR';
   colors: Color[];
   hp: number;
   power?: Ability;
