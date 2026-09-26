@@ -22,6 +22,7 @@ import {
   type SideView,
   type Target,
 } from '@card-game/engine';
+import { ECONOMY, emptyTally, gameSummary, questDef, recordGame, refreshDay, tallyEvents, type GameTally, type Profile } from '@card-game/economy';
 import { chooseAction, STYLES } from '@card-game/sim/bot';
 import { describeEvents, ZONE, type LogLine } from './log';
 import {
@@ -37,6 +38,7 @@ import {
   type KindFilter,
 } from './deck-builder';
 import { ONLINE_AVAILABLE, OnlineClient } from './online';
+import { loadProfile, newShop, ownedOf, saveProfile, shopClick, shopScreen, today, walletBar, type Shop } from './shop';
 import { esc, kindLabel, pips } from './ui';
 import './style.css';
 
@@ -65,15 +67,31 @@ type Selection =
   | { kind: 'hero'; player: PlayerId }
   | { kind: 'field'; player: PlayerId };
 
+/** 這局結束時拿到的獎勵，顯示在結算畫面上。 */
+interface Reward {
+  winGold: number;
+  questGold: number;
+  /** 結算後的任務進度，例如「召喚 10 隻生物 6/10」。 */
+  quest: string;
+  /** 自己投降的對局不算。 */
+  conceded: boolean;
+}
+
 interface Saved {
   format: number;
-  screen: 'setup' | 'deck' | 'lobby' | 'play';
+  screen: 'setup' | 'deck' | 'lobby' | 'play' | 'shop';
   heroId: string;
   /** 每個英雄的自訂牌組；沒有就每局自動組。 */
   decks: Record<string, string[]>;
   state: GameState | null;
   log: LogLine[];
   redraw: number[];
+  /** 這局你用的牌組，結算任務（例如用有綠色卡的牌組贏）時看顏色。 */
+  gameDeck: string[];
+  /** 這局邊打邊累計的召喚、抽牌、法術。 */
+  tally: GameTally;
+  /** 這局的獎勵；null 表示還沒結算。 */
+  reward: Reward | null;
 }
 
 interface App extends Saved {
@@ -97,6 +115,9 @@ interface App extends Saved {
   roomCode: string;
   /** 看牌庫頂選牌時，已經點選的牌。 */
   picks: number[];
+  /** 金幣、收藏、每日任務，存在這個瀏覽器裡。 */
+  profile: Profile;
+  shop: Shop;
 }
 
 const app: App = {
@@ -119,7 +140,35 @@ const app: App = {
   playerName: loadName(),
   roomCode: new URLSearchParams(location.search).get('room')?.toUpperCase() ?? '',
   picks: [],
+  gameDeck: [],
+  tally: emptyTally(),
+  reward: null,
+  profile: loadProfile(db),
+  shop: newShop(),
 };
+
+/** 開始新的一局：清掉上一局的累計與獎勵。 */
+function resetGameRecord(deck: string[]): void {
+  Object.assign(app, { gameDeck: deck, tally: emptyTally(), reward: null });
+}
+
+/** 對局結束：照勝負、這局的累計與牌組發金幣、推進每日任務。每局只結算一次。 */
+function settle(view: PlayerView): void {
+  if (app.reward || !view.result) return;
+  const { winner, reason } = view.result;
+  const conceded = reason === 'concede' && winner !== YOU;
+  const summary = gameSummary(db, app.tally, app.gameDeck, winner === YOU, conceded);
+  const result = recordGame(app.profile, summary, today());
+  app.profile = result.profile;
+  saveProfile(app.profile);
+  const quest = questDef(app.profile.quest.id);
+  app.reward = {
+    winGold: result.winGold,
+    questGold: result.questGold,
+    quest: quest ? `${quest.text} ${app.profile.quest.progress}/${quest.goal}` : '',
+    conceded,
+  };
+}
 
 function loadName(): string {
   try {
@@ -144,7 +193,10 @@ online.onMessage = (message) => {
     app.mode = 'online';
     app.pending = false;
     const fresh = message.view.phase === 'mulligan' && app.view?.phase !== 'mulligan';
-    if (fresh) Object.assign(app, { log: [], redraw: [], selection: null, view: null });
+    if (fresh) {
+      Object.assign(app, { log: [], redraw: [], selection: null, view: null });
+      resetGameRecord(app.gameDeck);
+    }
     app.screen = 'play';
     step(app.view ?? message.view, message.view, message.legal, message.events);
   } else {
@@ -160,7 +212,9 @@ online.onMessage = (message) => {
 };
 
 function createRoom(): void {
-  online.send({ t: 'create', name: app.playerName, heroId: app.heroId, deck: myDeck() });
+  const deck = myDeck();
+  resetGameRecord(deck);
+  online.send({ t: 'create', name: app.playerName, heroId: app.heroId, deck });
 }
 
 function joinRoom(): void {
@@ -170,7 +224,9 @@ function joinRoom(): void {
     render();
     return;
   }
-  online.send({ t: 'join', code, name: app.playerName, heroId: app.heroId, deck: myDeck() });
+  const deck = myDeck();
+  resetGameRecord(deck);
+  online.send({ t: 'join', code, name: app.playerName, heroId: app.heroId, deck });
 }
 
 function leaveRoom(): void {
@@ -292,6 +348,8 @@ function floatsFrom(events: GameEvent[]): Float[] {
 function step(before: PlayerView, after: PlayerView, legalActions: Action[], events: GameEvent[]): void {
   app.view = after;
   app.legalActions = legalActions;
+  app.tally = tallyEvents(app.tally, events, YOU);
+  if (after.phase === 'over') settle(after);
   if (!after.choice) app.picks = [];
   app.log.push(...describeEvents(db, events, before, after, themName()));
   if (app.log.length > 300) app.log.splice(0, app.log.length - 300);
@@ -356,11 +414,12 @@ function startGame(): void {
   const rivals = SAMPLE_HEROES.filter((h) => h.id !== app.heroId);
   const rival = rivals[seed % rivals.length]!.id;
   YOU = 0;
-  // 雙方都照正式規則組牌；你有自訂牌組就用你的，電腦每局自動組一副。
+  // 雙方都照正式規則組牌；你有自訂牌組就用你的，沒有就用收藏自動組一副。電腦每局從全部的卡自動組一副。
+  const deck = myDeck();
   const created = engine.createGame({
     seed,
     players: [
-      { heroId: app.heroId, deck: myDeck() },
+      { heroId: app.heroId, deck },
       { heroId: rival, deck: autoDeck(db, rival, seed + 1) },
     ],
   });
@@ -372,11 +431,15 @@ function startGame(): void {
   const kept = engine.apply(created.state, { type: 'mulligan', player: BOT, cards: [] });
   if (!kept.ok) return;
   Object.assign(app, { mode: 'bot', screen: 'play', log: [], redraw: [], selection: null, toast: null, view: null });
+  resetGameRecord(deck);
   localStep(kept.state, []);
 }
 
-/** 你這局要用的牌組：有自訂牌組就用，沒有就自動組一副。 */
-const myDeck = (): string[] => app.decks[app.heroId] ?? autoDeck(db, app.heroId, (Math.random() * 2 ** 32) >>> 0);
+/** 收藏決定每張卡最多能放幾張。 */
+const owned = () => ownedOf(app.profile);
+
+/** 你這局要用的牌組：有自訂牌組就用，沒有就用收藏自動組一副。 */
+const myDeck = (): string[] => app.decks[app.heroId] ?? autoDeck(db, app.heroId, (Math.random() * 2 ** 32) >>> 0, owned());
 
 /** 目前的天生技：英雄進化卡有新的就用新的。 */
 function powerOf(side: SideView) {
@@ -636,16 +699,18 @@ function energyRow(side: SideView): string {
 function heroPlate(side: SideView, player: PlayerId, picks: Map<string, Action>): string {
   const h = hero(side.heroId);
   const key = `h${player}`;
-  const pct = Math.max(0, Math.round((side.heroHp / side.heroMaxHp) * 100));
+  // 打倒時可能扣到負的，畫面上寫 0。
+  const hp = Math.max(0, side.heroHp);
+  const pct = Math.round((hp / side.heroMaxHp) * 100);
   const classes = ['hero', side.heroHp < side.heroMaxHp ? 'hurt' : 'full'];
   if (picks.has(key)) classes.push('pick');
   if (app.selection?.kind === 'hero' && app.selection.player === player) classes.push('selected');
   const extra = player !== YOU ? `<span class="h-hand">手牌 ${side.handCount}</span>` : '';
   const name = side.heroEvolution ? nameOf(side.heroEvolution) : h.name;
   if (side.heroEvolution) classes.push('evolved');
-  return `<button class="${classes.join(' ')}" data-key="${key}" aria-label="${esc(name)}，血量 ${side.heroHp}">
+  return `<button class="${classes.join(' ')}" data-key="${key}" aria-label="${esc(name)}，血量 ${hp}">
     <span class="h-name">${esc(name)}</span>${pips(h.colors)}
-    <span class="h-hp"><i aria-hidden="true">♥</i><b>${side.heroHp}</b><small>/${side.heroMaxHp}</small></span>
+    <span class="h-hp"><i aria-hidden="true">♥</i><b>${hp}</b><small>/${side.heroMaxHp}</small></span>
     <span class="h-bar"><i style="width:${pct}%"></i></span>${extra}</button>`;
 }
 
@@ -760,12 +825,26 @@ function overlay(view: PlayerView): string {
           ? `<p class="d-line">等${esc(themName())}也按「再來一局」……</p><button class="ghost" data-do="leave-room">離開房間</button>`
           : `${asked?.[THEM()] ? `<p class="d-line">${esc(themName())}想再來一局</p>` : ''}
              <div class="end-actions"><button class="primary" data-do="rematch">再來一局</button><button class="ghost" data-do="leave-room">離開房間</button></div>`
-        : '<div class="end-actions"><button class="primary" data-do="again">再來一局</button><button class="ghost" data-do="setup">換英雄</button></div>';
+        : '<div class="end-actions"><button class="primary" data-do="again">再來一局</button><button class="ghost" data-do="setup">換英雄</button><button class="ghost" data-do="shop">卡包與收藏</button></div>';
     return `<div class="overlay"><div class="dialog end ${winner === YOU ? 'won' : 'lost'}" role="dialog" aria-label="${title}">
-      <h2>${title}</h2><p class="d-line">${why}・共 ${view.turn} 回合</p>${actions}
+      <h2>${title}</h2><p class="d-line">${why}・共 ${view.turn} 回合</p>${rewardLines()}${actions}
     </div></div>`;
   }
   return '';
+}
+
+/** 結算畫面上的金幣與任務進度。 */
+function rewardLines(): string {
+  const reward = app.reward;
+  if (!reward) return '';
+  if (reward.conceded) return '<p class="d-line reward">投降的對局不算金幣與任務進度。</p>';
+  const lines: string[] = [];
+  if (reward.winGold > 0) lines.push(`<span class="gain">+${reward.winGold} 金幣</span>（今天贏場 ${app.profile.winGoldToday}/${ECONOMY.dailyWinGoldCap}）`);
+  else if (app.view?.result?.winner === YOU) lines.push(`今天贏場金幣已經拿滿 ${ECONOMY.dailyWinGoldCap} 了`);
+  if (reward.questGold > 0) lines.push(`<span class="gain">每日任務完成 +${reward.questGold} 金幣</span>`);
+  else if (reward.quest && !app.profile.quest.done) lines.push(`每日任務：${esc(reward.quest)}`);
+  lines.push(`金幣 ${app.profile.gold}`);
+  return `<div class="reward">${lines.map((line) => `<p class="d-line">${line}</p>`).join('')}</div>`;
 }
 
 function playScreen(): string {
@@ -812,10 +891,10 @@ function setupScreen(): string {
       <span class="hp-text">${esc(body.join('　'))}</span><span class="sr">${esc(head ?? '')}</span></button>`;
   }).join('');
   const custom = app.decks[app.heroId];
-  const problems = custom ? deckIssues(db, app.heroId, custom).problems : [];
+  const problems = custom ? deckIssues(db, app.heroId, custom, owned()).problems : [];
   const colors = describeColors(hero(app.heroId).colors);
   const deckText = !custom
-    ? `還沒有自訂牌組：每局從${colors}與無色的卡自動組一副（進化線照 2/2 帶）。`
+    ? `還沒有自訂牌組：每局從收藏裡${colors}與無色的卡自動組一副（進化線照 2/2 帶）。`
     : problems.length
       ? `自訂牌組還不能用：${problems[0]}`
       : `用你的自訂牌組（${custom.length} 張）。`;
@@ -825,6 +904,7 @@ function setupScreen(): string {
         ? '選一名英雄，跟電腦打，或開一個房間跟朋友連線對戰。'
         : '選一名英雄，跟電腦打一局。對手的英雄隨機，開局時會先告訴你是誰。'
     }</p></header>
+    ${walletBar(app.profile)}
     <div class="heroes">${heroes}</div>
     <section class="deck-bar">
       <div><p class="d-head">牌組</p><p class="d-line${problems.length ? ' warn' : ''}">${esc(deckText)}</p></div>
@@ -848,7 +928,8 @@ function setupScreen(): string {
         <li>把對手英雄的血量打到 0 就贏了。</li>
       </ul>
       <p class="note">試玩說明：範例卡有 ${SAMPLE_CARDS.length} 張，牌組照正式規則：${DEFAULT_RULES.deckSize} 張、同名最多 ${DEFAULT_RULES.maxCopies} 張、UR 最多 ${DEFAULT_RULES.maxUrCopies} 張、只能放英雄顏色內的卡與無色卡。
-        你可以自己組牌；電腦每局自動組一副。電腦用的是模擬平衡時的均衡打法。</p>
+        你可以用收藏裡的卡自己組牌；電腦每局從全部的卡自動組一副。電腦用的是模擬平衡時的均衡打法。
+        金幣、收藏與牌組存在這個瀏覽器裡，換瀏覽器或清掉網站資料就會重來。</p>
     </section>
   </main>`;
 }
@@ -899,14 +980,22 @@ function lobbyScreen(): string {
 function render(): void {
   const handScroll = root.querySelector('.hand')?.scrollLeft ?? 0;
   const custom = app.decks[app.builder.heroId];
+  // 開著頁面跨過午夜：換成今天的任務。
+  const fresh = refreshDay(app.profile, today());
+  if (fresh !== app.profile) {
+    app.profile = fresh;
+    saveProfile(fresh);
+  }
   root.innerHTML =
     app.screen === 'setup'
       ? setupScreen()
       : app.screen === 'deck'
-        ? deckScreen(db, app.builder, custom ?? [], custom !== undefined)
-        : app.screen === 'lobby'
-          ? lobbyScreen()
-          : playScreen();
+        ? deckScreen(db, app.builder, custom ?? [], custom !== undefined, owned())
+        : app.screen === 'shop'
+          ? shopScreen(db, app.profile, app.shop, app.toast)
+          : app.screen === 'lobby'
+            ? lobbyScreen()
+            : playScreen();
   const handEl = root.querySelector('.hand');
   if (handEl) handEl.scrollLeft = handScroll;
   const log = root.querySelector('.log');
@@ -957,7 +1046,7 @@ function builderClick(el: HTMLElement, command: string | undefined): boolean {
     saveDecks(app.decks);
   };
   if (add) {
-    if (addProblem(db, deck, add) === null) edit([...deck, add]);
+    if (addProblem(db, deck, add, owned()) === null) edit([...deck, add]);
     app.builder.focus = add;
   } else if (remove) {
     edit(removeOne(deck, remove));
@@ -967,9 +1056,9 @@ function builderClick(el: HTMLElement, command: string | undefined): boolean {
   } else if (filter) {
     app.builder.filter = filter as KindFilter;
   } else if (command === 'deck-fill') {
-    edit(fillRandom(db, heroId, deck));
+    edit(fillRandom(db, heroId, deck, owned()));
   } else if (command === 'deck-auto') {
-    edit(autoDeck(db, heroId, (Math.random() * 2 ** 32) >>> 0));
+    edit(autoDeck(db, heroId, (Math.random() * 2 ** 32) >>> 0, owned()));
   } else if (command === 'deck-clear') {
     edit([]);
   } else if (command === 'deck-forget') {
@@ -988,7 +1077,7 @@ function builderClick(el: HTMLElement, command: string | undefined): boolean {
 
 root.addEventListener('click', (event) => {
   const el = (event.target as HTMLElement).closest<HTMLElement>(
-    '[data-do],[data-key],[data-hand],[data-skill],[data-hero],[data-mull],[data-pick],[data-add],[data-remove],[data-focus],[data-filter]',
+    '[data-do],[data-key],[data-hand],[data-skill],[data-hero],[data-mull],[data-pick],[data-add],[data-remove],[data-focus],[data-filter],[data-rarity],[data-color],[data-missing],[data-exchange]',
   );
   if (!el) {
     if (app.selection) {
@@ -999,6 +1088,10 @@ root.addEventListener('click', (event) => {
   }
   const { do: command, key, hand: handUid, skill, hero: heroId, mull, pick } = el.dataset;
   if (app.screen === 'deck' && builderClick(el, command)) return;
+  if (app.screen === 'shop' && shopClick(db, app, el, command)) {
+    render();
+    return;
+  }
 
   if (heroId) {
     app.heroId = heroId;
@@ -1035,6 +1128,15 @@ root.addEventListener('click', (event) => {
     app.builder = { heroId: app.heroId, filter: app.builder.filter, focus: null };
     app.screen = 'deck';
     app.toast = null;
+    render();
+    window.scrollTo(0, 0);
+  } else if (command === 'shop') {
+    Object.assign(app, { screen: 'shop', toast: null });
+    app.shop = { ...app.shop, opened: null, dealing: false, notice: null };
+    render();
+    window.scrollTo(0, 0);
+  } else if (command === 'shop-done') {
+    Object.assign(app, { screen: 'setup', toast: null });
     render();
     window.scrollTo(0, 0);
   } else if (command === 'create-room') {
@@ -1148,6 +1250,9 @@ hot?.snapshot?.(() => ({
   state: app.mode === 'online' ? null : app.state,
   log: app.mode === 'online' ? [] : app.log,
   redraw: app.redraw,
+  gameDeck: app.gameDeck,
+  tally: app.tally,
+  reward: app.reward,
 }));
 
 function start(data: Partial<Saved>): void {

@@ -301,7 +301,57 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
   background: var(--mat); border: 1px solid var(--mat-edge); border-radius: var(--radius); padding: 12px 16px;
 }
 .deck-bar .d-line.warn { color: #ffc9c2; }
+.notice { margin: 0; padding: 8px 10px; border-radius: 6px; background: #1f3a26; color: #c9f2d2; }
 .primary:disabled { filter: grayscale(1) brightness(.6); cursor: default; }
+
+/* ─── 金幣與每日任務 ─── */
+.wallet {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  background: var(--mat); border: 1px solid var(--mat-edge); border-radius: var(--radius); padding: 12px 16px;
+}
+.w-gold { display: inline-flex; align-items: center; gap: 8px; flex: none; }
+.w-gold b { font: 700 30px/1 var(--num); color: var(--r-ur); font-variant-numeric: tabular-nums; }
+.w-gold span:last-child { color: var(--ink-soft); font-size: 13px; }
+.coin {
+  width: 20px; height: 20px; border-radius: 50%; flex: none;
+  background: radial-gradient(circle at 35% 35%, #fff3c4, var(--r-ur) 45%, #b8862a); box-shadow: inset 0 0 0 1.5px #8a6420;
+}
+.w-info { flex: 1 1 260px; display: grid; gap: 2px; min-width: 0; }
+.w-info b { color: var(--ink); font-family: var(--num); font-size: 15px; }
+.w-label { display: inline-block; min-width: 5.2em; color: var(--ink-faint); font-size: 12px; }
+.w-info .done { color: var(--heal); font-weight: 700; }
+.wallet .ghost, .pack-bar .primary { position: relative; }
+.dot { position: absolute; top: -4px; right: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--r-ur); box-shadow: 0 0 0 2px var(--page); }
+.reward { display: grid; gap: 2px; padding: 8px 14px; border-radius: var(--radius); background: #0003; }
+.reward .gain { color: var(--r-ur); font-weight: 700; }
+
+/* ─── 卡包與收藏 ─── */
+.shop .b-head .w-gold b { font-size: 36px; }
+.pack-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  background: linear-gradient(135deg, #3a3024, var(--mat) 60%); border: 1px solid #5a4a33; border-radius: 12px; padding: 14px 18px;
+}
+.pack-info { flex: 1 1 320px; display: grid; gap: 4px; min-width: 0; }
+.pack-bar .primary.big { justify-self: auto; }
+.vouchers { margin: 2px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 13px; }
+.voucher { display: inline-flex; align-items: baseline; gap: 4px; padding: 2px 8px; border: 1px solid var(--mat-edge); border-radius: 4px; }
+.voucher b { font: 700 16px var(--num); color: var(--ink); }
+.pack-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 18px 14px; padding: 18px 8px 8px; }
+.p-card { display: grid; justify-items: center; gap: 8px; }
+.pack-row.deal .p-card { animation: deal .45s calc(var(--i) * .18s) both ease-out; }
+.p-card .card { width: 120px; min-height: 150px; }
+.p-card .card.r-SR { box-shadow: 0 0 14px #c38bff88; border-color: var(--r-sr); }
+.p-card .card.r-UR { box-shadow: 0 0 20px #ffcf5aaa; border-color: var(--r-ur); }
+.p-card .card.r-R { border-color: var(--r-r); }
+.p-tag { font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 4px; white-space: nowrap; }
+.p-tag.new { background: var(--heal); color: #0d2414; }
+.p-tag.dup { background: var(--zone); color: var(--ink-soft); }
+@keyframes deal { from { opacity: 0; translate: 0 18px; scale: .9; } }
+.own-count { text-align: center; font: 600 13px var(--num); color: var(--ink-soft); }
+.own-count b { font-size: 17px; color: var(--ink); }
+.pool-card.unowned .card { opacity: .38; filter: grayscale(.6); }
+.pool-card.unowned.focused .card { opacity: .7; }
+.d-line.warn { color: #ffc9c2; }
 
 /* ─── 連線對戰 ─── */
 .online { display: grid; gap: 12px; background: var(--mat); border: 1px solid var(--mat-edge); border-radius: var(--radius); padding: 14px 16px; }
@@ -418,7 +468,7 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
   .b-head { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pick, .float { animation: none; }
+  .pick, .float, .pack-row.deal .p-card { animation: none; }
   .float { display: none; }
   .h-bar i { transition: none; }
 }

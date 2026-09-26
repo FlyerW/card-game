@@ -7,6 +7,8 @@ import type { Ability, DeckCardDef, HeroDef, TargetSpec } from '../types';
 // 生物的基準照總費用 C（進化生物是基礎加進化的費用）：攻擊 C、HP C + 1，跟爐石的白板一樣。
 //
 // 稀有度：N 沒有技能，數值照基準；R 照基準、一個技能；SR 多 2 點 HP、一個技能；UR 多 3 點數值、兩個技能。
+// 原本是二階進化、後來改成基礎生物的卡（熾天使、深海水母皇、死亡騎士、九尾天狐、古樹熊神），技能是照二階的預算做的，
+// 所以數值照 R（不拿 SR/UR 的額外數值），技能貴 1 費、效果略減。
 // 無色卡比有顏色的卡少 1 點數值。進場效果、速攻、吸血、再生扣 1 點左右；9 費以上的進場效果不扣。
 // 單體傷害（技能與法術共用）：任意目標 = 費用 + 1，剛好解掉同費用的生物；只打英雄、只打生物、位置 = 費用 + 2。
 // 附帶其他效果的扣 1–2。範圍傷害約費用的一半；天生技約是同費用技能的一半。
@@ -40,7 +42,7 @@ export const SAMPLE_HEROES: HeroDef[] = [
     name: '烈焰領主',
     colors: ['red'],
     hp: 51,
-    power: hit('燃燼', 2, ANY, 1),
+    power: hit('燃燼', 1, ANY, 1),
   },
   {
     kind: 'hero',
@@ -110,10 +112,10 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     skills: [{ name: '守護', cost: 0, rest: true, target: NONE, effects: [{ type: 'taunt' }] }],
   },
   {
-    // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物。
+    // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物（見開頭：數值照 R、技能貴 1 費）。
     kind: 'creature', id: 'seraph', name: '熾天使', rarity: 'SR', colors: ['white'],
-    stage: 0, cost: 6, attack: 6, hp: 9,
-    skills: [{ name: '神聖庇護', cost: 2, target: ALLY, effects: [{ type: 'heal', amount: 5 }] }],
+    stage: 0, cost: 6, attack: 6, hp: 7,
+    skills: [{ name: '神聖庇護', cost: 3, target: ALLY, effects: [{ type: 'heal', amount: 5 }] }],
   },
   {
     kind: 'creature', id: 'shield-knight', name: '盾衛騎士', rarity: 'R', colors: ['white'],
@@ -192,10 +194,10 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     skills: [{ name: '麻痺觸手', cost: 2, target: CREATURE, effects: [{ type: 'paralyze' }] }],
   },
   {
-    // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物。
+    // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物（見開頭：數值照 R、技能貴 1 費）。
     kind: 'creature', id: 'jelly-empress', name: '深海水母皇', rarity: 'SR', colors: ['blue'],
-    stage: 0, cost: 5, attack: 5, hp: 8,
-    skills: [{ name: '麻痺電網', cost: 3, target: CREATURE, effects: [{ type: 'damage', amount: 4 }, { type: 'paralyze' }] }],
+    stage: 0, cost: 5, attack: 5, hp: 6,
+    skills: [{ name: '麻痺電網', cost: 4, target: CREATURE, effects: [{ type: 'damage', amount: 3 }, { type: 'paralyze' }] }],
   },
   {
     kind: 'creature', id: 'tide-mage', name: '潮汐術士', rarity: 'R', colors: ['blue'],
@@ -271,10 +273,10 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     skills: [{ name: '碎骨', cost: 1, target: { kind: 'enemyItemOrField' }, effects: [{ type: 'destroy' }] }],
   },
   {
-    // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物。
+    // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物（見開頭：數值照 R、技能貴 1 費）。
     kind: 'creature', id: 'death-knight', name: '死亡騎士', rarity: 'SR', colors: ['black'],
-    stage: 0, cost: 6, attack: 6, hp: 9,
-    skills: [{ name: '凋零', cost: 3, target: CREATURE, effects: [{ type: 'halveHp' }] }],
+    stage: 0, cost: 6, attack: 6, hp: 7,
+    skills: [{ name: '凋零', cost: 4, target: CREATURE, effects: [{ type: 'halveHp' }] }],
   },
   {
     kind: 'creature', id: 'rust-mite', name: '腐蝕蟲', rarity: 'R', colors: ['black'],
@@ -345,11 +347,11 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     skills: [{ name: '狐火', cost: 2, target: DIAGONAL, effects: [{ type: 'damage', amount: 3 }, { type: 'draw', count: 1 }] }],
   },
   {
-    // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物。
+    // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物（見開頭：數值照 R、技能貴 1 費）。
     kind: 'creature', id: 'nine-tailed-fox', name: '九尾天狐', rarity: 'SR', colors: ['red'],
-    stage: 0, cost: 7, attack: 7, hp: 9,
+    stage: 0, cost: 7, attack: 7, hp: 7,
     entry: { name: '九焰', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] },
-    skills: [{ name: '燎天', cost: 4, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }, { type: 'buff', attack: 2, hp: 2, on: 'self' }] }],
+    skills: [{ name: '燎天', cost: 5, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }, { type: 'buff', attack: 1, hp: 1, on: 'self' }] }],
   },
   {
     kind: 'creature', id: 'flame-imp', name: '炎之小鬼', rarity: 'R', colors: ['red'],
@@ -401,12 +403,12 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     skills: [{ name: '巨力', cost: 4, target: NONE, effects: [{ type: 'buff', attack: 3, hp: 5, on: 'self' }] }],
   },
   {
-    // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物。
+    // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物（見開頭：數值照 R、技能貴 1 費）。
     kind: 'creature', id: 'ancient-bear-god', name: '古樹熊神', rarity: 'UR', colors: ['green'],
-    stage: 0, cost: 8, attack: 9, hp: 10, keywords: ['lifesteal'],
+    stage: 0, cost: 8, attack: 8, hp: 8, keywords: ['lifesteal'],
     skills: [
-      { name: '森之怒', cost: 5, target: CREATURE, effects: [{ type: 'damage', amount: 8 }, { type: 'buff', attack: 2, hp: 2, on: 'self' }] },
-      { name: '大地震', cost: 6, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] },
+      { name: '森之怒', cost: 6, target: CREATURE, effects: [{ type: 'damage', amount: 7 }, { type: 'buff', attack: 1, hp: 1, on: 'self' }] },
+      { name: '大地震', cost: 7, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] },
     ],
   },
   {

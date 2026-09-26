@@ -47,26 +47,44 @@ export function evolutionLines(pool: readonly DeckCardDef[]): CreatureDef[][] {
 
 /**
  * 組一副牌：挑 lineCount 條進化線照 2/2 帶，英雄有進化卡就帶 2 張，
- * 其餘從不屬於任何進化線的卡隨機補滿（同名最多 3 張，9 費以上合計最多 3 張）。同一個 seed 一定組出同一副。
+ * 其餘從不屬於任何進化線的卡隨機補滿（同名最多 2 張、UR 1 張，9 費以上合計最多 2 張）。同一個 seed 一定組出同一副。
+ * limitOf 是每張卡最多放幾張；只能用收藏裡的卡時傳進來，沒收齊的進化線不會選。
  */
-export function buildDeck(seed: number, heroId: string | null, pool: readonly DeckCardDef[] = SAMPLE_CARDS, lineCount = 2): string[] {
+export function buildDeck(
+  seed: number,
+  heroId: string | null,
+  pool: readonly DeckCardDef[] = SAMPLE_CARDS,
+  lineCount = 2,
+  limitOf: (card: DeckCardDef) => number = limit,
+): string[] {
   const rand = random(seed);
-  const lines = evolutionLines(pool);
+  const lines = evolutionLines(pool).filter((line) => line.every((card) => limitOf(card) > 0));
   const inLines = new Set(lines.flat().map((card) => card.id));
   const deck: string[] = [];
 
   for (const line of shuffle([...lines], rand).slice(0, lineCount)) {
-    line.forEach((card, stage) => deck.push(...Array<string>(Math.min(LINE_COPIES[stage] ?? 1, limit(card))).fill(card.id)));
+    line.forEach((card, stage) => deck.push(...Array<string>(Math.min(LINE_COPIES[stage] ?? 1, limitOf(card))).fill(card.id)));
   }
   for (const card of pool) {
-    if (card.kind === 'heroEvolution' && card.evolvesFrom === heroId) deck.push(...Array<string>(Math.min(2, limit(card))).fill(card.id));
+    if (card.kind === 'heroEvolution' && card.evolvesFrom === heroId) deck.push(...Array<string>(Math.min(2, limitOf(card))).fill(card.id));
   }
   const fillers = pool.filter((card) => card.kind !== 'heroEvolution' && !(card.kind === 'creature' && card.token) && !inLines.has(card.id));
   let highCost = 0;
-  for (const card of shuffle(fillers.flatMap((card) => Array<DeckCardDef>(limit(card)).fill(card)), rand)) {
+  for (const card of shuffle(fillers.flatMap((card) => Array<DeckCardDef>(limitOf(card)).fill(card)), rand)) {
     if (deck.length === DECK_SIZE) break;
     if (card.cost >= HIGH_COST && highCost++ >= MAX_HIGH_COST) continue;
     deck.push(card.id);
+  }
+  // 收藏不夠的話，進化線裡剩下的卡也拿來補：先補基礎，再補牌組裡已經有基礎的進化卡。
+  for (const stage of [0, 1]) {
+    for (const card of pool) {
+      if (card.kind !== 'creature' || card.stage !== stage || card.token || !inLines.has(card.id)) continue;
+      if (stage === 1 && !deck.includes(card.evolvesFrom!)) continue;
+      while (deck.length < DECK_SIZE && deck.filter((id) => id === card.id).length < limitOf(card)) {
+        if (card.cost >= HIGH_COST && highCost++ >= MAX_HIGH_COST) break;
+        deck.push(card.id);
+      }
+    }
   }
   return deck;
 }

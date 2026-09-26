@@ -8,6 +8,7 @@
     "build": "vite build && node scripts/artifact.mjs"
   },
   "dependencies": {
+    "@card-game/economy": "*",
     "@card-game/engine": "*",
     "@card-game/sim": "*",
     "@card-game/server": "*"

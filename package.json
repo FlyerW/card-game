@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc -p packages/engine && tsc -p packages/sim && tsc -p packages/web && tsc -p packages/server",
+    "typecheck": "tsc -p packages/engine && tsc -p packages/sim && tsc -p packages/economy && tsc -p packages/web && tsc -p packages/server",
     "cards": "tsx packages/engine/scripts/cards-md.ts",
     "sim": "tsx packages/sim/src/run.ts",
     "dev": "npm run dev -w @card-game/web",

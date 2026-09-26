@@ -12,17 +12,16 @@ import {
 import { buildDeck } from '@card-game/sim/deck';
 import { esc, kindLabel, pips } from './ui';
 
-// 組牌：照正式規則，30 張、同名最多 2 張、UR 最多 1 張、只能放英雄顏色內的卡與無色卡。
-// 牌組每個英雄各存一副，存在這個瀏覽器裡；沒有自訂牌組就每局自動組一副。
+// 組牌：照正式規則，30 張、同名最多 2 張、UR 最多 1 張、只能放英雄顏色內的卡與無色卡；
+// 而且只能放收藏裡有的卡，張數不超過擁有的。
+// 牌組每個英雄各存一副，存在這個瀏覽器裡；沒有自訂牌組就每局用收藏自動組一副。
+
+/** 每張卡最多能放幾張：規則上限與擁有張數取小的。電腦組牌不看收藏，用 copyLimit。 */
+export type Owned = (card: DeckCardDef) => number;
 
 const { deckSize, maxCopies, maxUrCopies } = DEFAULT_RULES;
 /** 牌組規則從 40 張改成 30 張時換了 key，舊的 40 張牌組就不讀了。 */
 const STORAGE_KEY = 'card-game.decks.v2';
-/** 這張卡最多能放幾張。 */
-const limitOf = (db: CardDb, id: string) => {
-  const card = db.cards.get(id);
-  return card ? copyLimit(DEFAULT_RULES, card) : maxCopies;
-};
 
 export type KindFilter = 'all' | 'creature' | 'spell' | 'other';
 const FILTERS: [KindFilter, string][] = [
@@ -65,10 +64,14 @@ export function saveDecks(decks: Record<string, string[]>): void {
 const count = (deck: readonly string[], id: string) => deck.filter((each) => each === id).length;
 
 /** 能不能再加一張；不能的話回傳原因。 */
-export function addProblem(db: CardDb, deck: readonly string[], id: string): string | null {
+export function addProblem(db: CardDb, deck: readonly string[], id: string, owned: Owned): string | null {
   if (deck.length >= deckSize) return `牌組已經 ${deckSize} 張了`;
-  const limit = limitOf(db, id);
+  const card = db.cards.get(id);
+  if (!card) return '沒有這張卡';
+  const limit = copyLimit(DEFAULT_RULES, card);
+  const have = owned(card);
   if (count(deck, id) >= limit) return limit < maxCopies ? `UR 最多 ${limit} 張` : `同名卡最多 ${limit} 張`;
+  if (count(deck, id) >= have) return have === 0 ? '還沒有這張卡：開卡包或用兌換卷換' : `你只有 ${have} 張`;
   return null;
 }
 
@@ -83,10 +86,8 @@ const MAX_HIGH_COST = 2;
 const highCostCount = (db: CardDb, deck: readonly string[]) => deck.filter((id) => (db.cards.get(id)?.cost ?? 0) >= HIGH_COST).length;
 
 /** 用英雄能用的卡隨機補滿，已經放的不動。高費卡補到上限為止。 */
-export function fillRandom(db: CardDb, heroId: string, deck: readonly string[]): string[] {
-  const spare = deckPool(db, heroId).flatMap((card) =>
-    Array<string>(Math.max(0, copyLimit(DEFAULT_RULES, card) - count(deck, card.id))).fill(card.id),
-  );
+export function fillRandom(db: CardDb, heroId: string, deck: readonly string[], owned: Owned): string[] {
+  const spare = deckPool(db, heroId).flatMap((card) => Array<string>(Math.max(0, owned(card) - count(deck, card.id))).fill(card.id));
   for (let i = spare.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [spare[i], spare[j]] = [spare[j]!, spare[i]!];
@@ -101,12 +102,17 @@ export function fillRandom(db: CardDb, heroId: string, deck: readonly string[]):
   return filled;
 }
 
-/** 跟電腦的牌組一樣自動組一副：進化線照 2/2 帶，其餘隨機。 */
-export const autoDeck = (db: CardDb, heroId: string, seed: number): string[] => buildDeck(seed, heroId, deckPool(db, heroId));
+/** 跟電腦的牌組一樣自動組一副：進化線照 2/2 帶，其餘隨機。給了 owned 就只用收藏裡的卡。 */
+export const autoDeck = (db: CardDb, heroId: string, seed: number, owned?: Owned): string[] =>
+  buildDeck(seed, heroId, deckPool(db, heroId), 2, owned);
 
 /** 規則上的問題（有就不能開始），以及組牌建議（可以不理）。 */
-export function deckIssues(db: CardDb, heroId: string, deck: readonly string[]): { problems: string[]; tips: string[] } {
+export function deckIssues(db: CardDb, heroId: string, deck: readonly string[], owned: Owned): { problems: string[]; tips: string[] } {
   const problems = validateDeck(db, DEFAULT_RULES, heroId, deck);
+  for (const id of new Set(deck)) {
+    const card = db.cards.get(id);
+    if (card && count(deck, id) > owned(card)) problems.push(`${card.name} 只有 ${owned(card)} 張，牌組放了 ${count(deck, id)} 張`);
+  }
   const tips: string[] = [];
   const name = (id: string) => db.cards.get(id)?.name ?? id;
   for (const id of new Set(deck)) {
@@ -137,12 +143,13 @@ const KIND_NAMES: Record<DeckCardDef['kind'], string> = {
 const byCost = (x: DeckCardDef, y: DeckCardDef) =>
   x.cost - y.cost || RARITIES.indexOf(x.rarity) - RARITIES.indexOf(y.rarity) || x.name.localeCompare(y.name, 'zh-Hant');
 
-function poolCard(db: CardDb, card: DeckCardDef, deck: readonly string[], focus: string | null): string {
+function poolCard(db: CardDb, card: DeckCardDef, deck: readonly string[], focus: string | null, owned: Owned): string {
   const n = count(deck, card.id);
   const hp = card.kind === 'creature' ? `<span class="c-hp"><span class="c-atk">⚔${card.attack}</span> <span class="c-heart">♥</span>${card.hp}</span>` : '';
   const evo = card.kind === 'creature' && card.stage > 0;
-  const addWhy = addProblem(db, deck, card.id);
-  return `<div class="pool-card${n ? ' in-deck' : ''}${focus === card.id ? ' focused' : ''}">
+  const addWhy = addProblem(db, deck, card.id, owned);
+  const have = owned(card);
+  return `<div class="pool-card${n ? ' in-deck' : ''}${have === 0 ? ' unowned' : ''}${focus === card.id ? ' focused' : ''}">
     <button class="card k-${card.kind} r-${card.rarity}" data-focus="${card.id}" aria-label="${esc(card.name)}，看說明">
       <span class="c-cost${evo ? ' evo' : ''}">${evo ? '+' : ''}${card.cost}</span>
       <span class="c-top"><span class="rarity">${card.rarity}</span>${pips(card.colors)}</span>
@@ -151,7 +158,7 @@ function poolCard(db: CardDb, card: DeckCardDef, deck: readonly string[], focus:
     </button>
     <div class="pc-count">
       <button data-remove="${card.id}" ${n === 0 ? 'disabled' : ''} aria-label="拿掉一張${esc(card.name)}">−</button>
-      <span><b>${n}</b>/${copyLimit(DEFAULT_RULES, card)}</span>
+      <span>${have === 0 ? '未擁有' : `<b>${n}</b>/${have}`}</span>
       <button data-add="${card.id}" ${addWhy ? `disabled title="${esc(addWhy)}"` : ''} aria-label="加一張${esc(card.name)}">+</button>
     </div>
   </div>`;
@@ -189,17 +196,21 @@ function deckList(db: CardDb, deck: readonly string[]): string {
     .join('');
 }
 
-export function deckScreen(db: CardDb, b: Builder, deck: readonly string[], custom: boolean): string {
+export function deckScreen(db: CardDb, b: Builder, deck: readonly string[], custom: boolean, owned: Owned): string {
   const hero = db.heroes.get(b.heroId)!;
-  const pool = deckPool(db, b.heroId).filter((card) => matches(card, b.filter)).sort(byCost);
-  const { problems, tips } = deckIssues(db, b.heroId, deck);
+  // 擁有的排前面，沒有的變暗放後面，看得到還能收集什麼。
+  const pool = deckPool(db, b.heroId)
+    .filter((card) => matches(card, b.filter))
+    .sort((x, y) => Number(owned(y) > 0) - Number(owned(x) > 0) || byCost(x, y));
+  const { problems, tips } = deckIssues(db, b.heroId, deck, owned);
   const focus = b.focus ? db.cards.get(b.focus) : undefined;
   const focusBox = focus
     ? `<div class="focus">${describeCard(focus, (id) => db.cards.get(id)?.name ?? id)
         .map((line, i) => (i === 0 ? `<p class="d-head">${esc(line)}</p>` : `<p class="d-line">${esc(line)}</p>`))
         .join('')}
         <div class="respond"><button class="ghost" data-remove="${focus.id}" ${count(deck, focus.id) === 0 ? 'disabled' : ''}>拿掉一張</button>
-        <button class="primary" data-add="${focus.id}" ${addProblem(db, deck, focus.id) ? 'disabled' : ''}>加一張（${count(deck, focus.id)}/${copyLimit(DEFAULT_RULES, focus)}）</button></div></div>`
+        <button class="primary" data-add="${focus.id}" ${addProblem(db, deck, focus.id, owned) ? 'disabled' : ''}>加一張（${count(deck, focus.id)}/${owned(focus)}）</button></div>
+        ${owned(focus) === 0 ? '<p class="d-line warn">還沒有這張卡：開卡包，或用 3 張同稀有度的兌換卷換。</p>' : ''}</div>`
     : '<p class="d-line">點卡片看說明；卡片下面的 − ＋ 調整張數。</p>';
   const status =
     problems.length === 0
@@ -213,14 +224,14 @@ export function deckScreen(db: CardDb, b: Builder, deck: readonly string[], cust
   return `<main class="builder">
     <header class="b-head">
       <div><h1>組牌・${esc(hero.name)}</h1>
-        <p>${pips(hero.colors)} ${describeColors(hero.colors)}的卡加上無色卡；${deckSize} 張，同名最多 ${maxCopies} 張，UR 最多 ${maxUrCopies} 張。
-        ${custom ? '牌組存在這個瀏覽器裡。' : '還沒有自訂牌組，開始對戰時會自動組一副。'}</p></div>
+        <p>${pips(hero.colors)} ${describeColors(hero.colors)}的卡加上無色卡；${deckSize} 張，同名最多 ${maxCopies} 張，UR 最多 ${maxUrCopies} 張，只能放收藏裡有的卡。
+        ${custom ? '牌組存在這個瀏覽器裡。' : '還沒有自訂牌組，開始對戰時會用收藏自動組一副。'}</p></div>
       <div class="b-count${deck.length === deckSize ? ' full' : ''}"><b>${deck.length}</b>/${deckSize}</div>
     </header>
     <div class="b-body">
       <section class="b-pool" aria-label="可以放的卡">
         <div class="chips">${filters}</div>
-        <div class="pool">${pool.map((card) => poolCard(db, card, deck, b.focus)).join('')}</div>
+        <div class="pool">${pool.map((card) => poolCard(db, card, deck, b.focus, owned)).join('')}</div>
       </section>
       <aside class="b-side">
         <div class="detail">${focusBox}</div>

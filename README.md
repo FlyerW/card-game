@@ -4,18 +4,20 @@
 召喚生物、使用技能、施放法術都從池裡付費；每位玩家有一名英雄，英雄的顏色決定牌組能放哪些卡，
 英雄被打倒就輸。遊戲名稱暫定。
 
-> **這是大縮模實驗分支**（`claude/hearthstone-scale`）：生物有攻擊力，每回合可以免費攻擊（會被反擊）或花能量發動技能，
+> **這是大縮模實驗分支**（`claude/hearthstone-scale`）：生物有攻擊力，每回合可以免費攻擊一次（會被反擊）、花能量發動技能一次，
 > 數字跟爐石一樣（攻擊 = 費用、HP = 費用 + 1）；牌組 30 張、同名最多 2 張、UR 最多 1 張，最多進化一次、進化線照 2/2 帶。規則見 [docs/design.md 的「大縮模實驗」](docs/design.md#大縮模實驗這個分支)。
 
 ## 目前進度
 
 - [x] 規則設計：[docs/design.md](docs/design.md)（v0.8）
-- [x] 規則引擎：[`packages/engine`](packages/engine)，包括異常狀態、吸血與再生；全部 183 個測試
+- [x] 規則引擎：[`packages/engine`](packages/engine)，包括異常狀態、吸血與再生；180 個測試
 - [x] 平衡模擬：[`packages/sim`](packages/sim)，讓機器人大量對打，比較不同規則、估算一局要打多久。結果見 [docs/balance-results.md](docs/balance-results.md)
 - [x] 網頁試玩版：[`packages/web`](packages/web)，跟電腦對戰，可以自己組牌。引擎和電腦對手都在瀏覽器裡跑，不需要伺服器
 - [x] 伺服器：兩人連線對戰（[`packages/server`](packages/server)），見下面「跟朋友連線對戰」
+- [x] 金幣、每日任務、卡包、兌換卷：規則在 [`packages/economy`](packages/economy)，試玩版的收藏存在瀏覽器裡
 - [ ] 網頁客戶端
-- [ ] 帳號、配對；牌組存到伺服器（試玩版的牌組先存在瀏覽器裡）
+- [ ] 帳號、配對、牌位；牌組與收藏存到伺服器（試玩版先存在瀏覽器裡）
+- [ ] 卡牌插圖（AI 畫）
 
 範例卡牌見 [docs/cards.md](docs/cards.md)。
 
@@ -73,6 +75,7 @@ npm run server                 # 預設埠 8787；要換埠：PORT=9000 npm run 
 ```
 docs/
 ├── design.md             規則設計文件
+├── art.md                卡牌美術的 AI 繪圖指南
 ├── board.svg             場上配置圖（由 scripts/board-svg.py 產生）
 ├── cards.md              範例卡牌（自動產生，請勿手動編輯）
 └── balance-results.md    平衡模擬結果（自動產生，請勿手動編輯）
@@ -94,11 +97,14 @@ packages/engine/          規則引擎：純函式庫，不碰網路也不碰畫
 
 packages/sim/             平衡模擬
 ├── src/bot.ts            機器人：貪婪策略與局面評分，三種打法
-├── src/deck.ts           自動組牌：進化線照 3/2/1 帶
+├── src/deck.ts           自動組牌：進化線照 2/2 帶，可以限制只用收藏裡的卡
 ├── src/experiments.ts    實驗設定：比較哪些規則、牌組怎麼組
 ├── src/match.ts          打一局
 ├── src/pace.ts           用動作數估算真人一局要打多久
 └── src/run.ts            多程序平行跑大量對局，統計並寫出報告
+
+packages/economy/         金幣、每日任務、卡包、兌換卷：純函式，網頁與之後的伺服器共用
+└── src/index.ts
 
 packages/server/          連線對戰伺服器（Node + WebSocket），也負責提供網頁
 ├── src/lobby.ts          房間與對局：驗證動作、分別送出各自的視角
@@ -108,7 +114,8 @@ packages/server/          連線對戰伺服器（Node + WebSocket），也負�
 
 packages/web/             網頁試玩版（Vite）
 ├── src/main.ts           牌桌畫面與操作；能點的東西全部由引擎的合法動作推出來
-├── src/deck-builder.ts   組牌畫面，牌組存在瀏覽器裡
+├── src/deck-builder.ts   組牌畫面，牌組存在瀏覽器裡，只能放收藏裡有的卡
+├── src/shop.ts           卡包與收藏畫面、開局畫面的金幣與每日任務；玩家資料存在瀏覽器裡
 ├── src/online.ts         連線對戰：連到伺服器、斷線自動回到座位
 ├── src/log.ts            把引擎事件翻成對戰紀錄
 ├── src/ui.ts             共用的小工具
