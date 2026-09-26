@@ -24,6 +24,7 @@ export type ErrorCode =
   | 'DISARMED'
   | 'NO_HERO_POWER'
   | 'HERO_POWER_USED'
+  | 'HERO_POWER_SPENT'
   | 'TARGET_REQUIRED'
   | 'TARGET_NOT_ALLOWED'
   | 'NO_LEGAL_TARGET'

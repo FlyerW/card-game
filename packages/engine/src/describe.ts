@@ -87,7 +87,7 @@ export function describeEffects(ability: Omit<Ability, 'cost'>): string {
 
 /** 技能與天生技：「火花（能量 2）：〔斜對角〕造成 7 傷害」。 */
 export const describeAbility = (ability: Ability): string =>
-  `${ability.name}（能量 ${ability.cost}）：${describeEffects(ability)}`;
+  `${ability.name}（能量 ${ability.cost}${ability.uses ? `，每局 ${ability.uses} 次` : ''}）：${describeEffects(ability)}`;
 
 /** 進場效果：「進場 火星：〔任意目標〕造成 2 傷害」。 */
 export const describeEntry = (entry: Omit<Ability, 'cost'>): string => `進場 ${entry.name}：${describeEffects(entry)}`;
@@ -137,7 +137,6 @@ function describeFieldTriggers(field: Extract<DeckCardDef, { kind: 'field' }>): 
   return lines;
 }
 
-const STAGE_NAMES = ['基礎', '一階', '二階'] as const;
 
 /** 整張卡的說明，第一行是標題，其餘是效果。費用一律寫成「能量 N」；進化生物寫的是進化要花的能量。 */
 export function describeCard(card: DeckCardDef, names: (id: string) => string = (id) => id): string[] {
@@ -145,10 +144,9 @@ export function describeCard(card: DeckCardDef, names: (id: string) => string = 
   const cost = `能量 ${card.cost}`;
   switch (card.kind) {
     case 'creature': {
-      const stage = STAGE_NAMES[card.stage];
-      const from = card.evolvesFrom === undefined ? '' : `，由${names(card.evolvesFrom)}進化`;
+      const stage = card.evolvesFrom === undefined ? '基礎' : `由${names(card.evolvesFrom)}進化`;
       const entry = card.entry ? [describeEntry(card.entry)] : [];
-      return [`${card.name}　${tag}・${stage}${from}｜${cost}｜⚔ ${card.attack}｜♥ ${card.hp}`, ...describeTraits(card), ...entry, ...card.skills.map(describeAbility)];
+      return [`${card.name}　${tag}・${stage}｜${cost}｜⚔ ${card.attack}｜♥ ${card.hp}`, ...describeTraits(card), ...entry, ...card.skills.map(describeAbility)];
     }
     case 'spell':
       return [`${card.name}　${tag}・法術｜${cost}`, describeEffects(card)];

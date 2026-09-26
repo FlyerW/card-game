@@ -50,7 +50,7 @@ const THEM = (): PlayerId => other(YOU);
 const BOT: PlayerId = 1;
 const BOT_STEP_MS = 750;
 /** 存檔格式。引擎的狀態改了就加一，舊版存下來的對局就不接著打。 */
-const SAVE_FORMAT = 3;
+const SAVE_FORMAT = 4;
 
 // ─── 狀態 ────────────────────────────────────────────────────────────────────
 
@@ -654,8 +654,10 @@ function sideRows(side: SideView, player: PlayerId, picks: Map<string, Action>, 
     const power = powerOf(side);
     if (power) {
       const usable = actsForPower().length > 0;
+      // 有次數限制的天生技，標出這局還剩幾次。
+      const left = power.uses === undefined ? '' : `（剩 ${Math.max(0, power.uses - side.heroPowerUses)} 次）`;
       heroRow += `<button class="power${app.selection?.kind === 'heroPower' ? ' selected' : ''}" data-do="power" ${usable ? '' : 'disabled'}>
-        <span class="skill-cost">${power.cost}</span>天生技「${esc(power.name)}」</button>`;
+        <span class="skill-cost">${power.cost}</span>天生技「${esc(power.name)}」${left}</button>`;
     }
   }
   heroRow += '</div>';
@@ -775,7 +777,7 @@ function setupScreen(): string {
   const problems = custom ? deckIssues(db, app.heroId, custom).problems : [];
   const colors = describeColors(hero(app.heroId).colors);
   const deckText = !custom
-    ? `還沒有自訂牌組：每局從${colors}與無色的卡自動組一副（進化線照 2/2/1 帶）。`
+    ? `還沒有自訂牌組：每局從${colors}與無色的卡自動組一副（進化線照 2/2 帶）。`
     : problems.length
       ? `自訂牌組還不能用：${problems[0]}`
       : `用你的自訂牌組（${custom.length} 張）。`;

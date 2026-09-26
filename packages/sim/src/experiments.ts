@@ -96,7 +96,7 @@ export const EXPERIMENTS: Experiment[] = [
   ),
 ];
 
-/** 模擬用的牌組：進化線照 2/2/1 帶，其餘隨機；模擬英雄沒有英雄進化卡。同一個 seed 一定組出同一副。 */
+/** 模擬用的牌組：進化線照 2/2 帶，其餘隨機；模擬英雄沒有英雄進化卡。同一個 seed 一定組出同一副。 */
 export const mirrorDeck = (seed: number): string[] => buildDeck(seed, null);
 
 /**

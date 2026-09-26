@@ -3,11 +3,11 @@ import { copyLimit, DEFAULT_RULES, SAMPLE_CARDS, type CreatureDef, type DeckCard
 // 試玩與模擬共用的組牌方式。
 //
 // 完全隨機組牌會抽到一堆沒有對應基礎生物的進化卡，卡在手上用不了。
-// 所以進化線照 2/2/1 帶：基礎 2 張、一階 2 張、二階 1 張；其餘隨機補滿。同名最多 2 張、UR 最多 1 張。
+// 所以進化線照 2/2 帶：基礎 2 張、進化 2 張（最多進化一次）；其餘隨機補滿。同名最多 2 張、UR 最多 1 張。
 // 9 費以上的卡最多帶 2 張，不然前幾回合手上都是打不出來的牌。
 
 const DECK_SIZE = DEFAULT_RULES.deckSize;
-const LINE_COPIES = [2, 2, 1];
+const LINE_COPIES = [2, 2];
 const HIGH_COST = 9;
 const MAX_HIGH_COST = 2;
 const limit = (card: DeckCardDef) => copyLimit(DEFAULT_RULES, card);
@@ -46,7 +46,7 @@ export function evolutionLines(pool: readonly DeckCardDef[]): CreatureDef[][] {
 }
 
 /**
- * 組一副牌：挑 lineCount 條進化線照 2/2/1 帶，英雄有進化卡就帶 2 張，
+ * 組一副牌：挑 lineCount 條進化線照 2/2 帶，英雄有進化卡就帶 2 張，
  * 其餘從不屬於任何進化線的卡隨機補滿（同名最多 3 張，9 費以上合計最多 3 張）。同一個 seed 一定組出同一副。
  */
 export function buildDeck(seed: number, heroId: string | null, pool: readonly DeckCardDef[] = SAMPLE_CARDS, lineCount = 2): string[] {

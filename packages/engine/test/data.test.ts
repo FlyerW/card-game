@@ -115,7 +115,7 @@ describe('卡面文字', () => {
   it('由資料產生', () => {
     const hound = db.cards.get('hound')!;
     expect(describeCard(hound, (id) => db.cards.get(id)!.name)).toEqual([
-      'hound　R・無色・一階，由pup進化｜能量 2｜⚔ 2｜♥ 10',
+      'hound　R・無色・由pup進化｜能量 2｜⚔ 2｜♥ 10',
       'bite2（能量 1）：〔任意目標〕造成 2 傷害',
       'sniff（能量 1）：抽 1 張牌',
     ]);
@@ -132,27 +132,29 @@ describe('資料驗證', () => {
     expect(problems([creature({ attack: 0 })])).toBe('');
   });
 
-  it('每次進化稀有度升一級：N → R → SR、R → SR → UR 都可以', () => {
+  it('進化稀有度升一級：N → R、R → SR 都可以；最多進化一次', () => {
     const chain = (rarities: DeckCardDef['rarity'][]) =>
       rarities.map((rarity, stage) =>
         creature({
           id: `s${stage}`,
           rarity,
-          stage: stage as 0 | 1 | 2,
+          stage: stage as 0 | 1,
           ...(stage > 0 ? { evolvesFrom: `s${stage - 1}` } : {}),
         }),
       );
-    expect(problems(chain(['N', 'R', 'SR']))).toBe('');
-    expect(problems(chain(['R', 'SR', 'UR']))).toBe('');
+    expect(problems(chain(['N', 'R']))).toBe('');
+    expect(problems(chain(['R', 'SR']))).toBe('');
     expect(problems(chain(['N', 'SR']))).toContain('進化後稀有度要升一級');
     expect(problems(chain(['UR', 'UR']))).toContain('進化後稀有度要升一級');
+    expect(problems(chain(['N', 'R', 'SR']))).toContain('最多進化一次');
   });
 
-  it('進化來源必須存在，而且是低一階的生物', () => {
+  it('進化來源必須存在，而且是基礎生物', () => {
     expect(problems([creature({ stage: 1, evolvesFrom: 'nope' })])).toContain('找不到進化來源');
-    expect(
-      problems([creature({ id: 'x' }), creature({ id: 'y', stage: 2, rarity: 'SR', evolvesFrom: 'x' })]),
-    ).toContain('低一階');
+    const spell: DeckCardDef = {
+      kind: 'spell', id: 'x', name: 'x', rarity: 'N', colors: [], cost: 1, target: { kind: 'none' }, effects: [{ type: 'draw', count: 1 }],
+    };
+    expect(problems([spell, creature({ id: 'y', stage: 1, evolvesFrom: 'x' })])).toContain('低一階');
   });
 
   it('位置技能只能用在生物身上', () => {

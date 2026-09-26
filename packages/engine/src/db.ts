@@ -52,6 +52,7 @@ function checkAbility(ability: Ability, where: string, isCreatureSkill: boolean)
   const problems: string[] = [];
   const at = `${where}「${ability.name}」`;
   if (!Number.isInteger(ability.cost) || ability.cost < 0) problems.push(`${at}：費用必須是非負整數`);
+  if (ability.uses !== undefined && (!Number.isInteger(ability.uses) || ability.uses <= 0)) problems.push(`${at}：次數必須是正整數`);
   if (ability.effects.length === 0) problems.push(`${at}：沒有任何效果`);
   if (ability.target.kind === 'lane' && !isCreatureSkill) problems.push(`${at}：位置技能只能用在生物身上`);
   if (!isCreatureSkill && ability.effects.some((e) => e.type === 'searchEvolution' || e.type === 'evolveFromDeck')) {
@@ -105,6 +106,7 @@ function checkCard(
       }
       for (const skill of card.skills) problems.push(...checkAbility(skill, where, true));
       if (card.entry) problems.push(...checkAbility({ ...card.entry, cost: 0 }, `${where}的進場效果`, true));
+      if ((card.stage as number) > 1) problems.push(`${where}：最多進化一次，stage 只能是 0 或 1`);
       if (card.stage === 0 && card.evolvesFrom !== undefined) {
         problems.push(`${where}：基礎生物不能有進化來源`);
       }

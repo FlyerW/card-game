@@ -47,7 +47,7 @@ export const TEST_CARDS: DeckCardDef[] = [
   creature('scholar', [{ name: 'study', cost: 1, target: NONE, effects: [{ type: 'draw', count: 1 }] }, hit('tap', ANY, 1)]),
   creature('pricey', [hit('a', ANY, 1), hit('b', ANY, 1)], { cost: 5 }),
 
-  // 進化線 N → R → SR
+  // 進化線 N → R（最多進化一次）
   creature('pup', [hit('nip', ANY, 1)], { rarity: 'N', hp: 6 }),
   creature('hound', [hit('bite2', ANY, 2), { name: 'sniff', cost: 1, target: NONE, effects: [{ type: 'draw', count: 1 }] }], {
     stage: 1,
@@ -55,7 +55,6 @@ export const TEST_CARDS: DeckCardDef[] = [
     cost: 2,
     hp: 10,
   }),
-  creature('warg', [hit('maul', ANY, 3), hit('howl', ANY, 3)], { rarity: 'SR', stage: 2, evolvesFrom: 'hound', cost: 3, hp: 14 }),
 
   // 找進化卡、直接進化
   creature('seed', [

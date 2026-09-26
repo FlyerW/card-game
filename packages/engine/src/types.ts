@@ -109,6 +109,8 @@ export interface Ability {
   cost: number;
   target: TargetSpec;
   effects: Effect[];
+  /** 每局最多發動幾次；沒有就不限。目前用在天生技上。 */
+  uses?: number;
 }
 
 interface CardBase {
@@ -120,8 +122,8 @@ interface CardBase {
 
 export interface CreatureDef extends CardBase {
   kind: 'creature';
-  /** 0 = 基礎，1 = 一階，2 = 二階。 */
-  stage: 0 | 1 | 2;
+  /** 0 = 基礎，1 = 進化。最多進化一次。 */
+  stage: 0 | 1;
   /** 基礎生物是召喚費用，進化生物是進化費用。 */
   cost: number;
   /** 進化生物才有：從哪張卡進化而來。 */
@@ -305,6 +307,8 @@ export interface PlayerState {
   heroId: string;
   heroDamage: number;
   heroPowerUsedTurn: number | null;
+  /** 目前這個天生技這局用了幾次；英雄進化換成新的天生技時重新算。 */
+  heroPowerUses: number;
   /** 已經用掉的英雄進化卡；每局最多一張。 */
   heroEvolution: CardRef | null;
   zones: (Creature | null)[];

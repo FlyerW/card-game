@@ -53,6 +53,8 @@ export interface SideView {
   heroHp: number;
   heroMaxHp: number;
   heroPowerUsedThisTurn: boolean;
+  /** 目前的天生技這局用了幾次。 */
+  heroPowerUses: number;
   zones: (CreatureView | null)[];
   handCount: number;
   deckCount: number;
@@ -115,6 +117,7 @@ function sideView(db: CardDb, state: GameState, player: PlayerId): SideView {
     heroHp: heroHp(db, state, player),
     heroMaxHp: heroMaxHp(db, state, player),
     heroPowerUsedThisTurn: p.heroPowerUsedTurn === state.turn,
+    heroPowerUses: p.heroPowerUses,
     zones: p.zones.map((creature) => (creature === null ? null : creatureView(db, state, creature))),
     handCount: p.hand.length,
     deckCount: p.deck.length,

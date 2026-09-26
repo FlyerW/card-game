@@ -6,7 +6,7 @@ import { EXPERIMENTS, engine, gameConfig, mirrorDeck } from '../src/experiments'
 import { playMatch } from '../src/match';
 
 describe('模擬環境', () => {
-  it('進化線照 2/2/1 帶：一階不會比基礎多、二階不會比一階多', () => {
+  it('進化線照 2/2 帶：進化卡不會比基礎多', () => {
     for (let seed = 0; seed < 50; seed++) {
       const deck = mirrorDeck(seed);
       const count = (id: string) => deck.filter((card) => card === id).length;
@@ -106,10 +106,10 @@ describe('機器人', () => {
     expect(evaluate(engine.db, state, 1, STYLES.balanced)).toBe(-1e6);
   });
 
-  it('每種打法都能把一局打完，而且是靠打倒英雄分出勝負', () => {
+  it('每種打法都能把一局正常打完：打倒英雄，或牌庫抽完（30 張的牌組偶爾會）', () => {
     for (const style of Object.values(STYLES)) {
       const outcome = playMatch(engine, gameConfig({ ...EXPERIMENTS[3]!, style }, 1), style);
-      expect(outcome.result.reason).toBe('heroDefeated');
+      expect(['heroDefeated', 'deckOut']).toContain(outcome.result.reason);
       expect(outcome.turns).toBeGreaterThan(2);
     }
   });

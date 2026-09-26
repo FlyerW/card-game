@@ -101,7 +101,7 @@ export function fillRandom(db: CardDb, heroId: string, deck: readonly string[]):
   return filled;
 }
 
-/** 跟電腦的牌組一樣自動組一副：進化線照 2/2/1 帶，其餘隨機。 */
+/** 跟電腦的牌組一樣自動組一副：進化線照 2/2 帶，其餘隨機。 */
 export const autoDeck = (db: CardDb, heroId: string, seed: number): string[] => buildDeck(seed, heroId, deckPool(db, heroId));
 
 /** 規則上的問題（有就不能開始），以及組牌建議（可以不理）。 */
@@ -114,7 +114,7 @@ export function deckIssues(db: CardDb, heroId: string, deck: readonly string[]):
     if (def?.kind !== 'creature' || def.evolvesFrom === undefined) continue;
     const base = def.evolvesFrom;
     if (!deck.includes(base)) tips.push(`${def.name} 要由 ${name(base)} 進化，牌組裡沒有 ${name(base)}`);
-    else if (count(deck, id) > count(deck, base)) tips.push(`${def.name} 比 ${name(base)} 多，容易卡在手上用不了（建議照 2/2/1 帶）`);
+    else if (count(deck, id) > count(deck, base)) tips.push(`${def.name} 比 ${name(base)} 多，容易卡在手上用不了（建議照 2/2 帶）`);
   }
   const highCost = highCostCount(db, deck);
   if (highCost > MAX_HIGH_COST) tips.push(`9 費以上的卡有 ${highCost} 張，前幾回合容易卡手（建議 ${MAX_HIGH_COST} 張以內）`);

@@ -32,14 +32,14 @@ export const SAMPLE_HEROES: HeroDef[] = [
   // 英雄 HP 的起點是 55 − 3 ×（顏色數 − 1）− 效果強度，再照模擬調整。
   {
     kind: 'hero', id: 'nameless-swordsman', name: '無名劍士', colors: ['white'], hp: 53,
-    passive: { name: '劍士之道', ownTurn: { attack: 1 } },
+    passive: { name: '劍士之道', creatures: { attack: 1 } },
   },
   {
     kind: 'hero',
     id: 'flame-lord',
     name: '烈焰領主',
     colors: ['red'],
-    hp: 54,
+    hp: 51,
     power: hit('燃燼', 2, ANY, 1),
   },
   {
@@ -47,8 +47,8 @@ export const SAMPLE_HEROES: HeroDef[] = [
     id: 'forest-king',
     name: '林海之王',
     colors: ['green'],
-    hp: 49,
-    passive: { name: '豐饒', opponentTurn: { hp: 1 } },
+    hp: 52,
+    passive: { name: '豐饒', creatures: { hp: 1 } },
   },
   {
     kind: 'hero',
@@ -56,7 +56,7 @@ export const SAMPLE_HEROES: HeroDef[] = [
     name: '潮影雙生',
     colors: ['blue', 'black'],
     hp: 39,
-    power: { name: '低語', cost: 4, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
+    power: { name: '低語', cost: 4, uses: 2, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
   },
   {
     kind: 'hero',
@@ -64,7 +64,7 @@ export const SAMPLE_HEROES: HeroDef[] = [
     name: '虹彩賢者',
     colors: ['white', 'blue', 'black', 'red', 'green'],
     hp: 44,
-    power: { name: '稜光', cost: 3, target: NONE, effects: [{ type: 'draw', count: 1 }] },
+    power: { name: '稜光', cost: 3, uses: 3, target: NONE, effects: [{ type: 'draw', count: 1 }] },
   },
 ];
 
@@ -110,8 +110,9 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     skills: [{ name: '守護', cost: 1, target: NONE, effects: [{ type: 'taunt' }] }],
   },
   {
+    // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物。
     kind: 'creature', id: 'seraph', name: '熾天使', rarity: 'SR', colors: ['white'],
-    stage: 2, evolvesFrom: 'paladin', cost: 4, attack: 9, hp: 12,
+    stage: 0, cost: 6, attack: 6, hp: 9,
     skills: [{ name: '神聖庇護', cost: 2, target: ALLY, effects: [{ type: 'heal', amount: 5 }] }],
   },
   {
@@ -191,8 +192,9 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     skills: [{ name: '麻痺觸手', cost: 2, target: CREATURE, effects: [{ type: 'paralyze' }] }],
   },
   {
+    // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物。
     kind: 'creature', id: 'jelly-empress', name: '深海水母皇', rarity: 'SR', colors: ['blue'],
-    stage: 2, evolvesFrom: 'storm-jelly', cost: 3, attack: 6, hp: 9,
+    stage: 0, cost: 5, attack: 5, hp: 8,
     skills: [{ name: '麻痺電網', cost: 3, target: CREATURE, effects: [{ type: 'damage', amount: 4 }, { type: 'paralyze' }] }],
   },
   {
@@ -262,8 +264,9 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     skills: [{ name: '碎骨', cost: 1, target: { kind: 'enemyItemOrField' }, effects: [{ type: 'destroy' }] }],
   },
   {
+    // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物。
     kind: 'creature', id: 'death-knight', name: '死亡騎士', rarity: 'SR', colors: ['black'],
-    stage: 2, evolvesFrom: 'skeleton-knight', cost: 4, attack: 9, hp: 12,
+    stage: 0, cost: 6, attack: 6, hp: 9,
     skills: [{ name: '凋零', cost: 3, target: CREATURE, effects: [{ type: 'halveHp' }] }],
   },
   {
@@ -335,8 +338,9 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     skills: [{ name: '狐火', cost: 2, target: DIAGONAL, effects: [{ type: 'damage', amount: 3 }, { type: 'draw', count: 1 }] }],
   },
   {
+    // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物。
     kind: 'creature', id: 'nine-tailed-fox', name: '九尾天狐', rarity: 'SR', colors: ['red'],
-    stage: 2, evolvesFrom: 'ember-fox-king', cost: 4, attack: 9, hp: 11,
+    stage: 0, cost: 7, attack: 7, hp: 9,
     entry: { name: '九焰', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] },
     skills: [{ name: '燎天', cost: 4, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }, { type: 'buff', attack: 2, hp: 2, on: 'self' }] }],
   },
@@ -387,11 +391,12 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   {
     kind: 'creature', id: 'grove-bear-king', name: '森林熊王', rarity: 'SR', colors: ['green'],
     stage: 1, evolvesFrom: 'grove-bear', cost: 3, attack: 7, hp: 10,
-    skills: [{ name: '古樹之召', cost: 4, target: NONE, effects: [{ type: 'evolveFromDeck' }] }],
+    skills: [{ name: '巨力', cost: 4, target: NONE, effects: [{ type: 'buff', attack: 3, hp: 5, on: 'self' }] }],
   },
   {
+    // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物。
     kind: 'creature', id: 'ancient-bear-god', name: '古樹熊神', rarity: 'UR', colors: ['green'],
-    stage: 2, evolvesFrom: 'grove-bear-king', cost: 4, attack: 12, hp: 14, keywords: ['lifesteal'],
+    stage: 0, cost: 8, attack: 9, hp: 10, keywords: ['lifesteal'],
     skills: [
       { name: '森之怒', cost: 5, target: CREATURE, effects: [{ type: 'damage', amount: 8 }, { type: 'buff', attack: 2, hp: 2, on: 'self' }] },
       { name: '大地震', cost: 6, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] },
@@ -498,7 +503,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     cost: 6, evolvesFrom: 'tide-shadow-twins', hpBonus: 11,
     entry: { name: '潮汐吞噬', target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 2 }] },
     power: {
-      name: '深淵低語', cost: 3, target: NONE,
+      name: '深淵低語', cost: 3, uses: 2, target: NONE,
       effects: [{ type: 'opponentDiscardRandom', count: 1 }, { type: 'draw', count: 1 }],
     },
   },

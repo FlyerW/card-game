@@ -13,7 +13,7 @@ export function pips(colors: Color[]): string {
 export function kindLabel(def: DeckCardDef): string {
   switch (def.kind) {
     case 'creature':
-      return def.stage === 0 ? '生物' : `進化・${def.stage === 1 ? '一階' : '二階'}`;
+      return def.stage === 0 ? '生物' : '進化';
     case 'spell':
       return '法術';
     case 'item':

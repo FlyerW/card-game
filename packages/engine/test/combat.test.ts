@@ -132,17 +132,15 @@ describe('進化', () => {
     expect(state.players[a].energy).toBe(8);
   });
 
-  it('可以一路 N → R → SR，但同一隻一回合只能進化一次', () => {
+  it('最多進化一次：進化過的生物不能再疊進化卡', () => {
     let { state, a } = start();
     place(state, a, 0, 'pup');
     state.players[a].energy = 10;
-    const warg = give(state, a, 'warg');
     state = act(state, { type: 'evolve', player: a, card: give(state, a, 'hound'), zone: 0 });
-    expect(reject(state, { type: 'evolve', player: a, card: warg, zone: 0 })).toBe('ALREADY_EVOLVED');
     state = endTurn(endTurn(state));
     state.players[a].energy = 10;
-    state = act(state, { type: 'evolve', player: a, card: warg, zone: 0 });
-    expect(at(state, a, 0)?.cards.map((card) => card.cardId)).toEqual(['pup', 'hound', 'warg']);
+    expect(reject(state, { type: 'evolve', player: a, card: give(state, a, 'hound'), zone: 0 })).toBe('EVOLUTION_MISMATCH');
+    expect(at(state, a, 0)?.cards.map((card) => card.cardId)).toEqual(['pup', 'hound']);
   });
 
   it('進化卡要對上正確的進化來源', () => {
@@ -150,7 +148,7 @@ describe('進化', () => {
     place(state, a, 0, 'pup');
     place(state, a, 1, 'wolf');
     state.players[a].energy = 10;
-    expect(reject(state, { type: 'evolve', player: a, card: give(state, a, 'warg'), zone: 0 })).toBe('EVOLUTION_MISMATCH');
+    expect(reject(state, { type: 'evolve', player: a, card: give(state, a, 'sprout'), zone: 0 })).toBe('EVOLUTION_MISMATCH');
     expect(reject(state, { type: 'evolve', player: a, card: give(state, a, 'hound'), zone: 1 })).toBe('EVOLUTION_MISMATCH');
   });
 

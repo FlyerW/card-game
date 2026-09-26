@@ -340,11 +340,15 @@ function heroPower(ctx: Ctx, a: ActionOf<'heroPower'>): void {
   const hero = heroDef(db, state, a.player);
   const power = currentHeroPower(db, state, a.player) ?? fail('NO_HERO_POWER', `${hero.name} 沒有天生技`);
   if (p.heroPowerUsedTurn === state.turn) fail('HERO_POWER_USED', '天生技每回合只能發動一次');
+  if (power.uses !== undefined && p.heroPowerUses >= power.uses) {
+    fail('HERO_POWER_SPENT', `天生技「${power.name}」每局只能發動 ${power.uses} 次，已經用完了`);
+  }
 
   const source: AbilitySource = { kind: 'hero', player: a.player };
   const target = chooseTarget(ctx, power, source, a.target);
   pay(p, power.cost);
   p.heroPowerUsedTurn = state.turn;
+  p.heroPowerUses += 1;
   ctx.events.push({ type: 'abilityUsed', player: a.player, source: 'hero', cardId: hero.id, ability: power.name });
   resolveAbility(ctx, power, source, target);
 }
@@ -365,6 +369,8 @@ function evolveHero(ctx: Ctx, a: ActionOf<'evolveHero'>): void {
   removeFromHand(p, card.uid);
   // 已受的傷害保留，HP 上限提高，所以目前 HP 跟著增加。本回合是否用過天生技也保留。
   p.heroEvolution = card;
+  // 換成新的天生技就重新算次數。
+  if (def.power !== undefined) p.heroPowerUses = 0;
   ctx.events.push({ type: 'heroEvolved', player: a.player, cardId: card.cardId });
   cleanup(ctx);
   triggerHeroEntry(ctx, def, a.player, a.target);
@@ -529,6 +535,7 @@ export function createEngine(db: CardDb) {
       heroId,
       heroDamage: 0,
       heroPowerUsedTurn: null,
+      heroPowerUses: 0,
       heroEvolution: null,
       zones: Array.from({ length: rules.zones }, () => null),
       hand: [],
