@@ -154,6 +154,25 @@ describe('只在某一方回合生效的被動', () => {
   });
 });
 
+describe('有次數限制的天生技', () => {
+  it('每局只能發動規定的次數；英雄進化換成新的天生技時重新算', () => {
+    let { state, a, b } = start({ deckSize: 60 });
+    state.players[a].heroId = 'thrifty';
+    for (let i = 0; i < 2; i++) {
+      state = act(state, { type: 'heroPower', player: a, target: hero(b) });
+      state = endTurn(endTurn(state));
+    }
+    expect(state.players[a].heroPowerUses).toBe(2);
+    expect(reject(state, { type: 'heroPower', player: a, target: hero(b) })).toBe('HERO_POWER_SPENT');
+    expect(engine.legalActions(state, a).some((action) => action.type === 'heroPower')).toBe(false);
+
+    state = act(state, { type: 'evolveHero', player: a, card: give(state, a, 'thrifty-plus') });
+    expect(state.players[a].heroPowerUses).toBe(0);
+    state = act(state, { type: 'heroPower', player: a, target: hero(b) });
+    expect(state.players[b].heroDamage).toBe(1 + 1 + 2);
+  });
+});
+
 describe('道具給的技能', () => {
   it('排在生物自己的技能後面，一樣算這隻生物這回合的行動', () => {
     let { state, a, b } = start();

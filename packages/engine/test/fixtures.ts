@@ -131,6 +131,11 @@ export const TEST_CARDS: DeckCardDef[] = [
     passive: { name: 'fury', creatures: { attack: 1 } },
   },
 
+  {
+    kind: 'heroEvolution', id: 'thrifty-plus', name: 'thrifty-plus', rarity: 'SR', colors: ['red'],
+    cost: 1, evolvesFrom: 'thrifty', hpBonus: 2, power: { ...hit('squeeze', ANY, 2, 1), uses: 2 },
+  },
+
   // 有進場效果的英雄進化卡，像爐石英雄卡的戰吼
   {
     kind: 'heroEvolution', id: 'pinger-flare', name: 'pinger-flare', rarity: 'SR', colors: ['red'],
@@ -168,6 +173,7 @@ export const TEST_CARDS: DeckCardDef[] = [
 export const TEST_HEROES: HeroDef[] = [
   { kind: 'hero', id: 'blank', name: 'blank', colors: ['white', 'blue', 'black', 'red', 'green'], hp: 50 },
   { kind: 'hero', id: 'pinger', name: 'pinger', colors: ['red'], hp: 46, power: hit('ping', ANY, 2, 2) },
+  { kind: 'hero', id: 'thrifty', name: 'thrifty', colors: ['red'], hp: 46, power: { ...hit('pinch', ANY, 1, 1), uses: 2 } },
   { kind: 'hero', id: 'forester', name: 'forester', colors: ['green'], hp: 47, passive: { name: 'plenty', ceilingBonus: 1 } },
   { kind: 'hero', id: 'red-green', name: 'red-green', colors: ['red', 'green'], hp: 45 },
   {
