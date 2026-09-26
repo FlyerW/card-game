@@ -106,7 +106,9 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 
 .hero {
   display: grid; grid-template-columns: auto auto; align-items: center; gap: 0 10px; position: relative;
-  background: var(--hero); border: 1.5px solid var(--hero-edge); border-radius: 10px; padding: 6px 18px; min-width: 210px;
+  border: 1.5px solid var(--hero-edge); border-radius: 10px; padding: 6px 18px; min-width: 210px;
+  /* 英雄插圖當背景，蓋一層英雄色讓字看得清楚；圖還沒有時只剩底色 */
+  background: linear-gradient(90deg, #2a2118f0 0%, #2a2118b8 55%, #2a211890 100%), var(--art) center 30% / cover no-repeat, var(--hero);
 }
 .h-name { font: 700 16px/1.3 var(--display); color: var(--hero-ink); }
 .hero.evolved { border-width: 2.5px; box-shadow: 0 0 0 3px #d4a24c33, 0 0 18px #d4a24c44; }
@@ -159,6 +161,10 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
   background: var(--zone); border: 1.5px solid var(--zone-edge); border-radius: var(--radius);
 }
 .zone.empty { background: #22303b; border-color: #7f9bb055; border-style: dashed; place-items: center; }
+/* 場上生物的插圖當背景：上面放名字、下面放狀態，所以上下加深，中間露出圖 */
+.zone.has-art {
+  background: linear-gradient(180deg, #16222bf2 0%, #16222bb0 38%, #16222b70 62%, #16222be6 100%), var(--art) center / cover no-repeat, var(--zone);
+}
 .zone.empty { grid-template-columns: 1fr; grid-template-rows: 1fr; }
 .zone-num { color: var(--ink-faint); font-size: 20px; }
 .z-top { grid-column: 1 / -1; display: flex; align-items: center; gap: 5px; }

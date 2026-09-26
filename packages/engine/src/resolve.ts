@@ -71,15 +71,24 @@ export function drawTaken(ctx: Ctx, player: PlayerId, cards: CardRef[]): void {
   if (drawn.length > 0) ctx.events.push({ type: 'drew', player, cards: drawn });
 }
 
-/** 抽到牌庫空為止。只有「回合開始時」抽不到牌才會落敗，那個判斷在 startTurn。 */
+/**
+ * 抽牌。要抽的時候牌庫已經空了就落敗：回合開始的抽牌、卡牌效果的抽牌都一樣。
+ * 抽到剛好空掉不會輸，下一次要抽才會。
+ */
 export function drawCards(ctx: Ctx, player: PlayerId, count: number): void {
   const p = ctx.state.players[player];
   const drawn: CardRef[] = [];
-  for (let i = 0; i < count && p.deck.length > 0; i++) {
-    const card = p.deck.shift()!;
+  let emptied = false;
+  for (let i = 0; i < count; i++) {
+    const card = p.deck.shift();
+    if (card === undefined) {
+      emptied = true;
+      break;
+    }
     if (toHand(ctx, player, card)) drawn.push(card);
   }
   if (drawn.length > 0) ctx.events.push({ type: 'drew', player, cards: drawn });
+  if (emptied && ctx.state.phase !== 'over') endGame(ctx, { winner: other(player), reason: 'deckOut' });
 }
 
 export function endGame(ctx: Ctx, result: GameResult): void {

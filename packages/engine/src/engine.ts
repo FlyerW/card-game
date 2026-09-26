@@ -200,11 +200,8 @@ function startTurn(ctx: Ctx, player: PlayerId): void {
   }
 
   const p = state.players[player];
-  if (p.deck.length === 0) {
-    endGame(ctx, { winner: other(player), reason: 'deckOut' });
-    return;
-  }
   drawCards(ctx, player, 1 + (fieldDef(db, state, player)?.extraDraw ?? 0));
+  if (state.phase !== 'main') return; // 牌庫抽完，落敗
 
   // 能量在這裡重置：第一個回合用起始值，之後每回合成長，再補滿。
   // 場地卡被破壞後最高上限可能比能量上限低，這裡會一併壓回去。

@@ -209,14 +209,23 @@ describe('回合', () => {
     expect(reject(state, { type: 'endTurn', player: b })).toBe('GAME_OVER');
   });
 
-  it('效果抽牌抽到牌庫空為止，不會因此落敗', () => {
-    let { state, a } = start();
+  it('效果要抽牌但牌庫已經空了，也落敗', () => {
+    let { state, a, b } = start();
     place(state, a, 0, 'scholar');
     state.players[a].deck = [];
-    const handSize = state.players[a].hand.length;
     state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0 });
-    expect(state.players[a].hand).toHaveLength(handSize);
+    expect(state.result).toEqual({ winner: b, reason: 'deckOut' });
+  });
+
+  it('抽到牌庫剛好空掉不會輸，下一次要抽才會', () => {
+    let { state, a, b } = start();
+    place(state, a, 0, 'scholar');
+    state.players[a].deck = state.players[a].deck.slice(0, 1);
+    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0 });
     expect(state.phase).toBe('main');
+    expect(state.players[a].deck).toHaveLength(0);
+    state = endTurn(endTurn(state)); // a 的下一個回合開始要抽牌
+    expect(state.result).toEqual({ winner: b, reason: 'deckOut' });
   });
 
   it('投降', () => {
