@@ -433,10 +433,13 @@ online.onMessage = (message) => {
   }
 };
 
+/** 友誼賽用的名字：自己填的，沒填就用帳號名字。 */
+const roomName = (): string => app.playerName.trim() || app.session?.account.name || '';
+
 function createRoom(): void {
   const deck = myDeck();
   resetGameRecord(deck);
-  online.send({ t: 'create', name: app.playerName, heroId: app.heroId, deck });
+  online.send({ t: 'create', name: roomName(), heroId: app.heroId, deck });
 }
 
 function joinRoom(): void {
@@ -448,7 +451,7 @@ function joinRoom(): void {
   }
   const deck = myDeck();
   resetGameRecord(deck);
-  online.send({ t: 'join', code, name: app.playerName, heroId: app.heroId, deck });
+  online.send({ t: 'join', code, name: roomName(), heroId: app.heroId, deck });
 }
 
 function leaveRoom(): void {
@@ -1296,26 +1299,18 @@ function setupScreen(): string {
         ${who.kind === 'test' ? '<button class="ghost small" data-do="reset-test">重設</button>' : ''}
         <button class="ghost small" data-do="logout">登出</button></div>` : ''}
     </header>
-    ${
-      tutorialDone()
-        ? ''
-        : `<section class="tut-banner"><div><p class="d-head">第一次玩？</p><p class="d-line">先玩一場新手教學，大約 3 分鐘，一步一步帶你召喚、攻擊、放技能、進化。</p></div>
-      <button class="primary" data-do="tut-start">開始新手教學</button></section>`
-    }
     ${walletBar(app.profile)}
     <div class="heroes">${heroes}</div>
     <section class="deck-bar">
       <div><p class="d-head">牌組</p><p class="d-line${problems.length ? ' warn' : ''}">${esc(deckText)}</p></div>
       <button class="ghost" data-do="builder">${custom ? '編輯牌組' : '自己組牌'}</button>
     </section>
-    <section class="difficulty" aria-label="電腦難度"><span class="w-label">電腦難度</span>
-      ${(['normal', 'hard'] as const)
-        .map((d) => `<button class="chip${app.difficulty === d ? ' on' : ''}" data-difficulty="${d}" aria-pressed="${app.difficulty === d}">${d === 'normal' ? '普通' : '困難'}</button>`)
-        .join('')}
-      <span class="d-line">${app.difficulty === 'normal' ? '只看眼前這一步，適合剛上手' : '會規劃整個回合、提防你下回合的攻擊'}</span>
-      ${tutorialDone() ? '<button class="ghost small tut-again" data-do="tut-start">新手教學</button>' : ''}</section>
-    ${ONLINE_AVAILABLE ? rankedPanel(problems.length > 0) : ''}
-    ${ONLINE_AVAILABLE ? onlineSetup(problems.length > 0) : `<button class="primary big" data-do="start" ${problems.length ? 'disabled' : ''}>開始對戰</button>`}
+    <div class="modes">
+      ${tutorialMode()}
+      ${botMode(problems.length > 0)}
+      ${rankedPanel(problems.length > 0)}
+      ${friendlyMode(problems.length > 0)}
+    </div>
     ${app.toast ? `<p class="toast" role="alert">${esc(app.toast)}</p>` : ''}
     <section class="howto">
       <h2>怎麼玩</h2>
@@ -1342,8 +1337,12 @@ function setupScreen(): string {
 
 /** 排位賽：牌位、這季戰績、開始排位、排行榜。只有伺服器帳號（訪客、Google）能打。 */
 function rankedPanel(blocked: boolean): string {
+  if (!ONLINE_AVAILABLE) {
+    return `<section class="mode ranked"><p class="mode-title">牌位</p>
+      <p class="d-line">排位賽要從遊戲伺服器打開網頁才能打（見 README 的「部署在這台機器」）。</p></section>`;
+  }
   if (!app.session || app.session.kind === 'test') {
-    return `<section class="ranked"><p class="d-head">排位賽</p>
+    return `<section class="mode ranked"><p class="mode-title">牌位</p>
       <p class="d-line">排位賽要用伺服器上的帳號（訪客或 Google），結果才記得住、也才公平。登出後選「訪客帳號」就能打。</p></section>`;
   }
   const rank = app.rank;
@@ -1354,12 +1353,12 @@ function rankedPanel(blocked: boolean): string {
         <span class="lb-rank tier-${row.tier}">${esc(rankLabel({ ...row, season: '', streak: 0, best: row.tier }))}</span><span class="lb-wl">${row.wins} 勝 ${row.losses} 敗</span></li>`,
     )
     .join('');
-  return `<section class="ranked">
+  return `<section class="mode ranked">
     <div class="rank-main">
-      <p class="d-head">排位賽${rank ? `・${esc(rank.season)} 賽季` : ''}</p>
+      <p class="mode-title">牌位${rank ? `<small>${esc(rank.season)} 賽季</small>` : ''}</p>
       ${rank ? `<p class="rank-now tier-${rank.tier}">${esc(rankLabel(rank))}</p><p class="d-line">本季 ${rank.wins} 勝 ${rank.losses} 敗${rank.streak >= 2 ? `・${rank.streak} 連勝` : ''}</p>` : ''}
       <p class="d-line">贏 +1 星、輸 −1 星，鑽石以下 2 連勝起每場多 +1；銅牌、銀牌不會掉段。每月換季發獎勵。牌組只能放收藏裡有的卡。</p>
-      <button class="primary big" data-do="queue" ${blocked ? 'disabled' : ''}>開始排位</button>
+      <button class="primary" data-do="queue" ${blocked ? 'disabled' : ''}>開始排位</button>
     </div>
     ${rows ? `<div class="leaderboard"><p class="d-head">本季排行</p><ol>${rows}</ol></div>` : ''}
   </section>`;
@@ -1403,20 +1402,46 @@ function startQueue(): void {
   render();
 }
 
-/** 開局畫面上連線對戰的部分：名字、跟電腦打、開房間、用房號加入。 */
-function onlineSetup(blocked: boolean): string {
+/** 開局畫面的四種玩法：新手教學。第一次玩的人標亮。 */
+function tutorialMode(): string {
+  const done = tutorialDone();
+  return `<section class="mode mode-tutorial${done ? '' : ' fresh'}">
+    <p class="mode-title">新手教學${done ? '' : '<small>第一次玩？從這裡開始</small>'}</p>
+    <p class="d-line">一場大約 3 分鐘的引導對局，一步一步帶你召喚、攻擊、放技能、用法術、進化，還有攻擊範圍。</p>
+    <button class="${done ? 'ghost' : 'primary'}" data-do="tut-start">${done ? '再玩一次' : '開始新手教學'}</button>
+  </section>`;
+}
+
+/** 跟電腦打：選難度。 */
+function botMode(blocked: boolean): string {
+  const chips = (['normal', 'hard'] as const)
+    .map((d) => `<button class="chip${app.difficulty === d ? ' on' : ''}" data-difficulty="${d}" aria-pressed="${app.difficulty === d}">${d === 'normal' ? '普通' : '困難'}</button>`)
+    .join('');
+  return `<section class="mode">
+    <p class="mode-title">電腦</p>
+    <div class="chips" aria-label="電腦難度">${chips}</div>
+    <p class="d-line">${app.difficulty === 'normal' ? '普通：只看眼前這一步，適合剛上手。' : '困難：會規劃整個回合、提防你下回合的攻擊。'}對手的英雄隨機，開局時會先告訴你是誰。</p>
+    <button class="primary" data-do="start" ${blocked ? 'disabled' : ''}>跟電腦打</button>
+  </section>`;
+}
+
+/** 友誼賽：開房間或用房號加入，跟朋友連線對戰（不算牌位）。 */
+function friendlyMode(blocked: boolean): string {
+  if (!ONLINE_AVAILABLE) {
+    return `<section class="mode"><p class="mode-title">友誼賽</p>
+      <p class="d-line">跟朋友連線對戰要從遊戲伺服器打開網頁（見 README 的「部署在這台機器」）。</p></section>`;
+  }
   const invited = new URLSearchParams(location.search).get('room');
-  return `<section class="online">
+  return `<section class="mode online">
+    <p class="mode-title">友誼賽<small>不算牌位</small></p>
     ${invited ? `<p class="invite">朋友邀請你加入房間 <b>${esc(invited.toUpperCase())}</b>：選好英雄和牌組，按「加入」。</p>` : ''}
     <label class="field-row"><span>你的名字</span>
-      <input id="player-name" maxlength="16" placeholder="對手會看到這個名字" value="${esc(app.playerName)}" autocomplete="nickname"></label>
+      <input id="player-name" maxlength="16" placeholder="對手會看到這個名字" value="${esc(roomName())}" autocomplete="nickname"></label>
     <div class="online-actions">
-      <button class="primary big" data-do="create-room" ${blocked ? 'disabled' : ''}>開房間跟朋友打</button>
+      <button class="primary" data-do="create-room" ${blocked ? 'disabled' : ''}>開房間</button>
       <span class="or">或</span>
       <label class="join"><input id="room-code" maxlength="4" placeholder="房號" value="${esc(app.roomCode)}" autocomplete="off">
         <button class="primary" data-do="join-room" ${blocked ? 'disabled' : ''}>加入</button></label>
-      <span class="or">或</span>
-      <button class="ghost" data-do="start" ${blocked ? 'disabled' : ''}>跟電腦打</button>
     </div>
   </section>`;
 }

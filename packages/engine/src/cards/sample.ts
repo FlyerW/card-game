@@ -74,9 +74,9 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   // ── 無色：比同費用有顏色的卡少 1 點數值 ──
   { kind: 'creature', id: 'gray-wolf', name: '灰狼', rarity: 'N', colors: [], race: 'beast', stage: 0, cost: 1, attack: 2, hp: 1, skills: [] },
   {
-    // 用攻擊力換 HP：打不了人，但能休息挑釁擋刀。
+    // 攻擊低、血厚，能休息挑釁擋刀。
     kind: 'creature', id: 'rock-turtle', name: '岩殼龜', rarity: 'R', colors: [], race: 'beast',
-    stage: 0, cost: 2, attack: 0, hp: 5,
+    stage: 0, cost: 2, attack: 1, hp: 4,
     skills: [{ name: '縮殼', cost: 0, rest: true, target: NONE, effects: [{ type: 'taunt' }] }],
   },
   {

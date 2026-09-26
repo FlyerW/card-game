@@ -88,7 +88,7 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .hp-name { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; font: 700 17px/1.3 var(--display); color: var(--hero-ink); margin-top: 6px; }
 .hp-name .pips { flex: none; }
 .hp-text { grid-column: 1 / -1; font-size: 12.5px; color: var(--ink-soft); margin-top: 4px; }
-.howto { background: var(--mat); border: 1px solid var(--mat-edge); border-radius: var(--radius); padding: 16px 20px; max-width: 70ch; }
+.howto { background: var(--mat); border: 1px solid var(--mat-edge); border-radius: var(--radius); padding: 16px 20px; }
 .howto h2 { font: 700 17px var(--display); margin: 0 0 8px; }
 .howto ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
 .note { color: var(--ink-faint); font-size: 12.5px; margin: 12px 0 0; }
@@ -355,12 +355,22 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .tut-glow { outline: 3px solid var(--heal) !important; outline-offset: 3px; animation: tut-pulse 1.2s ease-in-out infinite; }
 @keyframes tut-pulse { 50% { outline-color: #7bd88f55; } }
 
-/* ─── 排位賽 ─── */
-.ranked {
-  display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px; align-items: start;
-  background: linear-gradient(135deg, #2a2440, var(--mat) 60%); border: 1px solid #6a5a9a; border-radius: 12px; padding: 14px 18px;
+/* ─── 開局畫面的四種玩法：新手教學、電腦、牌位、友誼賽 ─── */
+.modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 14px; align-items: stretch; }
+.mode {
+  display: grid; gap: 8px; align-content: start; background: var(--mat); border: 1px solid var(--mat-edge);
+  border-radius: 12px; padding: 14px 18px; min-width: 0;
 }
-.ranked > .d-head, .ranked > .d-line { grid-column: 1 / -1; }
+.mode-title { margin: 0; font: 700 19px/1.3 var(--display); display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.mode-title small { font: 400 12.5px var(--body); color: var(--ink-faint); }
+.mode > .primary, .mode > .ghost { justify-self: start; }
+.mode-tutorial.fresh { border-color: var(--heal); background: linear-gradient(135deg, #1f3a26, var(--mat) 70%); }
+.mode-tutorial.fresh .mode-title small { color: #a8e0b4; }
+/* .online 另外管輸入框的樣子；卡片外觀跟其他三張一樣 */
+.mode.online { border-radius: 12px; padding: 14px 18px; gap: 8px; }
+
+/* ─── 牌位 ─── */
+.ranked { background: linear-gradient(135deg, #2a2440, var(--mat) 60%); border-color: #6a5a9a; }
 .rank-main { display: grid; gap: 6px; }
 .rank-main .primary.big { justify-self: start; }
 .rank-now { margin: 0; font: 700 24px var(--display); }
@@ -371,7 +381,7 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .lb-n { color: var(--ink-faint); font-family: var(--num); }
 .lb-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lb-wl { color: var(--ink-faint); font-size: 12px; }
-@media (max-width: 700px) { .ranked { grid-template-columns: 1fr; } }
+@media (max-width: 800px) { .modes { grid-template-columns: 1fr; } }
 
 /* ─── 登入 ─── */
 .login-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
