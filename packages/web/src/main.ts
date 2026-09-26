@@ -7,6 +7,7 @@ import {
   describeEffects,
   describeEntry,
   describeHero,
+  describePassive,
   other,
   RACE_NAMES,
   RACE_TRAITS,
@@ -753,6 +754,20 @@ const owned = () => ownedOf(app.profile);
 const myDeck = (): string[] => app.decks[app.heroId] ?? autoDeck(db, app.heroId, (Math.random() * 2 ** 32) >>> 0, owned());
 
 /** 目前的天生技：英雄進化卡有新的就用新的。 */
+/** 對手英雄右邊的說明：手牌張數、被動、目前的天生技（輪流的話下一個是什麼）。 */
+function heroInfo(side: SideView): string {
+  const h = hero(side.heroId);
+  const evolution = side.heroEvolution ? card(side.heroEvolution) : null;
+  const lines: string[] = [];
+  if (h.passive) lines.push(describePassive(h.passive));
+  if (evolution?.kind === 'heroEvolution' && evolution.passive) lines.push(describePassive(evolution.passive));
+  const current = powerOf(side);
+  if (current) {
+    lines.push(`天生技 ${describeAbility(current.power, nameOf)}${current.next ? `；用完換成「${current.next.name}」` : ''}`);
+  }
+  return `<div class="hero-info"><span class="hi-hand">手牌 ${side.handCount}</span>${lines.map((line) => `<p>${esc(line)}</p>`).join('')}</div>`;
+}
+
 /** 目前的天生技，以及輪流的話下一次換成哪一個（跟引擎的 heroPower 同一套規則）。 */
 function powerOf(side: SideView): { power: Ability; next: Ability | null } | null {
   const evolution = side.heroEvolution ? card(side.heroEvolution) : null;
@@ -1032,7 +1047,7 @@ function heroPlate(side: SideView, player: PlayerId, picks: Map<string, Action>)
   const classes = ['hero', side.heroHp < side.heroMaxHp ? 'hurt' : 'full'];
   if (picks.has(key)) classes.push('pick');
   if (app.selection?.kind === 'hero' && app.selection.player === player) classes.push('selected');
-  const extra = player !== YOU ? `<span class="h-hand">手牌 ${side.handCount}</span>` : '';
+  const extra = '';
   const name = side.heroEvolution ? nameOf(side.heroEvolution) : h.name;
   if (side.heroEvolution) classes.push('evolved');
   // 背景是英雄（進化後是英雄進化卡）的插圖。
@@ -1058,6 +1073,7 @@ function sideRows(side: SideView, player: PlayerId, picks: Map<string, Action>, 
   const energy = `<div class="row energy-row">${mine ? `<span></span>${energyRow(side)}${deck}` : `${deck}${energyRow(side)}<span></span>`}</div>`;
 
   let heroRow = `<div class="row hero-row">${heroPlate(side, player, picks)}`;
+  if (player !== YOU) heroRow += heroInfo(side);
   if (player === YOU) {
     const current = powerOf(side);
     if (current) {
@@ -1256,7 +1272,7 @@ function setupScreen(): string {
     const locked = !ownsHero(app.profile, db, h.id);
     return `<button class="hero-pick${chosen ? ' chosen' : ''}${locked ? ' locked' : ''}" data-hero="${h.id}" aria-pressed="${chosen}" ${locked ? 'disabled' : ''}>
       <span class="hp-big">${h.hp}</span><span class="hp-unit">♥${h.rarity ? '<b class="hp-ur">UR</b>' : ''}</span>
-      <span class="hp-name">${esc(h.name)}</span>${pips(h.colors)}
+      <span class="hp-name">${pips(h.colors)}${esc(h.name)}</span>
       <span class="hp-text">${esc(body.join('　'))}</span>${locked ? '<span class="hp-lock">還沒有：卡包抽到或用 UR 兌換卷換</span>' : ''}
       <span class="sr">${esc(head ?? '')}</span></button>`;
   }).join('');
@@ -1342,7 +1358,7 @@ function rankedPanel(blocked: boolean): string {
     <div class="rank-main">
       <p class="d-head">排位賽${rank ? `・${esc(rank.season)} 賽季` : ''}</p>
       ${rank ? `<p class="rank-now tier-${rank.tier}">${esc(rankLabel(rank))}</p><p class="d-line">本季 ${rank.wins} 勝 ${rank.losses} 敗${rank.streak >= 2 ? `・${rank.streak} 連勝` : ''}</p>` : ''}
-      <p class="d-line">贏 +1 星、輸 −1 星，鑽石以下 3 連勝多 +1；銅牌、銀牌不會掉段。每月換季發獎勵。牌組只能放收藏裡有的卡。</p>
+      <p class="d-line">贏 +1 星、輸 −1 星，鑽石以下 2 連勝起每場多 +1；銅牌、銀牌不會掉段。每月換季發獎勵。牌組只能放收藏裡有的卡。</p>
       <button class="primary big" data-do="queue" ${blocked ? 'disabled' : ''}>開始排位</button>
     </div>
     ${rows ? `<div class="leaderboard"><p class="d-head">本季排行</p><ol>${rows}</ol></div>` : ''}

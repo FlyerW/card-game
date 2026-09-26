@@ -1,7 +1,7 @@
 // 排位：牌位（給玩家看的段位與星星）加上隱藏分數（Elo，用來配對）。全部是純函式。
 //
 // - 段位：銅牌、銀牌、金牌、白金、鑽石各 5 顆星，最上面是大師（不再算星星，看分數）。
-// - 贏 +1 星，鑽石以下連勝 3 場以上再多 +1；輸 −1 星，星星扣到 0 再輸就掉一段。
+// - 贏 +1 星，鑽石以下連勝 2 場以上再多 +1；輸 −1 星，星星扣到 0 再輸就掉一段。
 //   銅牌、銀牌不會掉段，保護新手。大師整季不會掉。
 // - 隱藏分數從 1000 開始，照 Elo 算（K = 32），配對時找分數接近的人。
 // - 賽季一個月一季（YYYY-MM）。換季時照這季最高的段位發金幣，段位往下重置、分數往 1000 拉回一半。
@@ -13,6 +13,8 @@ export const STARS_PER_TIER = 5;
 const PROTECTED_BELOW = 2;
 /** 這個段位以下（不含）有連勝加星：鑽石以下。 */
 const STREAK_BELOW = 4;
+/** 連勝幾場開始多 +1 星。 */
+export const STREAK_BONUS_AT = 2;
 const K = 32;
 export const START_MMR = 1000;
 /** 換季時照這季最高的段位發的金幣。 */
@@ -69,7 +71,7 @@ export function applyRankedResult(before: RankState, won: boolean, opponentMmr: 
   const position = (r: RankState) => r.tier * STARS_PER_TIER + r.stars;
   if (before.tier < MASTER) {
     if (won) {
-      rank.stars += 1 + (rank.streak >= 3 && before.tier < STREAK_BELOW ? 1 : 0);
+      rank.stars += 1 + (rank.streak >= STREAK_BONUS_AT && before.tier < STREAK_BELOW ? 1 : 0);
       while (rank.stars >= STARS_PER_TIER && rank.tier < MASTER) {
         rank.stars -= STARS_PER_TIER;
         rank.tier += 1;

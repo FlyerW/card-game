@@ -20,9 +20,10 @@ describe('牌位', () => {
     expect(applyRankedResult(at({ tier: 0, stars: 0 }), false, START_MMR).rank).toMatchObject({ tier: 0, stars: 0 });
   });
 
-  it('鑽石以下連勝 3 場以上多 +1 星；鑽石沒有', () => {
-    expect(applyRankedResult(at({ tier: 1, stars: 0, streak: 2 }), true, START_MMR).rank).toMatchObject({ stars: 2, streak: 3 });
-    expect(applyRankedResult(at({ tier: 4, stars: 0, streak: 2 }), true, START_MMR).rank).toMatchObject({ stars: 1 });
+  it('鑽石以下連勝 2 場以上多 +1 星；第一場不算；鑽石沒有', () => {
+    expect(applyRankedResult(at({ tier: 1, stars: 0, streak: 0 }), true, START_MMR).rank).toMatchObject({ stars: 1, streak: 1 });
+    expect(applyRankedResult(at({ tier: 1, stars: 0, streak: 1 }), true, START_MMR).rank).toMatchObject({ stars: 2, streak: 2 });
+    expect(applyRankedResult(at({ tier: 4, stars: 0, streak: 1 }), true, START_MMR).rank).toMatchObject({ stars: 1 });
   });
 
   it('鑽石滿星升大師；大師不算星星，輸了也不掉', () => {
