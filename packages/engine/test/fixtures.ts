@@ -166,6 +166,7 @@ export const TEST_CARDS: DeckCardDef[] = [
     keywords: ['lifesteal'],
   }),
   creature('moss', [hit('x', ANY, 1), hit('y', ANY, 1)], { regenerate: 2 }),
+  creature('sapper', [{ name: 'drain3', cost: 1, target: NONE, effects: [{ type: 'drainMaxEnergy', amount: 3 }] }]),
   { kind: 'spell', id: 'bloom', name: 'bloom', rarity: 'N', colors: [], cost: 1, target: NONE, effects: [{ type: 'healAll', amount: 4 }] },
   {
     kind: 'spell', id: 'doom', name: 'doom', rarity: 'R', colors: [], cost: 1,

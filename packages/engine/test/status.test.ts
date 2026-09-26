@@ -59,17 +59,16 @@ describe('中毒', () => {
 });
 
 describe('灼燒', () => {
-  it('擁有者的回合開始時受到 N 傷害；減傷擋得住；再中一次取大的', () => {
+  it('擁有者的回合結束時受到 N 傷害；減傷擋得住；再中一次取大的', () => {
     let { state, a, b } = start();
     place(state, a, 0, 'venom');
     place(state, b, 0, 'hitter', { item: { uid: 900, cardId: 'armor' } });
     state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 1, target: creatureAt(b, 0) });
     expect(at(state, b, 0)!.burn).toBe(3);
-    expect(at(state, b, 0)!.damage).toBe(0);
 
-    state = endTurn(state); // b 的回合開始：3 − 鐵甲 2 = 1
-    expect(at(state, b, 0)!.damage).toBe(1);
-    state = endTurn(state); // a 的回合開始：灼燒的是 b 的生物，不發作
+    state = endTurn(state); // a 的回合結束：灼燒的是 b 的生物，不發作
+    expect(at(state, b, 0)!.damage).toBe(0);
+    state = endTurn(state); // b 的回合結束：3 − 鐵甲 2 = 1
     expect(at(state, b, 0)!.damage).toBe(1);
 
     at(state, b, 0)!.burn = 5;

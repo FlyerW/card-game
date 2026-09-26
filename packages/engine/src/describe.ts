@@ -62,6 +62,8 @@ export function describeEffect(effect: Effect, names: Names = ids): string {
     }
     case 'gainMaxEnergy':
       return `能量上限 +${effect.amount}`;
+    case 'drainMaxEnergy':
+      return `對手能量上限 −${effect.amount}`;
     case 'raiseCeiling':
       return `最高上限 +${effect.amount}`;
     case 'destroy':
@@ -73,7 +75,7 @@ export function describeEffect(effect: Effect, names: Names = ids): string {
     case 'poison':
       return `${effect.all ? '對手每隻生物' : ''}中毒 ${effect.amount}（牠的回合結束時失去 ${effect.amount}♥，♥ 上限也少 ${effect.amount}）`;
     case 'burn':
-      return `${effect.all ? '對手每隻生物' : ''}灼燒 ${effect.amount}（牠的回合開始時受到 ${effect.amount} 傷害）`;
+      return `${effect.all ? '對手每隻生物' : ''}灼燒 ${effect.amount}（牠的回合結束時受到 ${effect.amount} 傷害）`;
     case 'paralyze':
       return `${effect.all ? '對手每隻生物' : ''}麻痺（到牠的下個回合結束前不能攻擊、不能發動技能）`;
     case 'silence':

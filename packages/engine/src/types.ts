@@ -79,6 +79,11 @@ export type Effect =
   | { type: 'buff'; attack: number; hp: number; on: 'self' | 'target' }
   /** 加速型：能量上限 +N，不超過最高上限，當回合不補能量。 */
   | { type: 'gainMaxEnergy'; amount: number }
+  /**
+   * 對手的能量上限 -N（最低 0）。能量上限每回合 +2、最高 12，所以對手已經在 12 的時候，-2 下回合就補回來了；
+   * 前期效果大，後期要 -3 以上才有感。
+   */
+  | { type: 'drainMaxEnergy'; amount: number }
   /** 突破型：最高上限永久 +N。目前先維持上限 12，範例卡不使用。 */
   | { type: 'raiseCeiling'; amount: number }
   /** 破壞目標生物身上的道具，或目標場地卡。 */
@@ -91,7 +96,7 @@ export type Effect =
   // all 為 true 時不選目標，對手每隻生物都中。
   /** 中毒 N：牠的擁有者回合結束時失去 N HP，HP 上限也跟著少 N（不算傷害，回復補不回來）。再中一次數字相加。 */
   | { type: 'poison'; amount: number; all?: boolean }
-  /** 灼燒 N：牠的擁有者回合開始時受到 N 傷害（算傷害，減傷擋得住）。再中一次取大的。 */
+  /** 灼燒 N：牠的擁有者回合結束時受到 N 傷害（算傷害，減傷擋得住）。再中一次取大的。 */
   | { type: 'burn'; amount: number; all?: boolean }
   /** 麻痺：不能攻擊、不能發動技能，直到擁有者的下一個回合結束。 */
   | { type: 'paralyze'; all?: boolean }
@@ -429,6 +434,7 @@ export type GameEvent =
   | { type: 'itemDestroyed'; player: PlayerId; zone: number; cardId: string }
   | { type: 'fieldDestroyed'; player: PlayerId; cardId: string }
   | { type: 'maxEnergyGained'; player: PlayerId; amount: number }
+  | { type: 'maxEnergyLost'; player: PlayerId; amount: number }
   | { type: 'ceilingRaised'; player: PlayerId; amount: number }
   | { type: 'statusApplied'; player: PlayerId; zone: number; status: StatusKind; amount?: number }
   /** 中毒或灼燒發作，接著會有 hpLost 或 damaged 事件。 */

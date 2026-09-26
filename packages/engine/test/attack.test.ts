@@ -238,3 +238,32 @@ describe('場地卡的回合開始效果', () => {
     expect(state.players[b].heroDamage).toBe(7);
   });
 });
+
+describe('對手能量上限 -X', () => {
+  it('對手的能量上限減少（最低 0），下回合從減少後的數字再 +2', () => {
+    let { state, a, b } = start();
+    state = endTurn(endTurn(state)); // 過了雙方的第一個回合（第一個回合的能量是固定的）
+    place(state, a, 0, 'sapper');
+    state.players[b].maxEnergy = 5;
+    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0 });
+    expect(state.players[b].maxEnergy).toBe(2);
+    state = endTurn(state);
+    expect(state.players[b].maxEnergy).toBe(4);
+    expect(state.players[b].energy).toBe(4);
+
+    state = endTurn(state);
+    state.players[b].maxEnergy = 1;
+    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0 });
+    expect(state.players[b].maxEnergy).toBe(0);
+  });
+
+  it('對手已經在最高上限 12 時，-3 下回合只少 1', () => {
+    let { state, a, b } = start();
+    state = endTurn(endTurn(state));
+    place(state, a, 0, 'sapper');
+    state.players[b].maxEnergy = 12;
+    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0 });
+    state = endTurn(state);
+    expect(state.players[b].maxEnergy).toBe(11);
+  });
+});

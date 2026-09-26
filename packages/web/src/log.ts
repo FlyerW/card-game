@@ -144,6 +144,9 @@ export function describeEvents(
       case 'maxEnergyGained':
         lines.push({ text: `　${who(event.player)}的能量上限 +${event.amount}`, tone: 'turn' });
         break;
+      case 'maxEnergyLost':
+        lines.push({ text: `　${who(event.player)}的能量上限 −${event.amount}`, tone: 'turn' });
+        break;
       case 'ceilingRaised':
         lines.push({ text: `　${who(event.player)}的最高上限 +${event.amount}`, tone: 'turn' });
         break;

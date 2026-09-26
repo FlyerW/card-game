@@ -84,6 +84,12 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     stage: 0, cost: 3, attack: 3, hp: 3,
     skills: [{ name: '磨刀', cost: 0, rest: true, target: NONE, effects: [{ type: 'buff', attack: 2, hp: 0, on: 'self' }] }],
   },
+  {
+    // 對手能量上限 -X：能量上限每回合 +2、最高 12，後期會補回來，所以數字給大一點。
+    kind: 'creature', id: 'sealing-golem', name: '封能石像', rarity: 'R', colors: [],
+    stage: 0, cost: 5, attack: 4, hp: 6,
+    skills: [{ name: '封能', cost: 0, rest: true, target: NONE, effects: [{ type: 'drainMaxEnergy', amount: 1 }] }],
+  },
   { kind: 'creature', id: 'gargoyle', name: '石像鬼', rarity: 'N', colors: [], stage: 0, cost: 4, attack: 4, hp: 4, skills: [] },
   {
     kind: 'creature', id: 'siege-colossus', name: '攻城巨像', rarity: 'R', colors: [],
@@ -204,6 +210,14 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     stage: 0, cost: 2, attack: 2, hp: 3,
     skills: [{ name: '洞察', cost: 1, target: NONE, effects: [{ type: 'draw', count: 1 }] }],
   },
+  { kind: 'creature', id: 'mana-anemone', name: '汲能海葵', rarity: 'N', colors: ['blue'], stage: 0, cost: 2, attack: 2, hp: 2, skills: [],
+    entry: { name: '汲能', target: NONE, effects: [{ type: 'drainMaxEnergy', amount: 1 }] } },
+  {
+    kind: 'creature', id: 'void-scholar', name: '虛空學者', rarity: 'SR', colors: ['blue'],
+    stage: 0, cost: 6, attack: 6, hp: 8,
+    entry: { name: '虛空吞噬', target: NONE, effects: [{ type: 'drainMaxEnergy', amount: 3 }] },
+    skills: [{ name: '洞悉', cost: 3, target: NONE, effects: [{ type: 'draw', count: 1 }] }],
+  },
   {
     kind: 'creature', id: 'apprentice-scholar', name: '見習學者', rarity: 'R', colors: ['blue'],
     stage: 0, cost: 3, attack: 3, hp: 3,
@@ -303,6 +317,20 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     kind: 'creature', id: 'soul-eater', name: '影噬魔', rarity: 'SR', colors: ['black'],
     stage: 0, cost: 5, attack: 5, hp: 8,
     skills: [{ name: '蝕魂', cost: 3, target: CREATURE, effects: [{ type: 'halveHp' }] }],
+  },
+  {
+    kind: 'creature', id: 'mana-eater', name: '噬能魔', rarity: 'R', colors: ['black'],
+    stage: 0, cost: 4, attack: 4, hp: 5,
+    skills: [{ name: '吞噬', cost: 3, target: NONE, effects: [{ type: 'drainMaxEnergy', amount: 2 }, { type: 'gainMaxEnergy', amount: 1 }] }],
+  },
+  {
+    kind: 'creature', id: 'abyss-devourer', name: '深淵吞噬者', rarity: 'UR', colors: ['black'],
+    stage: 0, cost: 8, attack: 9, hp: 10,
+    entry: { name: '吞噬虛空', target: NONE, effects: [{ type: 'drainMaxEnergy', amount: 4 }] },
+    skills: [
+      { name: '吞能', cost: 4, target: NONE, effects: [{ type: 'drainMaxEnergy', amount: 3 }, { type: 'gainMaxEnergy', amount: 1 }] },
+      hit('深淵之觸', 5, CREATURE, 7),
+    ],
   },
   {
     kind: 'creature', id: 'lord-of-decay', name: '腐朽之王', rarity: 'SR', colors: ['black'],

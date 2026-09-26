@@ -199,8 +199,7 @@ function startTurn(ctx: Ctx, player: PlayerId): void {
   p.maxEnergy = Math.min(grown, ceiling(db, state, player));
   p.energy = p.maxEnergy + (isFirstTurn && !isFirstPlayer ? rules.secondPlayerBonusEnergy : 0);
   tickRegenerate(ctx, player);
-  tickBurn(ctx, player);
-  if (state.phase === 'main') tickField(ctx, player);
+  tickField(ctx, player);
 }
 
 // ─── 各個動作 ────────────────────────────────────────────────────────────────
@@ -461,9 +460,10 @@ function choose(ctx: Ctx, a: ActionOf<'choose'>): void {
   ctx.events.push({ type: 'picked', player: a.player, count: chosen.length, rest: rest.length });
 }
 
-/** 回合結束：自己中毒的生物失去 HP 與上限，然後換對手。 */
+/** 回合結束：自己中毒的生物失去 HP 與上限、灼燒的受到傷害，然後換對手。 */
 function endTurn(ctx: Ctx, a: ActionOf<'endTurn'>): void {
   tickPoison(ctx, a.player);
+  if (ctx.state.phase === 'main') tickBurn(ctx, a.player);
   if (ctx.state.phase !== 'main') return;
   startTurn(ctx, other(a.player));
 }

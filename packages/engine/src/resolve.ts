@@ -254,7 +254,7 @@ export function tickPoison(ctx: Ctx, player: PlayerId): void {
   cleanup(ctx);
 }
 
-/** 回合開始：這位玩家有再生的生物回復 HP。在灼燒之前。 */
+/** 回合開始：這位玩家有再生的生物回復 HP。 */
 export function tickRegenerate(ctx: Ctx, player: PlayerId): void {
   const { db, state } = ctx;
   state.players[player].zones.forEach((creature, zone) => {
@@ -309,7 +309,7 @@ export function combat(ctx: Ctx, player: PlayerId, zone: number, target: Target)
   cleanup(ctx);
 }
 
-/** 回合開始：這位玩家灼燒的生物受到傷害。算傷害，減傷擋得住。 */
+/** 回合結束：這位玩家灼燒的生物受到傷害（在中毒之後）。算傷害，減傷擋得住。 */
 export function tickBurn(ctx: Ctx, player: PlayerId): void {
   ctx.state.players[player].zones.forEach((creature, zone) => {
     if (creature === null || creature.burn === 0) return;
@@ -451,6 +451,14 @@ function applyEffect(
       const gained = Math.max(0, Math.min(effect.amount, ceiling(db, state, me) - player.maxEnergy));
       player.maxEnergy += gained;
       ctx.events.push({ type: 'maxEnergyGained', player: me, amount: gained });
+      return;
+    }
+
+    case 'drainMaxEnergy': {
+      const enemy = other(me);
+      const lost = Math.min(effect.amount, state.players[enemy].maxEnergy);
+      state.players[enemy].maxEnergy -= lost;
+      ctx.events.push({ type: 'maxEnergyLost', player: enemy, amount: lost });
       return;
     }
 
