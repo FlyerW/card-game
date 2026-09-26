@@ -11,6 +11,7 @@ import {
   sampleDb,
   SAMPLE_CARDS,
   SAMPLE_HEROES,
+  type Ability,
   type Action,
   type CreatureView,
   type DeckCardDef,
@@ -556,9 +557,21 @@ const owned = () => ownedOf(app.profile);
 const myDeck = (): string[] => app.decks[app.heroId] ?? autoDeck(db, app.heroId, (Math.random() * 2 ** 32) >>> 0, owned());
 
 /** 目前的天生技：英雄進化卡有新的就用新的。 */
-function powerOf(side: SideView) {
+/** 目前的天生技，以及輪流的話下一次換成哪一個（跟引擎的 heroPower 同一套規則）。 */
+function powerOf(side: SideView): { power: Ability; next: Ability | null } | null {
   const evolution = side.heroEvolution ? card(side.heroEvolution) : null;
-  return (evolution?.kind === 'heroEvolution' ? evolution.power : undefined) ?? hero(side.heroId).power;
+  const source = evolution?.kind === 'heroEvolution' && evolution.power ? evolution : hero(side.heroId);
+  if (!source.power) return null;
+  if (!source.alternatePower) return { power: source.power, next: null };
+  const odd = side.heroPowerUses % 2 === 1;
+  return odd ? { power: source.alternatePower, next: source.power } : { power: source.power, next: source.alternatePower };
+}
+
+/** 技能按鈕上的費用：能量，加上能量上限 −N。 */
+function costBadge(ability: Ability): string {
+  const cap = ability.maxEnergyCost ? `<span class="skill-cost cap" title="能量上限 −${ability.maxEnergyCost}">上限−${ability.maxEnergyCost}</span>` : '';
+  const energy = ability.cost > 0 || !ability.maxEnergyCost ? `<span class="skill-cost">${ability.cost}</span>` : '';
+  return `<span class="costs">${energy}${cap}</span>`;
 }
 
 /** 對手的稱呼：電腦，或朋友取的名字。 */
@@ -598,13 +611,14 @@ function actReason(cv: CreatureView): string | null {
   return null;
 }
 
-function skillReason(cv: CreatureView, cost: number, energy: number, rest: boolean): string {
+function skillReason(cv: CreatureView, skill: Ability, you: SideView): string {
   const reason = actReason(cv);
   if (reason) return reason;
   if (cv.skillUsedThisTurn) return '這回合已經發動過技能';
   if (cv.silenced) return '沉默中，不能發動技能';
-  if (rest && cv.attackedThisTurn) return '這回合攻擊過了，不能休息';
-  if (cost > energy) return `能量不足：需要 ${cost}`;
+  if (skill.rest && cv.attackedThisTurn) return '這回合攻擊過了，不能休息';
+  if (skill.cost > you.energy) return `能量不足：需要 ${skill.cost}`;
+  if ((skill.maxEnergyCost ?? 0) > you.maxEnergy) return `能量上限不夠：需要 ${skill.maxEnergyCost}`;
   return '目前沒有可以指定的目標';
 }
 
@@ -705,9 +719,9 @@ function detail(view: PlayerView): string {
       body += '<div class="skills">';
       skillsOf(cv).forEach((skill, index) => {
         const acts = actsForSkill(sel.zone, index);
-        const reason = myTurn && acts.length === 0 ? skillReason(cv, skill.cost, view.you.energy, skill.rest === true) : '';
+        const reason = myTurn && acts.length === 0 ? skillReason(cv, skill, view.you) : '';
         body += `<button class="skill" data-skill="${sel.zone}:${index}" ${acts.length === 0 ? 'disabled' : ''}>
-          <span class="skill-cost">${skill.cost}</span><span class="skill-text">${esc(`${skill.name}：${describeEffects(skill, nameOf)}`)}</span>
+          ${costBadge(skill)}<span class="skill-text">${esc(`${skill.name}：${describeEffects(skill, nameOf)}`)}</span>
           ${reason ? `<span class="skill-why">${esc(reason)}</span>` : ''}</button>`;
       });
       body += '</div>';
@@ -737,7 +751,7 @@ function detail(view: PlayerView): string {
   }
 
   if (sel.kind === 'skill' || sel.kind === 'heroPower') {
-    const ability = sel.kind === 'skill' ? skillsOf(view.you.zones[sel.zone]!)[sel.skill]! : powerOf(view.you)!;
+    const ability = sel.kind === 'skill' ? skillsOf(view.you.zones[sel.zone]!)[sel.skill]! : powerOf(view.you)!.power;
     return toast + `<p class="d-head">選擇目標</p><p class="d-line">${esc(describeAbility(ability, nameOf))}</p><p class="hint">發光的就是可以選的目標。</p>` + cancel;
   }
 
@@ -840,13 +854,15 @@ function sideRows(side: SideView, player: PlayerId, picks: Map<string, Action>, 
 
   let heroRow = `<div class="row hero-row">${heroPlate(side, player, picks)}`;
   if (player === YOU) {
-    const power = powerOf(side);
-    if (power) {
+    const current = powerOf(side);
+    if (current) {
+      const { power, next } = current;
       const usable = actsForPower().length > 0;
-      // 有次數限制的天生技，標出這局還剩幾次。
+      // 有次數限制的天生技，標出這局還剩幾次；輪流的天生技，標出下一次換成哪個。
       const left = power.uses === undefined ? '' : `（剩 ${Math.max(0, power.uses - side.heroPowerUses)} 次）`;
+      const then = next ? `<small>・用完換成「${esc(next.name)}」</small>` : '';
       heroRow += `<button class="power${app.selection?.kind === 'heroPower' ? ' selected' : ''}" data-do="power" ${usable ? '' : 'disabled'}>
-        <span class="skill-cost">${power.cost}</span>天生技「${esc(power.name)}」${left}</button>`;
+        ${costBadge(power)}天生技「${esc(power.name)}」${left}${then}</button>`;
     }
   }
   heroRow += '</div>';

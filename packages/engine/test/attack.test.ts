@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { describeAbility } from '../src/describe';
 import { act, at, creatureAt, endTurn, engine, give, hero, place, reject, start } from './helpers';
 
 // 大縮模實驗：生物每回合可以攻擊（不花能量，被打的生物會反擊）或發動一個技能（花能量，不會被反擊）。
@@ -239,31 +240,69 @@ describe('場地卡的回合開始效果', () => {
   });
 });
 
-describe('對手能量上限 -X', () => {
-  it('對手的能量上限減少（最低 0），下回合從減少後的數字再 +2', () => {
+describe('能量上限 −X 的費用', () => {
+  it('發動時自己的能量上限 −X，這回合的能量壓到新的上限；之後照常每回合 +2', () => {
     let { state, a, b } = start();
-    state = endTurn(endTurn(state)); // 過了雙方的第一個回合（第一個回合的能量是固定的）
-    place(state, a, 0, 'sapper');
-    state.players[b].maxEnergy = 5;
-    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0 });
-    expect(state.players[b].maxEnergy).toBe(2);
-    state = endTurn(state);
-    expect(state.players[b].maxEnergy).toBe(4);
-    expect(state.players[b].energy).toBe(4);
-
-    state = endTurn(state);
-    state.players[b].maxEnergy = 1;
-    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0 });
-    expect(state.players[b].maxEnergy).toBe(0);
+    state = endTurn(endTurn(state)); // 過了雙方的第一個回合
+    place(state, a, 0, 'burnout');
+    place(state, b, 0, 'hitter');
+    state.players[a].maxEnergy = 6;
+    state.players[a].energy = 6;
+    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0, target: creatureAt(b, 0) });
+    expect(at(state, b, 0)!.damage).toBe(4);
+    expect(state.players[a]).toMatchObject({ maxEnergy: 4, energy: 4 });
+    state = endTurn(endTurn(state));
+    expect(state.players[a].maxEnergy).toBe(6);
   });
 
-  it('對手已經在最高上限 12 時，-3 下回合只少 1', () => {
+  it('能量已經花掉的話，這回合不會再少；能量上限不夠就不能發動', () => {
     let { state, a, b } = start();
+    place(state, a, 0, 'burnout');
+    state.players[a].maxEnergy = 8;
+    state.players[a].energy = 1;
+    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0, target: hero(b) });
+    expect(state.players[a]).toMatchObject({ maxEnergy: 6, energy: 1 });
+
+    const poor = start();
+    place(poor.state, poor.a, 0, 'burnout');
+    poor.state.players[poor.a].maxEnergy = 1;
+    expect(reject(poor.state, { type: 'useSkill', player: poor.a, zone: 0, skill: 0, target: hero(poor.b) })).toBe('NOT_ENOUGH_MAX_ENERGY');
+  });
+
+  it('卡面寫成「能量上限 −X」', () => {
+    const burnout = engine.db.cards.get('burnout');
+    if (burnout?.kind !== 'creature') throw new Error('burnout 應該是生物');
+    expect(describeAbility(burnout.skills[0]!)).toBe('sacrifice（能量上限 −2）：〔任意目標〕造成 4 傷害');
+  });
+});
+
+describe('輪流的天生技', () => {
+  it('每發動一次就換成另一個：抽牌用完變成棄牌，再變回抽牌', () => {
+    let { state, a, b } = start({ deckSize: 60 });
+    state.players[a].heroId = 'twins';
+    const hand = state.players[a].hand.length;
+    state = act(state, { type: 'heroPower', player: a });
+    expect(state.players[a].hand.length).toBe(hand + 1); // 抽 1 張
     state = endTurn(endTurn(state));
-    place(state, a, 0, 'sapper');
-    state.players[b].maxEnergy = 12;
-    state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0 });
-    state = endTurn(state);
-    expect(state.players[b].maxEnergy).toBe(11);
+    const theirs = state.players[b].hand.length;
+    state = act(state, { type: 'heroPower', player: a });
+    expect(state.players[b].hand.length).toBe(theirs - 1); // 對手棄 1 張
+    state = endTurn(endTurn(state));
+    const mine = state.players[a].hand.length;
+    state = act(state, { type: 'heroPower', player: a });
+    expect(state.players[a].hand.length).toBe(mine + 1);
+  });
+});
+
+describe('我方每隻生物增益', () => {
+  it('每隻我方生物都放上指示物，對手的不受影響', () => {
+    let { state, a, b } = start();
+    state.players[a].heroId = 'prism';
+    place(state, a, 0, 'wolf');
+    place(state, a, 3, 'hitter');
+    place(state, b, 0, 'wolf');
+    state = act(state, { type: 'heroPower', player: a });
+    for (const zone of [0, 3]) expect(at(state, a, zone)).toMatchObject({ attackCounters: 1, hpCounters: 1 });
+    expect(at(state, b, 0)).toMatchObject({ attackCounters: 0, hpCounters: 0 });
   });
 });

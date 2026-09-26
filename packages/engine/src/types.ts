@@ -76,14 +76,10 @@ export type Effect =
    * 放增益指示物。attack 讓攻擊力增加，hp 讓 HP 上限增加。
    * 「增益 N」就是 attack 與 hp 各 N。
    */
-  | { type: 'buff'; attack: number; hp: number; on: 'self' | 'target' }
+  /** all：我方每隻生物。 */
+  | { type: 'buff'; attack: number; hp: number; on: 'self' | 'target' | 'all' }
   /** 加速型：能量上限 +N，不超過最高上限，當回合不補能量。 */
   | { type: 'gainMaxEnergy'; amount: number }
-  /**
-   * 對手的能量上限 -N（最低 0）。能量上限每回合 +2、最高 12，所以對手已經在 12 的時候，-2 下回合就補回來了；
-   * 前期效果大，後期要 -3 以上才有感。
-   */
-  | { type: 'drainMaxEnergy'; amount: number }
   /** 突破型：最高上限永久 +N。目前先維持上限 12，範例卡不使用。 */
   | { type: 'raiseCeiling'; amount: number }
   /** 破壞目標生物身上的道具，或目標場地卡。 */
@@ -121,6 +117,11 @@ export interface Ability {
   uses?: number;
   /** 【休息】生物技能：這回合還沒攻擊才能發動，發動後這回合不能攻擊。通常不花能量。 */
   rest?: boolean;
+  /**
+   * 發動時自己的能量上限 −N（另一種費用）。能量上限不到 N 就不能發動；這回合的能量超過新的上限就壓到上限。
+   * 能量上限之後照常每回合 +2，所以前期代價大、後期接近免費，效果給得比同樣能量的強一點。
+   */
+  maxEnergyCost?: number;
 }
 
 interface CardBase {
@@ -223,6 +224,8 @@ export interface HeroEvolutionDef extends CardBase {
   hpBonus: number;
   /** 換成這個天生技；沒有就沿用原本的。 */
   power?: Ability;
+  /** 跟 power 輪流：每發動一次就換成另一個。 */
+  alternatePower?: Ability;
   /** 額外多一個被動，跟原本的被動同時生效。 */
   passive?: HeroPassive;
   /** 進場效果：打出這張卡時發動，像爐石英雄卡的戰吼。不另外花能量。 */
@@ -242,6 +245,8 @@ export interface HeroDef {
   colors: Color[];
   hp: number;
   power?: Ability;
+  /** 跟 power 輪流：每發動一次就換成另一個（例如抽牌用完變成棄牌）。 */
+  alternatePower?: Ability;
   passive?: HeroPassive;
 }
 

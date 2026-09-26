@@ -105,6 +105,19 @@ function pay(p: PlayerState, cost: number): void {
   p.energy -= cost;
 }
 
+/** 付技能與天生技的費用：能量，加上能量上限 −N（有的話）。 */
+function payAbility(ctx: Ctx, player: PlayerId, ability: Ability): void {
+  const p = ctx.state.players[player];
+  const cap = ability.maxEnergyCost ?? 0;
+  if (p.maxEnergy < cap) fail('NOT_ENOUGH_MAX_ENERGY', `能量上限不夠：需要 ${cap}，目前 ${p.maxEnergy}`);
+  pay(p, ability.cost);
+  if (cap > 0) {
+    p.maxEnergy -= cap;
+    p.energy = Math.min(p.energy, p.maxEnergy);
+    ctx.events.push({ type: 'maxEnergyLost', player, amount: cap });
+  }
+}
+
 function checkZone(state: GameState, zone: number): void {
   if (!Number.isInteger(zone) || zone < 0 || zone >= state.rules.zones) {
     fail('INVALID_ZONE', `格子編號必須是 1 到 ${state.rules.zones}`);
@@ -314,7 +327,7 @@ function useSkill(ctx: Ctx, a: ActionOf<'useSkill'>): void {
 
   const source: AbilitySource = { kind: 'creature', player: a.player, zone: a.zone };
   const target = chooseTarget(ctx, skill, source, a.target);
-  pay(p, skill.cost);
+  payAbility(ctx, a.player, skill);
   creature.skillUsedTurn = state.turn;
   if (skill.rest) creature.attackedTurn = state.turn; // 休息了，這回合不能攻擊
   ctx.events.push({ type: 'abilityUsed', player: a.player, source: 'creature', cardId: def.id, ability: skill.name });
@@ -333,7 +346,7 @@ function heroPower(ctx: Ctx, a: ActionOf<'heroPower'>): void {
 
   const source: AbilitySource = { kind: 'hero', player: a.player };
   const target = chooseTarget(ctx, power, source, a.target);
-  pay(p, power.cost);
+  payAbility(ctx, a.player, power);
   p.heroPowerUsedTurn = state.turn;
   p.heroPowerUses += 1;
   ctx.events.push({ type: 'abilityUsed', player: a.player, source: 'hero', cardId: hero.id, ability: power.name });

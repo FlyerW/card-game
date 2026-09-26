@@ -166,7 +166,9 @@ export const TEST_CARDS: DeckCardDef[] = [
     keywords: ['lifesteal'],
   }),
   creature('moss', [hit('x', ANY, 1), hit('y', ANY, 1)], { regenerate: 2 }),
-  creature('sapper', [{ name: 'drain3', cost: 1, target: NONE, effects: [{ type: 'drainMaxEnergy', amount: 3 }] }]),
+  creature('burnout', [
+    { name: 'sacrifice', cost: 0, maxEnergyCost: 2, target: ANY, effects: [{ type: 'damage', amount: 4 }] },
+  ]),
   { kind: 'spell', id: 'bloom', name: 'bloom', rarity: 'N', colors: [], cost: 1, target: NONE, effects: [{ type: 'healAll', amount: 4 }] },
   {
     kind: 'spell', id: 'doom', name: 'doom', rarity: 'R', colors: [], cost: 1,
@@ -191,6 +193,15 @@ export const TEST_HEROES: HeroDef[] = [
   { kind: 'hero', id: 'mender', name: 'mender', colors: ['green'], hp: 47, passive: { name: 'growth', creatures: { regenerate: 1 } } },
   { kind: 'hero', id: 'duelist', name: 'duelist', colors: ['white'], hp: 47, passive: { name: 'edge', ownTurn: { attack: 1 } } },
   { kind: 'hero', id: 'warder', name: 'warder', colors: ['green'], hp: 47, passive: { name: 'bark', opponentTurn: { hp: 2 } } },
+  {
+    kind: 'hero', id: 'twins', name: 'twins', colors: ['blue', 'black'], hp: 40,
+    power: { name: 'tide', cost: 1, target: NONE, effects: [{ type: 'draw', count: 1 }] },
+    alternatePower: { name: 'shade', cost: 1, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
+  },
+  {
+    kind: 'hero', id: 'prism', name: 'prism', colors: ['white', 'blue', 'black', 'red', 'green'], hp: 40,
+    power: { name: 'glow', cost: 1, target: NONE, effects: [{ type: 'buff', attack: 1, hp: 1, on: 'all' }] },
+  },
 ];
 
 export const testDb = () => buildCardDb(TEST_CARDS, TEST_HEROES);

@@ -51,6 +51,9 @@ function checkAbility(ability: Ability, where: string, isCreatureSkill: boolean)
   const at = `${where}「${ability.name}」`;
   if (!Number.isInteger(ability.cost) || ability.cost < 0) problems.push(`${at}：費用必須是非負整數`);
   if (ability.uses !== undefined && (!Number.isInteger(ability.uses) || ability.uses <= 0)) problems.push(`${at}：次數必須是正整數`);
+  if (ability.maxEnergyCost !== undefined && (!Number.isInteger(ability.maxEnergyCost) || ability.maxEnergyCost <= 0)) {
+    problems.push(`${at}：能量上限的費用必須是正整數`);
+  }
   if (ability.effects.length === 0) problems.push(`${at}：沒有任何效果`);
   for (const effect of ability.effects) {
     if (effect.type === 'summonToken' && effect.count <= 0) problems.push(`${at}：召喚的數量至少 1`);
@@ -145,6 +148,7 @@ function checkCard(
       }
       if (!Number.isInteger(card.hpBonus) || card.hpBonus < 0) problems.push(`${where}：hpBonus 必須是非負整數`);
       if (card.power) problems.push(...checkAbility(card.power, where, false));
+      if (card.alternatePower) problems.push(...checkAbility(card.alternatePower, where, false));
       if (card.entry) problems.push(...checkAbility({ ...card.entry, cost: 0 }, `${where}的進場效果`, false));
       for (const part of [card.passive?.creatures, card.passive?.ownTurn, card.passive?.opponentTurn]) problems.push(...checkModifier(part, where));
       break;
@@ -174,6 +178,7 @@ function checkHero(hero: HeroDef): string[] {
   if (hero.colors.length === 0) problems.push(`${where}：英雄至少要有一個顏色`);
   if (!Number.isInteger(hero.hp) || hero.hp <= 0) problems.push(`${where}：HP 必須是正整數`);
   if (hero.power) problems.push(...checkAbility(hero.power, where, false));
+  if (hero.alternatePower) problems.push(...(hero.power ? checkAbility(hero.alternatePower, where, false) : [`${where}：有輪流的天生技，就要有原本的天生技`]));
   for (const part of [hero.passive?.creatures, hero.passive?.ownTurn, hero.passive?.opponentTurn]) problems.push(...checkModifier(part, where));
   return problems;
 }

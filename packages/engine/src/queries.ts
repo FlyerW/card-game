@@ -40,9 +40,13 @@ export function heroEvolution(db: CardDb, state: GameState, player: PlayerId): H
   return def;
 }
 
-/** 目前的天生技：進化卡有新的就用新的。 */
-export const heroPower = (db: CardDb, state: GameState, player: PlayerId): Ability | undefined =>
-  heroEvolution(db, state, player)?.power ?? heroDef(db, state, player).power;
+/** 目前的天生技：進化卡有新的就用新的；有兩個輪流的，照這局用了幾次決定現在是哪一個。 */
+export function heroPower(db: CardDb, state: GameState, player: PlayerId): Ability | undefined {
+  const evolution = heroEvolution(db, state, player);
+  const source = evolution?.power ? evolution : heroDef(db, state, player);
+  const { power, alternatePower } = source;
+  return alternatePower && state.players[player].heroPowerUses % 2 === 1 ? alternatePower : power;
+}
 
 /** 目前生效的被動：原本的，加上進化卡多給的。 */
 export function heroPassives(db: CardDb, state: GameState, player: PlayerId): HeroPassive[] {

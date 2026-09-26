@@ -53,7 +53,7 @@ export function describeEffect(effect: Effect, names: Names = ids): string {
     case 'taunt':
       return '挑釁（對手下回合的單體傷害必須先打牠）';
     case 'buff': {
-      const who = effect.on === 'self' ? '自身' : '目標';
+      const who = effect.on === 'self' ? '自身' : effect.on === 'all' ? '我方每隻生物' : '目標';
       if (effect.attack === effect.hp) return `${who}增益 ${effect.attack}`;
       const parts: string[] = [];
       if (effect.attack > 0) parts.push(`⚔ +${effect.attack}`);
@@ -62,8 +62,6 @@ export function describeEffect(effect: Effect, names: Names = ids): string {
     }
     case 'gainMaxEnergy':
       return `能量上限 +${effect.amount}`;
-    case 'drainMaxEnergy':
-      return `對手能量上限 −${effect.amount}`;
     case 'raiseCeiling':
       return `最高上限 +${effect.amount}`;
     case 'destroy':
@@ -93,9 +91,13 @@ export function describeEffects(ability: Omit<Ability, 'cost'>, names: Names = i
 
 /** 技能與天生技：「火花（能量 2）：〔斜對角〕造成 7 傷害」。 */
 export function describeAbility(ability: Ability, names: Names = ids): string {
-  // 【休息】技能：不花能量的只寫「休息」。
-  const cost = ability.rest ? (ability.cost > 0 ? `能量 ${ability.cost}，休息` : '休息') : `能量 ${ability.cost}`;
-  return `${ability.name}（${cost}${ability.uses ? `，每局 ${ability.uses} 次` : ''}）：${describeEffects(ability, names)}`;
+  // 費用：能量（只付能量上限、或休息技能不花能量時不寫）、能量上限 −N、休息、每局次數。
+  const parts: string[] = [];
+  if (ability.cost > 0 || (!ability.rest && !ability.maxEnergyCost)) parts.push(`能量 ${ability.cost}`);
+  if (ability.maxEnergyCost) parts.push(`能量上限 −${ability.maxEnergyCost}`);
+  if (ability.rest) parts.push('休息');
+  if (ability.uses) parts.push(`每局 ${ability.uses} 次`);
+  return `${ability.name}（${parts.join('，')}）：${describeEffects(ability, names)}`;
 }
 
 /** 進場效果：「進場 火星：〔任意目標〕造成 2 傷害」。 */
@@ -179,6 +181,7 @@ export function describeCard(card: DeckCardDef, names: Names = ids): string[] {
       if (card.entry) lines.push(describeEntry(card.entry, names));
       lines.push(`英雄 ♥ 上限 +${card.hpBonus}`);
       if (card.power) lines.push(`天生技換成 ${describeAbility(card.power, names)}`);
+      if (card.alternatePower) lines.push(`每發動一次就跟 ${describeAbility(card.alternatePower, names)} 輪流`);
       if (card.passive) lines.push(`多一個${describePassive(card.passive)}`);
       lines.push('每局只能進化一次');
       return lines;
@@ -199,6 +202,7 @@ export function describeHero(hero: HeroDef): string[] {
   const lines = [`${hero.name}　${hero.rarity ? `${hero.rarity} 英雄・` : ''}${describeColors(hero.colors)}｜♥ ${hero.hp}`];
   if (hero.passive) lines.push(describePassive(hero.passive));
   if (hero.power) lines.push(`天生技 ${describeAbility(hero.power)}`);
+  if (hero.alternatePower) lines.push(`每發動一次就跟 ${describeAbility(hero.alternatePower)} 輪流`);
   if (!hero.passive && !hero.power) lines.push('沒有效果');
   return lines;
 }

@@ -429,7 +429,16 @@ function applyEffect(
       return;
 
     case 'buff': {
-      // 增益自身，或增益我方目標生物；兩者都是我方的生物。
+      // 增益自身、我方目標生物，或我方每隻生物；都是我方的生物。
+      if (effect.on === 'all') {
+        player.zones.forEach((each, zone) => {
+          if (each === null) return;
+          each.attackCounters += effect.attack;
+          each.hpCounters += effect.hp;
+          ctx.events.push({ type: 'buffed', player: me, zone, attack: effect.attack, hp: effect.hp });
+        });
+        return;
+      }
       let buffed: Creature | null = null;
       let zone = -1;
       if (effect.on === 'self' && source.kind === 'creature') {
@@ -450,14 +459,6 @@ function applyEffect(
       const gained = Math.max(0, Math.min(effect.amount, ceiling(db, state, me) - player.maxEnergy));
       player.maxEnergy += gained;
       ctx.events.push({ type: 'maxEnergyGained', player: me, amount: gained });
-      return;
-    }
-
-    case 'drainMaxEnergy': {
-      const enemy = other(me);
-      const lost = Math.min(effect.amount, state.players[enemy].maxEnergy);
-      state.players[enemy].maxEnergy -= lost;
-      ctx.events.push({ type: 'maxEnergyLost', player: enemy, amount: lost });
       return;
     }
 

@@ -12,6 +12,7 @@ export type ErrorCode =
   | 'CARD_NOT_IN_HAND'
   | 'WRONG_CARD_KIND'
   | 'NOT_ENOUGH_ENERGY'
+  | 'NOT_ENOUGH_MAX_ENERGY'
   | 'INVALID_ZONE'
   | 'ZONE_OCCUPIED'
   | 'NO_CREATURE'
