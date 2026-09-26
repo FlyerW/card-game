@@ -390,6 +390,8 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
   border-radius: 12px; padding: 18px 20px;
 }
 .login-card .primary.big { justify-self: start; }
+.login-card input { font: inherit; color: var(--ink); background: var(--page); border: 1px solid var(--mat-edge); border-radius: 6px; padding: 7px 10px; width: min(240px, 100%); }
+.login-actions { display: flex; gap: 8px; }
 .google-slot { min-height: 44px; }
 .setup-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
 .who { display: flex; align-items: center; gap: 8px; color: var(--ink-soft); font-size: 13px; }

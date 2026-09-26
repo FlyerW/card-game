@@ -1,7 +1,7 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { CardDb } from '@card-game/engine';
+import { copyLimit, DEFAULT_RULES, type CardDb } from '@card-game/engine';
 import {
   applyRankedResult,
   newProfile,
@@ -20,7 +20,7 @@ import {
 import type { GoogleIdentity } from './google';
 import type { RankedReport } from './protocol';
 
-// 帳號：用 Google 登入、或開訪客帳號的玩家，金幣、收藏與牌位存在伺服器上。整份資料存成一個 JSON 檔（試玩階段夠用，
+// 帳號：用 Google 登入、或用名字＋密碼開帳號的玩家，金幣、收藏與牌位存在伺服器上。整份資料存成一個 JSON 檔（試玩階段夠用，
 // 玩家多了再換資料庫）。寫檔先寫暫存檔再改名，寫到一半當機也不會把舊資料弄壞。
 // 登入後發一個隨機的 session token 給瀏覽器；檔案裡只存它的雜湊，檔案外流也拿不到能用的 token。
 
@@ -36,6 +36,8 @@ export interface Account {
   rank?: RankState;
   /** 換季發的獎勵，下次打開網頁時告訴玩家，說過就清掉。 */
   seasonReward?: { season: string; best: number; gold: number };
+  /** 名字＋密碼帳號的密碼（scrypt 雜湊）；Google 帳號沒有。舊的訪客帳號也沒有，第一次用名字登入時設定。 */
+  password?: { salt: string; hash: string };
   createdAt: string;
 }
 
@@ -64,6 +66,31 @@ interface Data {
 }
 
 const hash = (token: string) => createHash('sha256').update(token).digest('hex');
+
+/** 登入、註冊失敗的原因，直接給玩家看。 */
+export class AccountError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+const NAME_LIMIT = 16;
+const PASSWORD_MIN = 4;
+
+function hashPassword(password: string, salt = randomBytes(16).toString('hex')): { salt: string; hash: string } {
+  return { salt, hash: scryptSync(password, salt, 32).toString('hex') };
+}
+
+function checkPassword(password: string, stored: { salt: string; hash: string }): boolean {
+  const attempt = Buffer.from(hashPassword(password, stored.salt).hash, 'hex');
+  const expected = Buffer.from(stored.hash, 'hex');
+  return attempt.length === expected.length && timingSafeEqual(attempt, expected);
+}
+
+const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 /** 伺服器的日期（本地時間），每日任務照這個換日。 */
 export function serverDay(now = new Date()): string {
@@ -123,22 +150,73 @@ export class AccountStore {
     return { token, account };
   }
 
-  /** 訪客帳號：不用 Google，取個名字就開一個存在伺服器上的帳號（試玩、排位用）。 */
-  async loginGuest(name: string, now = Date.now()): Promise<{ token: string; account: Account }> {
-    const id = `guest:${randomBytes(12).toString('hex')}`;
-    const clean = name.trim().slice(0, 16) || '訪客';
+  /**
+   * 名字＋密碼登入。create 是開新帳號（名字不能跟別人重複）；不是就登入既有的帳號。
+   * 舊的訪客帳號沒有密碼：第一次用那個名字登入（或開帳號）時設定密碼，同名的舊訪客帳號全部合併成一個。
+   */
+  async loginWithPassword(name: string, password: string, create: boolean, now = Date.now()): Promise<{ token: string; account: Account }> {
+    const clean = name.trim().slice(0, NAME_LIMIT);
+    if (!clean) throw new AccountError(400, '取個名字吧');
+    if (password.length < PASSWORD_MIN) throw new AccountError(400, `密碼至少 ${PASSWORD_MIN} 個字`);
+    const all = Object.values(this.data.accounts).filter((account) => account.id.startsWith('guest:') && sameName(account.name, clean));
+    const owned = all.find((account) => account.password);
+    const legacy = all.filter((account) => !account.password);
+    let account: Account;
+    if (owned) {
+      if (create) throw new AccountError(409, '這個名字已經有人用了，換一個，或直接登入');
+      if (!checkPassword(password, owned.password!)) throw new AccountError(401, '名字或密碼不對');
+      account = owned;
+    } else if (legacy.length > 0) {
+      account = this.claim(legacy, password);
+    } else {
+      if (!create) throw new AccountError(404, '沒有這個帳號，要開新帳號請按「開新帳號」');
+      account = await this.createGuest(clean, now);
+      account.password = hashPassword(password);
+    }
+    const token = this.issueSession(account.id, now);
+    await this.save();
+    return { token, account };
+  }
+
+  /** 認領舊的訪客帳號：設定密碼，同名的全部合併到收藏最多的那個（抽到的卡加在一起，不超過上限）。 */
+  private claim(legacy: Account[], password: string): Account {
+    const count = (account: Account) => Object.values(account.profile.collection).reduce((sum, n) => sum + n, 0);
+    const [keep, ...rest] = [...legacy].sort((a, b) => count(b) - count(a));
+    const base = newProfile(keep!.profile.day, starterDecks(this.db)).collection;
+    const collection = { ...keep!.profile.collection };
+    const vouchers = { ...keep!.profile.vouchers };
+    let gold = keep!.profile.gold;
+    for (const other of rest) {
+      // 每個舊帳號都從同一份起始收藏開始，只把多抽到的加進來。
+      for (const [id, n] of Object.entries(other.profile.collection)) {
+        const extra = n - (base[id] ?? 0);
+        if (extra <= 0) continue;
+        const card = this.db.cards.get(id);
+        const limit = card ? copyLimit(DEFAULT_RULES, card) : this.db.heroes.has(id) ? 1 : 0;
+        collection[id] = Math.min(limit, (collection[id] ?? 0) + extra);
+      }
+      for (const rarity of Object.keys(vouchers) as (keyof typeof vouchers)[]) vouchers[rarity] += other.profile.vouchers[rarity];
+      gold += other.profile.gold;
+      delete this.data.accounts[other.id];
+      for (const [key, session] of Object.entries(this.data.sessions)) if (session.accountId === other.id) delete this.data.sessions[key];
+    }
+    keep!.profile = { ...keep!.profile, collection, vouchers, gold };
+    keep!.password = hashPassword(password);
+    return keep!;
+  }
+
+  /** 開一個新的名字＋密碼帳號（五個基礎英雄的起始牌組、100 金幣）。 */
+  private async createGuest(name: string, now: number): Promise<Account> {
     const account: Account = {
-      id,
-      name: clean,
+      id: `guest:${randomBytes(12).toString('hex')}`,
+      name,
       email: null,
       picture: null,
       profile: newProfile(serverDay(new Date(now)), starterDecks(this.db)),
       createdAt: new Date(now).toISOString(),
     };
-    this.data.accounts[id] = account;
-    const token = this.issueSession(id, now);
-    await this.save();
-    return { token, account };
+    this.data.accounts[account.id] = account;
+    return account;
   }
 
   private issueSession(accountId: string, now: number): string {

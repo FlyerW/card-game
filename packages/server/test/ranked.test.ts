@@ -111,10 +111,10 @@ describe('排位賽', () => {
 });
 
 describe('帳號的排位資料', () => {
-  it('訪客帳號；排位結果改變雙方的星星與分數，贏的人拿金幣', async () => {
+  it('排位結果改變雙方的星星與分數，贏的人拿金幣', async () => {
     const store = await AccountStore.open(null, sampleDb());
-    const { account: ann } = await store.loginGuest('小安');
-    const { account: bob } = await store.loginGuest('小寶');
+    const { account: ann } = await store.loginWithPassword('小安', 'pass1', true);
+    const { account: bob } = await store.loginWithPassword('小寶', 'pass2', true);
     expect(ann.id).toMatch(/^guest:/);
     const summary = (won: boolean) => ({ won, conceded: false, deckColors: [], summoned: 0, drew: 0, spells: 0 });
     const gold = ann.profile.gold;

@@ -16,7 +16,7 @@ const lan = Object.values(networkInterfaces())
   .map((net) => `http://${net!.address}:${bound}`);
 
 console.log(`連線對戰伺服器已啟動：http://localhost:${bound}`);
-console.log(`帳號資料存在 ${dataDir}；訪客帳號可以打排位賽。`);
-console.log(googleClientId ? 'Google 登入已開啟。' : 'Google 登入沒開（沒有設定 GOOGLE_CLIENT_ID），可以用訪客帳號或測試帳號。');
+console.log(`帳號資料存在 ${dataDir}；名字＋密碼帳號可以打排位賽。`);
+console.log(googleClientId ? 'Google 登入已開啟。' : 'Google 登入沒開（沒有設定 GOOGLE_CLIENT_ID），可以用名字＋密碼帳號或測試帳號。');
 if (lan.length > 0) console.log(`同一個網路的朋友可以開：${lan.join('、')}`);
 console.log('朋友在別的地方的話，要把這個埠開放到外網，或用 cloudflared 之類的通道，見 README。');

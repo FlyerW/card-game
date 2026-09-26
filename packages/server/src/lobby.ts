@@ -299,7 +299,7 @@ export class Lobby {
   private enqueue(client: Client, message: Extract<ClientMessage, { t: 'queue' }>): void {
     if (!this.ranked) return client.send({ t: 'error', message: '這台伺服器沒有開排位賽' });
     const player = typeof message.token === 'string' ? this.ranked.authenticate(message.token) : null;
-    if (!player) return client.send({ t: 'error', message: '要先用伺服器上的帳號登入（訪客或 Google）才能打排位' });
+    if (!player) return client.send({ t: 'error', message: '要先用伺服器上的帳號登入（名字＋密碼或 Google）才能打排位' });
     const seat = this.newSeat(client, player.name, message.heroId, message.deck);
     if (seat === null) return;
     const problem = player.ownershipProblem(seat.heroId, seat.deck);

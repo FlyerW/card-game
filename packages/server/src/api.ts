@@ -2,7 +2,7 @@ import { randomInt } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { DEFAULT_RULES, type CardDb } from '@card-game/engine';
 import { exchange, openPack, parseSummary, recordGame } from '@card-game/economy';
-import { accountInfo, serverDay, type Account, type AccountStore } from './accounts';
+import { AccountError, accountInfo, serverDay, type Account, type AccountStore } from './accounts';
 import { TokenError, type GoogleIdentity } from './google';
 
 // 帳號與經濟的 HTTP API，全部在 /api/ 底下，收發 JSON。登入後的請求帶 Authorization: Bearer <token>。
@@ -91,11 +91,16 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
         return send(response, 200, { account: accountInfo(account), profile: account.profile, rank, seasonReward }), true;
       }
 
-      case 'POST /api/login/guest': {
-        const { name } = await readJson(request);
-        if (typeof name !== 'string' || name.trim() === '') throw new HttpError(400, '取個名字吧');
-        const { token, account } = await store.loginGuest(name);
-        return send(response, 200, { token, account: accountInfo(account), profile: account.profile, rank: store.rankOf(account) }), true;
+      case 'POST /api/login/password': {
+        const { name, password, create } = await readJson(request);
+        if (typeof name !== 'string' || typeof password !== 'string' || password.length > 200) throw new HttpError(400, '名字或密碼格式不對');
+        try {
+          const { token, account } = await store.loginWithPassword(name, password, create === true);
+          return send(response, 200, { token, account: accountInfo(account), profile: account.profile, rank: store.rankOf(account) }), true;
+        } catch (error) {
+          if (error instanceof AccountError) throw new HttpError(error.status, error.message);
+          throw error;
+        }
       }
 
       case 'GET /api/leaderboard':

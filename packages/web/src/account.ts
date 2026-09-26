@@ -137,9 +137,12 @@ export async function googleLogin(credential: string): Promise<{ session: Sessio
   return { session: { kind: 'google', account: result.account, token: result.token }, profile: result.profile };
 }
 
-/** 開一個訪客帳號：不用 Google，取個名字，金幣、收藏與牌位存在伺服器上。 */
-export async function guestLogin(name: string): Promise<{ session: Session; profile: Profile }> {
-  const result = await api<{ token: string; account: AccountInfo; profile: Profile }>('/api/login/guest', null, { name });
+/**
+ * 名字＋密碼帳號：金幣、收藏與牌位存在伺服器上，換電腦也能登入。create 是開新帳號。
+ * 以前的訪客帳號第一次用名字登入時會設定密碼（同名的會合併）。
+ */
+export async function passwordLogin(name: string, password: string, create: boolean): Promise<{ session: Session; profile: Profile }> {
+  const result = await api<{ token: string; account: AccountInfo; profile: Profile }>('/api/login/password', null, { name, password, create });
   return { session: { kind: 'guest', account: result.account, token: result.token }, profile: result.profile };
 }
 

@@ -62,7 +62,7 @@ import {
   fetchMe,
   GOOGLE_CLIENT_ID,
   googleLogin,
-  guestLogin,
+  passwordLogin,
   loadSession,
   logout,
   mountGoogleButton,
@@ -150,8 +150,9 @@ interface App extends Saved {
   /** 這場排位賽的結果。 */
   rankedReport: RankedReport | null;
   leaderboard: LeaderboardRow[] | null;
-  /** 登入畫面輸入的訪客名字。 */
+  /** 登入畫面輸入的帳號名字與密碼。 */
   guestName: string;
+  guestPassword: string;
   /** 畫面上的局面：你的視角。跟電腦打時由 state 算出來，連線時由伺服器送來。 */
   view: PlayerView | null;
   /** 你現在能做的動作。 */
@@ -219,6 +220,7 @@ const app: App = {
   rankedReport: null,
   leaderboard: null,
   guestName: loadName(),
+  guestPassword: '',
 };
 
 /** 登入成功：記住帳號、換成這個帳號的資料與牌組。伺服器帳號另外帶牌位。 */
@@ -254,24 +256,29 @@ function refreshLeaderboard(): void {
   );
 }
 
-/** 開一個訪客帳號（存在伺服器上）。 */
-function onGuestLogin(): void {
+/** 名字＋密碼登入，或開新帳號（存在伺服器上）。 */
+function onPasswordLogin(create: boolean): void {
   const name = app.guestName.trim();
-  if (!name) {
-    app.toast = '取個名字吧，對手會看到';
+  if (!name || !app.guestPassword) {
+    app.toast = '名字和密碼都要填';
     render();
     return;
   }
   app.loggingIn = true;
   render();
-  guestLogin(name).then(
-    ({ session }) =>
-      fetchMe(session as Extract<Session, { token: string }>).then((me) => (me ? signIn(session, me.profile, me) : Promise.reject(new Error('登入失敗')))),
-    (error: unknown) => {
-      Object.assign(app, { loggingIn: false, toast: error instanceof Error ? error.message : '開不了訪客帳號' });
-      render();
-    },
-  );
+  passwordLogin(name, app.guestPassword, create)
+    .then(({ session }) => fetchMe(session as Extract<Session, { token: string }>).then((me) => ({ session, me })))
+    .then(
+      ({ session, me }) => {
+        if (!me) throw new Error('登入失敗');
+        app.guestPassword = '';
+        signIn(session, me.profile, me);
+      },
+      (error: unknown) => {
+        Object.assign(app, { loggingIn: false, toast: error instanceof Error ? error.message : '登入失敗' });
+        render();
+      },
+    );
 }
 
 async function signOut(): Promise<void> {
@@ -1248,10 +1255,15 @@ function loginScreen(): string {
       ${
         ONLINE_AVAILABLE
           ? `<section class="login-card">
-        <p class="d-head">訪客帳號</p>
-        <p class="d-line">取個名字就能玩，金幣、收藏與牌位存在遊戲伺服器上（這個瀏覽器記得你）。可以打排位賽。新帳號送五個基礎英雄的起始牌組與 100 金幣。</p>
-        <label class="field-row"><span>名字</span><input id="guest-name" maxlength="16" placeholder="對手會看到這個名字" value="${esc(app.guestName)}" autocomplete="nickname"></label>
-        <button class="primary big" data-do="login-guest" ${app.loggingIn ? 'disabled' : ''}>用訪客帳號進入</button>
+        <p class="d-head">帳號（名字＋密碼）</p>
+        <p class="d-line">金幣、收藏與牌位存在遊戲伺服器上，登出或換電腦都能用名字和密碼登回來。可以打排位賽。新帳號送五個基礎英雄的起始牌組與 100 金幣。
+          以前的訪客帳號：用原本的名字、設一個新密碼按「登入」就能拿回來（同名的會合併）。</p>
+        <label class="field-row"><span>名字</span><input id="guest-name" maxlength="16" placeholder="對手會看到這個名字" value="${esc(app.guestName)}" autocomplete="username"></label>
+        <label class="field-row"><span>密碼</span><input id="guest-password" type="password" maxlength="200" placeholder="至少 4 個字" value="${esc(app.guestPassword)}" autocomplete="current-password"></label>
+        <div class="login-actions">
+          <button class="primary" data-do="login-password" ${app.loggingIn ? 'disabled' : ''}>登入</button>
+          <button class="ghost" data-do="register-password" ${app.loggingIn ? 'disabled' : ''}>開新帳號</button>
+        </div>
       </section>`
           : ''
       }
@@ -1295,7 +1307,7 @@ function setupScreen(): string {
         : '選一名英雄，跟電腦打一局。對手的英雄隨機，開局時會先告訴你是誰。'
     }</p></div>
       ${who ? `<div class="who">${who.account.picture ? `<img src="${esc(who.account.picture)}" alt="" referrerpolicy="no-referrer">` : ''}
-        <span>${esc(who.account.name)}${who.kind === 'google' ? '<small>Google</small>' : who.kind === 'guest' ? '<small>訪客</small>' : ''}</span>
+        <span>${esc(who.account.name)}${who.kind === 'google' ? '<small>Google</small>' : ''}</span>
         ${who.kind === 'test' ? '<button class="ghost small" data-do="reset-test">重設</button>' : ''}
         <button class="ghost small" data-do="logout">登出</button></div>` : ''}
     </header>
@@ -1343,7 +1355,7 @@ function rankedPanel(blocked: boolean): string {
   }
   if (!app.session || app.session.kind === 'test') {
     return `<section class="mode ranked"><p class="mode-title">牌位</p>
-      <p class="d-line">排位賽要用伺服器上的帳號（訪客或 Google），結果才記得住、也才公平。登出後選「訪客帳號」就能打。</p></section>`;
+      <p class="d-line">排位賽要用伺服器上的帳號（名字＋密碼或 Google），結果才記得住、也才公平。登出後在登入畫面開一個帳號就能打。</p></section>`;
   }
   const rank = app.rank;
   const rows = (app.leaderboard ?? [])
@@ -1647,8 +1659,10 @@ root.addEventListener('click', (event) => {
     app.toast = null;
     render();
     window.scrollTo(0, 0);
-  } else if (command === 'login-guest') {
-    onGuestLogin();
+  } else if (command === 'login-password') {
+    onPasswordLogin(false);
+  } else if (command === 'register-password') {
+    onPasswordLogin(true);
   } else if (command === 'queue') {
     startQueue();
   } else if (command === 'unqueue') {
@@ -1770,6 +1784,8 @@ root.addEventListener('input', (event) => {
     }
   } else if (input.id === 'guest-name') {
     app.guestName = input.value;
+  } else if (input.id === 'guest-password') {
+    app.guestPassword = input.value;
   } else if (input.id === 'room-code') {
     app.roomCode = input.value.toUpperCase();
   }
