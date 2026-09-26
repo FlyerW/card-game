@@ -108,15 +108,15 @@ export function describeEvents(
         lines.push({ text: `　${targetText(event.target)}受到 ${event.amount} 傷害`, tone: 'turn' });
         break;
       case 'hpLost':
-        lines.push({ text: `　${targetText(event.target)}失去 ${event.amount} HP`, tone: 'turn' });
+        lines.push({ text: `　${targetText(event.target)}失去 ${event.amount}♥`, tone: 'turn' });
         break;
       case 'healed':
-        lines.push({ text: `　${targetText(event.target)}回復 ${event.amount} HP`, tone: 'turn' });
+        lines.push({ text: `　${targetText(event.target)}回復 ${event.amount}♥`, tone: 'turn' });
         break;
       case 'buffed': {
         const parts = [];
-        if (event.attack) parts.push(`攻擊 +${event.attack}`);
-        if (event.hp) parts.push(`HP 上限 +${event.hp}`);
+        if (event.attack) parts.push(`⚔ +${event.attack}`);
+        if (event.hp) parts.push(`♥ 上限 +${event.hp}`);
         lines.push({ text: `　${ZONE[event.zone]} ${parts.join('、')}`, tone: 'turn' });
         break;
       }

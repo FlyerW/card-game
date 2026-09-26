@@ -35,21 +35,21 @@ export function describeEffect(effect: Effect): string {
     case 'opponentDiscardRandom':
       return `對手隨機棄 ${effect.count} 張手牌`;
     case 'heal':
-      return `回復 ${effect.amount} HP`;
+      return `回復 ${effect.amount}♥`;
     case 'healAll':
-      return `我方英雄與每隻生物各回復 ${effect.amount} HP`;
+      return `我方英雄與每隻生物各回復 ${effect.amount}♥`;
     case 'destroyCreature':
       return '消滅（直接送進棄牌區，不算傷害）';
     case 'halveHp':
-      return `${effect.all ? '對手每隻生物' : ''}剩餘 HP 減半`;
+      return `${effect.all ? '對手每隻生物' : ''}剩餘 ♥ 減半`;
     case 'taunt':
       return '挑釁（對手下回合的單體傷害必須先打牠）';
     case 'buff': {
       const who = effect.on === 'self' ? '自身' : '目標';
       if (effect.attack === effect.hp) return `${who}增益 ${effect.attack}`;
       const parts: string[] = [];
-      if (effect.attack > 0) parts.push(`攻擊 +${effect.attack}`);
-      if (effect.hp > 0) parts.push(`HP 上限 +${effect.hp}`);
+      if (effect.attack > 0) parts.push(`⚔ +${effect.attack}`);
+      if (effect.hp > 0) parts.push(`♥ 上限 +${effect.hp}`);
       return `${who}${parts.join('、')}`;
     }
     case 'gainMaxEnergy':
@@ -63,7 +63,7 @@ export function describeEffect(effect: Effect): string {
     case 'evolveFromDeck':
       return '用牌庫裡自己的進化卡直接進化';
     case 'poison':
-      return `${effect.all ? '對手每隻生物' : ''}中毒 ${effect.amount}（牠的回合開始時失去 ${effect.amount} HP）`;
+      return `${effect.all ? '對手每隻生物' : ''}中毒 ${effect.amount}（牠的回合開始時失去 ${effect.amount}♥）`;
     case 'burn':
       return `${effect.all ? '對手每隻生物' : ''}灼燒 ${effect.amount}（牠的回合結束時受到 ${effect.amount} 傷害）`;
     case 'paralyze':
@@ -96,25 +96,25 @@ export const describeEntry = (entry: Omit<Ability, 'cost'>): string => `進場 $
 function describeTraits(card: CreatureDef): string[] {
   const lines: string[] = [];
   if (card.keywords?.includes('haste')) lines.push('速攻：召喚當回合就能攻擊或發動技能');
-  if (card.keywords?.includes('lifesteal')) lines.push('吸血：牠造成傷害時（攻擊、反擊、技能），你的英雄回復等量的 HP');
-  if (card.regenerate) lines.push(`再生 ${card.regenerate}：你的回合開始時，牠回復 ${card.regenerate} HP`);
+  if (card.keywords?.includes('lifesteal')) lines.push('吸血：牠造成傷害時（攻擊、反擊、技能），你的英雄回復等量的 ♥');
+  if (card.regenerate) lines.push(`再生 ${card.regenerate}：你的回合開始時，牠回復 ${card.regenerate}♥`);
   return lines;
 }
 
-/** 「我方生物攻擊 +1、HP 上限 +2」這類持續加成的說明。 */
+/** 「我方生物 ⚔ +1、♥ 上限 +2」這類持續加成的說明。 */
 function describeModifier(modifier: CreatureModifier | undefined): string[] {
   const parts: string[] = [];
-  if (modifier?.attack) parts.push(`攻擊 +${modifier.attack}`);
-  if (modifier?.hp) parts.push(`HP 上限 +${modifier.hp}`);
+  if (modifier?.attack) parts.push(`⚔ +${modifier.attack}`);
+  if (modifier?.hp) parts.push(`♥ 上限 +${modifier.hp}`);
   if (modifier?.damageReduction) parts.push(`受到傷害 −${modifier.damageReduction}`);
-  if (modifier?.regenerate) parts.push(`再生 ${modifier.regenerate}（你的回合開始時回復 ${modifier.regenerate} HP）`);
+  if (modifier?.regenerate) parts.push(`再生 ${modifier.regenerate}（你的回合開始時回復 ${modifier.regenerate}♥）`);
   return parts;
 }
 
-/** 「我方生物攻擊 +1」；英文開頭的（HP）前面空一格。 */
+/** 「我方生物 ⚔ +1」；符號開頭的（⚔、♥）前面空一格。 */
 const ourCreatures = (parts: string[]) => {
   const text = parts.join('、');
-  return `我方生物${/^[A-Za-z]/.test(text) ? ' ' : ''}${text}`;
+  return `我方生物${/^[A-Za-z⚔♥]/.test(text) ? ' ' : ''}${text}`;
 };
 
 function describeOwnEffects(creatures: CreatureModifier | undefined, ceilingBonus: number | undefined): string {
@@ -129,10 +129,10 @@ function describeOwnEffects(creatures: CreatureModifier | undefined, ceilingBonu
 function describeFieldTriggers(field: Extract<DeckCardDef, { kind: 'field' }>): string[] {
   const lines: string[] = [];
   if (field.extraDraw) lines.push(`你的回合開始時多抽 ${field.extraDraw} 張`);
-  if (field.heroRegenerate) lines.push(`你的回合開始時，你的英雄回復 ${field.heroRegenerate} HP`);
+  if (field.heroRegenerate) lines.push(`你的回合開始時，你的英雄回復 ${field.heroRegenerate}♥`);
   if (field.enemyDecay) {
-    const drain = field.lifesteal ? '，你的英雄回復等量的 HP（吸血）' : '';
-    lines.push(`你的回合開始時，對手每隻生物失去 ${field.enemyDecay} HP${drain}`);
+    const drain = field.lifesteal ? '，你的英雄回復等量的 ♥（吸血）' : '';
+    lines.push(`你的回合開始時，對手每隻生物失去 ${field.enemyDecay}♥${drain}`);
   }
   return lines;
 }
@@ -148,7 +148,7 @@ export function describeCard(card: DeckCardDef, names: (id: string) => string = 
       const stage = STAGE_NAMES[card.stage];
       const from = card.evolvesFrom === undefined ? '' : `，由${names(card.evolvesFrom)}進化`;
       const entry = card.entry ? [describeEntry(card.entry)] : [];
-      return [`${card.name}　${tag}・${stage}${from}｜${cost}｜攻 ${card.attack}｜HP ${card.hp}`, ...describeTraits(card), ...entry, ...card.skills.map(describeAbility)];
+      return [`${card.name}　${tag}・${stage}${from}｜${cost}｜⚔ ${card.attack}｜♥ ${card.hp}`, ...describeTraits(card), ...entry, ...card.skills.map(describeAbility)];
     }
     case 'spell':
       return [`${card.name}　${tag}・法術｜${cost}`, describeEffects(card)];
@@ -166,7 +166,7 @@ export function describeCard(card: DeckCardDef, names: (id: string) => string = 
     case 'heroEvolution': {
       const lines = [`${card.name}　${tag}・英雄進化｜${cost}｜由${names(card.evolvesFrom)}進化`];
       if (card.entry) lines.push(describeEntry(card.entry));
-      lines.push(`英雄 HP 上限 +${card.hpBonus}`);
+      lines.push(`英雄 ♥ 上限 +${card.hpBonus}`);
       if (card.power) lines.push(`天生技換成 ${describeAbility(card.power)}`);
       if (card.passive) lines.push(`多一個${describePassive(card.passive)}`);
       lines.push('每局只能進化一次');
@@ -185,7 +185,7 @@ function describePassive(passive: HeroPassive): string {
 }
 
 export function describeHero(hero: HeroDef): string[] {
-  const lines = [`${hero.name}　${describeColors(hero.colors)}｜HP ${hero.hp}`];
+  const lines = [`${hero.name}　${describeColors(hero.colors)}｜♥ ${hero.hp}`];
   if (hero.passive) lines.push(describePassive(hero.passive));
   if (hero.power) lines.push(`天生技 ${describeAbility(hero.power)}`);
   if (!hero.passive && !hero.power) lines.push('沒有效果');

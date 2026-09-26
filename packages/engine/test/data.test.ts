@@ -115,14 +115,14 @@ describe('卡面文字', () => {
   it('由資料產生', () => {
     const hound = db.cards.get('hound')!;
     expect(describeCard(hound, (id) => db.cards.get(id)!.name)).toEqual([
-      'hound　R・無色・一階，由pup進化｜能量 2｜攻 2｜HP 10',
+      'hound　R・無色・一階，由pup進化｜能量 2｜⚔ 2｜♥ 10',
       'bite2（能量 1）：〔任意目標〕造成 2 傷害',
       'sniff（能量 1）：抽 1 張牌',
     ]);
   });
 
   it('費用一律寫成「能量 N」，法術不重複寫名字', () => {
-    expect(describeCard(db.cards.get('dart')!)).toEqual(['dart　N・無色・法術｜能量 1', '〔任意目標〕造成 1 傷害，中毒 2（牠的回合開始時失去 2 HP）']);
+    expect(describeCard(db.cards.get('dart')!)).toEqual(['dart　N・無色・法術｜能量 1', '〔任意目標〕造成 1 傷害，中毒 2（牠的回合開始時失去 2♥）']);
   });
 });
 

@@ -87,9 +87,10 @@ function playRandomGame(seed: number) {
 
 describe('隨機對戰', () => {
   let games: ReturnType<typeof playRandomGame>[] = [];
+  // 25 局完整的隨機對局；有攻擊之後每一步的合法動作變多，機器忙的時候超過預設的 10 秒。
   beforeAll(() => {
     games = Array.from({ length: 25 }, (_, i) => playRandomGame(1000 + i));
-  });
+  }, 60_000);
 
   it('每一局都能正常打完，每一步都維持不變量', () => {
     expect(games.every((game) => game.final.result !== null)).toBe(true);

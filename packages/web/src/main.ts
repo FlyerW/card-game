@@ -442,11 +442,11 @@ function lines(texts: string[]): string {
 const myMove = (view: PlayerView) => view.phase === 'main' && view.activePlayer === YOU && !app.busy && !app.pending;
 
 function creatureStatus(cv: CreatureView): string {
-  const tags: string[] = [`攻擊 ${cv.attack}${cv.attackBonus ? `（含加成 +${cv.attackBonus}）` : ''}`, `HP ${cv.hp} / ${cv.maxHp}`];
+  const tags: string[] = [`⚔ ${cv.attack}${cv.attackBonus ? `（含加成 +${cv.attackBonus}）` : ''}`, `♥ ${cv.hp} / ${cv.maxHp}`];
   if (cv.damageReduction) tags.push(`受到傷害 −${cv.damageReduction}`);
   if (cv.item) tags.push(`道具：${nameOf(cv.item)}`);
   if (cv.taunting) tags.push('挑釁中');
-  if (cv.poison) tags.push(`中毒 ${cv.poison}：牠的回合開始時失去 ${cv.poison} HP`);
+  if (cv.poison) tags.push(`中毒 ${cv.poison}：牠的回合開始時失去 ${cv.poison}♥`);
   if (cv.burn) tags.push(`灼燒 ${cv.burn}：牠的回合結束時受到 ${cv.burn} 傷害`);
   if (cv.paralyzed) tags.push('麻痺：不能攻擊、不能發動技能');
   if (cv.silenced) tags.push('沉默：不能發動技能');
@@ -559,7 +559,7 @@ function detail(view: PlayerView): string {
   if (sel.kind === 'hero') {
     const side = sel.player === YOU ? view.you : view.opponent;
     const evolved = side.heroEvolution ? lines(describeCard(card(side.heroEvolution), nameOf)) : '';
-    return toast + lines(describeHero(hero(side.heroId))) + evolved + `<ul class="tags"><li>HP ${side.heroHp} / ${side.heroMaxHp}</li></ul>` + cancel;
+    return toast + lines(describeHero(hero(side.heroId))) + evolved + `<ul class="tags"><li>♥ ${side.heroHp} / ${side.heroMaxHp}</li></ul>` + cancel;
   }
 
   const side = sel.player === YOU ? view.you : view.opponent;
@@ -602,10 +602,10 @@ function zone(cv: CreatureView | null, player: PlayerId, index: number, picks: M
   const buffed = cv.attackBonus > 0 ? ' up' : '';
   // 左上角顯示這隻生物總共花了多少費用，進化過的顯示成 4+3，一眼看出對手在牠身上投資了多少。
   const invested = cv.evolutionChain.map((id) => card(id).cost).join('+');
-  return `<button class="${classes.join(' ')} r-${def.rarity}" data-key="${key}" aria-label="${esc(def.name)}，費用 ${invested}，攻擊 ${cv.attack}，HP ${cv.hp}">
+  return `<button class="${classes.join(' ')} r-${def.rarity}" data-key="${key}" aria-label="${esc(def.name)}，費用 ${invested}，攻擊 ${cv.attack}，血量 ${cv.hp}">
     <span class="z-top"><span class="z-cost">${invested}</span><span class="rarity">${def.rarity}</span>${pips(def.colors)}</span>
     <span class="z-name">${esc(def.name)}</span>
-    <span class="z-stats"><span class="z-atk${buffed}" title="攻擊">⚔<b>${cv.attack}</b></span><span class="z-hp${hurt}" title="HP"><b>${cv.hp}</b><small>/${cv.maxHp}</small></span></span>
+    <span class="z-stats"><span class="z-atk${buffed}" title="攻擊">⚔<b>${cv.attack}</b></span><span class="z-hp${hurt}" title="血量"><i aria-hidden="true">♥</i><b>${cv.hp}</b><small>/${cv.maxHp}</small></span></span>
     <span class="badges">${badges.join('')}</span>
   </button>`;
 }
@@ -629,9 +629,9 @@ function heroPlate(side: SideView, player: PlayerId, picks: Map<string, Action>)
   const extra = player !== YOU ? `<span class="h-hand">手牌 ${side.handCount}</span>` : '';
   const name = side.heroEvolution ? nameOf(side.heroEvolution) : h.name;
   if (side.heroEvolution) classes.push('evolved');
-  return `<button class="${classes.join(' ')}" data-key="${key}" aria-label="${esc(name)}，HP ${side.heroHp}">
+  return `<button class="${classes.join(' ')}" data-key="${key}" aria-label="${esc(name)}，血量 ${side.heroHp}">
     <span class="h-name">${esc(name)}</span>${pips(h.colors)}
-    <span class="h-hp"><b>${side.heroHp}</b><small>/${side.heroMaxHp}</small></span>
+    <span class="h-hp"><i aria-hidden="true">♥</i><b>${side.heroHp}</b><small>/${side.heroMaxHp}</small></span>
     <span class="h-bar"><i style="width:${pct}%"></i></span>${extra}</button>`;
 }
 
@@ -668,7 +668,7 @@ function hand(view: PlayerView): string {
       const def = card(held.cardId);
       const playable = actsForCard(held.uid).length > 0;
       const selected = app.selection?.kind === 'hand' && app.selection.uid === held.uid;
-      const hp = def.kind === 'creature' ? `<span class="c-hp"><span class="c-atk">⚔${def.attack}</span> HP ${def.hp}</span>` : '';
+      const hp = def.kind === 'creature' ? `<span class="c-hp"><span class="c-atk">⚔${def.attack}</span> <span class="c-heart">♥</span>${def.hp}</span>` : '';
       const isEvolution = def.kind === 'creature' && def.stage > 0;
       return `<button class="card k-${def.kind} r-${def.rarity}${playable ? ' playable' : ''}${selected ? ' selected' : ''}" data-hand="${held.uid}">
         <span class="c-cost${isEvolution ? ' evo' : ''}">${isEvolution ? '+' : ''}${def.cost}</span>
@@ -767,7 +767,7 @@ function setupScreen(): string {
     if (evolution) body.push(`可進化為 ${evolution.name}（${evolution.cost}）`);
     const chosen = h.id === app.heroId;
     return `<button class="hero-pick${chosen ? ' chosen' : ''}" data-hero="${h.id}" aria-pressed="${chosen}">
-      <span class="hp-big">${h.hp}</span><span class="hp-unit">HP</span>
+      <span class="hp-big">${h.hp}</span><span class="hp-unit">♥</span>
       <span class="hp-name">${esc(h.name)}</span>${pips(h.colors)}
       <span class="hp-text">${esc(body.join('　'))}</span><span class="sr">${esc(head ?? '')}</span></button>`;
   }).join('');
@@ -797,14 +797,14 @@ function setupScreen(): string {
       <ul>
         <li>能量：先攻第一回合 1 點、後攻 2 點，之後每回合上限 +2，最高 12。每個回合開始時補滿。</li>
         <li>點手牌出牌。生物要選一個空格召喚；道具要選自己的生物；進化卡要點場上對應的生物。</li>
-        <li>每隻生物有攻擊力（⚔）和 HP。HP 滿的是綠色，受過傷的是紅色。</li>
+        <li>每隻生物有攻擊力（⚔）和血量（♥）。血量滿的是綠色，受過傷的是紅色。</li>
         <li>點你的生物，再點發光的對手生物或英雄就是攻擊：不花能量，打生物時對方會用牠的攻擊力反擊，打英雄不會被反擊。也可以改成發動一個技能：要花能量，不會被反擊。攻擊和技能每隻每回合合計一次，召喚當回合都不行（有【速攻】的例外）。</li>
         <li>正對面、斜對角的技能，目標格空著就會打到後面的英雄。</li>
         <li>對手的生物在挑釁時，只能攻擊牠；選得到牠的技能也必須打牠，只打英雄的技能不受影響。</li>
         <li>手牌上限 10 張，滿手時抽到的牌直接進棄牌區。場地卡放在自己的場地區，只強化自己的生物。</li>
-        <li>有些英雄有英雄進化卡：HP 上限增加、天生技變強，每局只能進化一次。</li>
-        <li>異常狀態只會中在生物身上：中毒（回合開始時失去 HP）、灼燒（回合結束時受到傷害）、麻痺（不能攻擊也不能發動技能）、沉默（不能發動技能）、繳械（不能攻擊）、虛弱（攻擊傷害減半）、詛咒（技能傷害減半）。後面五種都到牠的下個回合結束，進化會解除全部。</li>
-        <li>把對手英雄的 HP 打到 0 就贏了。</li>
+        <li>有些英雄有英雄進化卡：血量上限增加、天生技變強，每局只能進化一次。</li>
+        <li>異常狀態只會中在生物身上：中毒（回合開始時失去血量）、灼燒（回合結束時受到傷害）、麻痺（不能攻擊也不能發動技能）、沉默（不能發動技能）、繳械（不能攻擊）、虛弱（攻擊傷害減半）、詛咒（技能傷害減半）。後面五種都到牠的下個回合結束，進化會解除全部。</li>
+        <li>把對手英雄的血量打到 0 就贏了。</li>
       </ul>
       <p class="note">試玩說明：範例卡有 ${SAMPLE_CARDS.length} 張，牌組照正式規則：${DEFAULT_RULES.deckSize} 張、同名最多 ${DEFAULT_RULES.maxCopies} 張、UR 最多 ${DEFAULT_RULES.maxUrCopies} 張、只能放英雄顏色內的卡與無色卡。
         你可以自己組牌；電腦每局自動組一副。電腦用的是模擬平衡時的均衡打法。</p>
