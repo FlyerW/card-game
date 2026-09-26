@@ -62,7 +62,7 @@ export const SAMPLE_HEROES: HeroDef[] = [
     // 潮與影輪流：抽牌用完變成棄牌，棄牌用完又變回抽牌。
     kind: 'hero', id: 'tide-shadow-twins', name: '潮影雙生', rarity: 'UR', colors: ['blue', 'black'], hp: 38,
     power: { name: '潮之面', cost: 3, target: NONE, effects: [{ type: 'draw', count: 1 }] },
-    alternatePower: { name: '影之面', cost: 3, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
+    alternatePower: { name: '影之面', cost: 4, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
   },
   {
     kind: 'hero', id: 'prism-sage', name: '虹彩賢者', rarity: 'UR', colors: ['white', 'blue', 'black', 'red', 'green'], hp: 40,
