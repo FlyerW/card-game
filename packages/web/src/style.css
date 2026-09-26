@@ -334,6 +334,22 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .primary:disabled { filter: grayscale(1) brightness(.6); cursor: default; }
 
 .difficulty { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tut-again { margin-left: auto; }
+
+/* ─── 新手教學 ─── */
+.tut-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  background: linear-gradient(135deg, #1f3a26, var(--mat) 70%); border: 1px solid var(--heal); border-radius: var(--radius); padding: 12px 16px;
+}
+.tutorial {
+  position: relative; margin: 0 auto 10px; max-width: 900px; display: grid; gap: 6px;
+  background: #1f3a26f2; border: 1.5px solid var(--heal); border-radius: 12px; padding: 10px 14px; box-shadow: 0 6px 20px #0008;
+}
+.tut-step { margin: 0; font-size: 12px; color: #a8e0b4; letter-spacing: .06em; }
+.tut-text { margin: 0; font-size: 15px; line-height: 1.5; color: var(--ink); }
+.tut-actions { display: flex; gap: 8px; align-items: center; }
+.tut-glow { outline: 3px solid var(--heal) !important; outline-offset: 3px; animation: tut-pulse 1.2s ease-in-out infinite; }
+@keyframes tut-pulse { 50% { outline-color: #7bd88f55; } }
 
 /* ─── 登入 ─── */
 .login-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
@@ -514,7 +530,7 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
   .b-head { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pick, .float, .pack-row.deal .p-card { animation: none; }
+  .pick, .float, .pack-row.deal .p-card, .tut-glow { animation: none; }
   .float { display: none; }
   .h-bar i { transition: none; }
 }

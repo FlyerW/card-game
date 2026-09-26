@@ -68,6 +68,7 @@ import {
   type Session,
 } from './account';
 import { ONLINE_AVAILABLE, OnlineClient } from './online';
+import { scriptedTurn, startTutorial, STEPS, TUTORIAL_KEY } from './tutorial';
 import { newShop, ownedOf, shopClick, shopScreen, walletBar, type Shop } from './shop';
 import { cardFace, esc, pips } from './ui';
 import './style.css';
@@ -128,7 +129,9 @@ interface Saved {
 
 interface App extends Saved {
   /** 跟電腦打，或連線對戰。 */
-  mode: 'bot' | 'online';
+  mode: 'bot' | 'online' | 'tutorial';
+  /** 新手教學進行到第幾步、對手照劇本打到第幾回合；不在教學就是 null。 */
+  tutorial: { step: number; round: number } | null;
   /** 畫面上的局面：你的視角。跟電腦打時由 state 算出來，連線時由伺服器送來。 */
   view: PlayerView | null;
   /** 你現在能做的動作。 */
@@ -189,6 +192,7 @@ const app: App = {
   profile: newProfile(today(), []),
   shop: newShop(),
   difficulty: loadDifficulty(),
+  tutorial: null,
 };
 
 /** 登入成功：記住帳號、換成這個帳號的資料與牌組。 */
@@ -264,7 +268,7 @@ let settling = false;
 
 /** 對局結束：照勝負、這局的累計與牌組發金幣、推進每日任務。每局只結算一次。 */
 function settle(view: PlayerView): void {
-  if (app.reward || settling || !view.result || !app.backend) return;
+  if (app.reward || settling || !view.result || !app.backend || app.mode === 'tutorial') return;
   const { winner, reason } = view.result;
   const conceded = reason === 'concede' && winner !== YOU;
   const summary = gameSummary(db, app.tally, app.gameDeck, winner === YOU, conceded);
@@ -492,8 +496,14 @@ function step(before: PlayerView, after: PlayerView, legalActions: Action[], eve
 
 // ─── 跟電腦打：完整的狀態在這個瀏覽器裡 ───────────────────────────────────────
 
-const localLegal = (state: GameState): Action[] =>
-  state.phase === 'main' && engine.actor(state) === YOU ? engine.legalActions(state, YOU) : [];
+/** 你現在能做的動作；教學時只留這一步要的。 */
+function localLegal(state: GameState): Action[] {
+  if (state.phase !== 'main' || engine.actor(state) !== YOU) return [];
+  const actions = engine.legalActions(state, YOU);
+  if (app.mode !== 'tutorial' || !app.tutorial) return actions;
+  const allow = STEPS[app.tutorial.step]?.allow;
+  return allow ? actions.filter((action) => allow(action, state)) : [];
+}
 
 function localStep(after: GameState, events: GameEvent[]): void {
   const before = app.view ?? engine.viewFor(after, YOU);
@@ -510,14 +520,97 @@ function perform(action: Action): void {
   }
   const before = app.state;
   if (before === null) return;
+  if (app.mode === 'tutorial' && app.tutorial) {
+    const allow = STEPS[app.tutorial.step]?.allow;
+    if (!allow || !allow(action, before)) {
+      app.toast = '照上面的說明做這一步';
+      render();
+      return;
+    }
+  }
   const result = engine.apply(before, action);
   if (!result.ok) {
     app.toast = result.error.message;
     render();
     return;
   }
+  // 結束回合的那一步，要等對手照劇本打完才進下一步，說明才會跟牌桌對得上。
+  if (app.mode === 'tutorial' && app.tutorial && action.type !== 'endTurn') app.tutorial.step += 1;
   localStep(result.state, result.events);
-  void advance();
+  if (app.mode === 'tutorial') void tutorialOpponent(action);
+  else void advance();
+}
+
+// ─── 新手教學 ────────────────────────────────────────────────────────────────
+
+function startTutorialGame(): void {
+  YOU = 0;
+  Object.assign(app, {
+    mode: 'tutorial',
+    screen: 'play',
+    tutorial: { step: 0, round: 0 },
+    log: [],
+    redraw: [],
+    selection: null,
+    toast: null,
+    view: null,
+  });
+  localStep(startTutorial(engine), []);
+}
+
+/** 你結束回合後，對手照劇本打一回合（稍等一下，看得到發生什麼）。 */
+async function tutorialOpponent(action: Action): Promise<void> {
+  if (action.type !== 'endTurn' || !app.tutorial || !app.state) return;
+  app.busy = true;
+  render();
+  await sleep(BOT_STEP_MS);
+  if (app.mode !== 'tutorial' || !app.tutorial || !app.state) return;
+  const { state, events } = scriptedTurn(engine, app.state, app.tutorial.round);
+  app.tutorial.round += 1;
+  app.tutorial.step += 1;
+  app.busy = false;
+  localStep(state, events);
+}
+
+function leaveTutorial(done: boolean): void {
+  if (done) {
+    try {
+      localStorage.setItem(TUTORIAL_KEY, '1');
+    } catch {
+      // 存不了就下次還會提示一次。
+    }
+  }
+  Object.assign(app, { mode: 'bot', tutorial: null, screen: 'setup', state: null, view: null, selection: null, toast: null, busy: false });
+  render();
+  window.scrollTo(0, 0);
+}
+
+const tutorialDone = (): boolean => {
+  try {
+    return localStorage.getItem(TUTORIAL_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+
+/** 教學的說明框：第幾步、要做什麼；只看說明的步驟有「下一步」。 */
+function tutorialPanel(): string {
+  const tutorial = app.tutorial;
+  if (!tutorial) return '';
+  const current = STEPS[tutorial.step];
+  if (!current) return '';
+  const last = tutorial.step === STEPS.length - 1;
+  const waiting = app.busy ? '<p class="tut-text">對手的回合……</p>' : '';
+  const action = last
+    ? '<button class="primary" data-do="tut-finish">完成教學</button>'
+    : current.allow
+      ? ''
+      : '<button class="primary" data-do="tut-next">下一步</button>';
+  return `<div class="tutorial" role="status">
+    <p class="tut-step">新手教學 ${tutorial.step + 1}/${STEPS.length}・${esc(current.title)}</p>
+    ${waiting || `<p class="tut-text">${esc(current.text)}</p>`}
+    <div class="tut-actions">${action}<button class="ghost small" data-do="tut-leave">離開教學</button></div>
+  </div>`;
 }
 
 /** 跟電腦打：輪到電腦就讓它一步一步慢慢播，看得清楚它做了什麼；輪到你時停下來。 */
@@ -1008,7 +1101,7 @@ function playScreen(): string {
         : `第 ${view.turn} 回合・${view.activePlayer === YOU ? '你的回合' : `${themName()}的回合`}`;
   const turnButton = `<button class="end-turn" data-do="end" ${myTurn ? '' : 'disabled'}>結束回合</button>`;
   const log = app.log.map((l) => `<li class="t-${l.tone}">${esc(l.text)}</li>`).join('');
-  return `<div class="table">
+  return `${tutorialPanel()}<div class="table">
     <section class="board${picks.size ? ' targeting' : ''}" aria-label="牌桌">
       ${sideRows(view.opponent, THEM(), picks, view)}
       <div class="midline"><span class="turn">${banner}</span>
@@ -1089,6 +1182,12 @@ function setupScreen(): string {
         ${who.kind === 'test' ? '<button class="ghost small" data-do="reset-test">重設</button>' : ''}
         <button class="ghost small" data-do="logout">登出</button></div>` : ''}
     </header>
+    ${
+      tutorialDone()
+        ? ''
+        : `<section class="tut-banner"><div><p class="d-head">第一次玩？</p><p class="d-line">先玩一場新手教學，大約 3 分鐘，一步一步帶你召喚、攻擊、放技能、進化。</p></div>
+      <button class="primary" data-do="tut-start">開始新手教學</button></section>`
+    }
     ${walletBar(app.profile)}
     <div class="heroes">${heroes}</div>
     <section class="deck-bar">
@@ -1099,7 +1198,8 @@ function setupScreen(): string {
       ${(['normal', 'hard'] as const)
         .map((d) => `<button class="chip${app.difficulty === d ? ' on' : ''}" data-difficulty="${d}" aria-pressed="${app.difficulty === d}">${d === 'normal' ? '普通' : '困難'}</button>`)
         .join('')}
-      <span class="d-line">${app.difficulty === 'normal' ? '只看眼前這一步，適合剛上手' : '會規劃整個回合、提防你下回合的攻擊'}</span></section>
+      <span class="d-line">${app.difficulty === 'normal' ? '只看眼前這一步，適合剛上手' : '會規劃整個回合、提防你下回合的攻擊'}</span>
+      ${tutorialDone() ? '<button class="ghost small tut-again" data-do="tut-start">新手教學</button>' : ''}</section>
     ${ONLINE_AVAILABLE ? onlineSetup(problems.length > 0) : `<button class="primary big" data-do="start" ${problems.length ? 'disabled' : ''}>開始對戰</button>`}
     ${app.toast ? `<p class="toast" role="alert">${esc(app.toast)}</p>` : ''}
     <section class="howto">
@@ -1191,6 +1291,12 @@ function render(): void {
             ? lobbyScreen()
             : playScreen();
   const googleSlot = document.getElementById('google-button');
+  // 教學：把這一步要點的地方標亮。
+  if (app.mode === 'tutorial' && app.tutorial && app.state && app.screen === 'play') {
+    for (const selector of STEPS[app.tutorial.step]?.highlight?.(app.state) ?? []) {
+      root.querySelectorAll(selector).forEach((el) => el.classList.add('tut-glow'));
+    }
+  }
   if (googleSlot) mountGoogleButton(googleSlot, onGoogleCredential).catch((error: unknown) => {
     googleSlot.textContent = error instanceof Error ? error.message : '載入不了 Google 登入';
   });
@@ -1406,8 +1512,19 @@ root.addEventListener('click', (event) => {
       app.toast = '這個畫面不能切換全螢幕，可以改用瀏覽器的全螢幕（F11）。';
       render();
     });
+  } else if (command === 'tut-start') {
+    startTutorialGame();
+  } else if (command === 'tut-next' && app.tutorial) {
+    app.tutorial.step += 1;
+    app.legalActions = app.state ? localLegal(app.state) : [];
+    render();
+  } else if (command === 'tut-finish') {
+    leaveTutorial(true);
+  } else if (command === 'tut-leave') {
+    leaveTutorial(false);
   } else if (command === 'concede') {
-    perform({ type: 'concede', player: YOU });
+    if (app.mode === 'tutorial') leaveTutorial(false);
+    else perform({ type: 'concede', player: YOU });
   } else if (command === 'power') {
     chooseAbility(actsForPower(), { kind: 'heroPower' });
   } else if (command === 'direct' && app.selection?.kind === 'hand') {
@@ -1458,11 +1575,11 @@ const hot = (window as unknown as { claude?: { hot?: Hot } }).claude?.hot;
 // 只保留跟電腦打的對局；連線對戰的狀態在伺服器上，重新連線就回得去。
 hot?.snapshot?.(() => ({
   format: SAVE_FORMAT,
-  screen: app.mode === 'online' ? 'setup' : app.screen,
+  screen: app.mode === 'bot' ? app.screen : 'setup',
   heroId: app.heroId,
   decks: app.decks,
-  state: app.mode === 'online' ? null : app.state,
-  log: app.mode === 'online' ? [] : app.log,
+  state: app.mode === 'bot' ? app.state : null,
+  log: app.mode === 'bot' ? app.log : [],
   redraw: app.redraw,
   gameDeck: app.gameDeck,
   tally: app.tally,

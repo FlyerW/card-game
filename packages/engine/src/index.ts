@@ -27,6 +27,8 @@ export { RuleError } from './errors';
 export type { ErrorCode } from './errors';
 export * from './describe';
 export { eventsFor } from './view';
+/** 教學與工具用：做一隻剛進場的生物（直接放進格子，不經過召喚）。 */
+export { newCreature } from './resolve';
 export type { CreatureView, PlayerView, SideView } from './view';
 export { SAMPLE_CARDS, SAMPLE_HEROES, sampleDb } from './cards/sample';
 export * from './types';
