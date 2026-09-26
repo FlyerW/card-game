@@ -34,7 +34,7 @@ export const SAMPLE_HEROES: HeroDef[] = [
   // 英雄 HP 的起點是 55 − 3 ×（顏色數 − 1）− 效果強度，再照模擬調整。
   // 單色的五個是基礎英雄，每個人都有；雙色以上的是 UR，要從卡包抽到。
   {
-    kind: 'hero', id: 'nameless-swordsman', name: '無名劍士', colors: ['white'], hp: 52,
+    kind: 'hero', id: 'nameless-swordsman', name: '無名劍士', colors: ['white'], hp: 50,
     passive: { name: '劍士之道', creatures: { attack: 1 }, pierce: true },
   },
   {
@@ -65,7 +65,7 @@ export const SAMPLE_HEROES: HeroDef[] = [
     alternatePower: { name: '影之面', cost: 4, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
   },
   {
-    kind: 'hero', id: 'prism-sage', name: '虹彩賢者', rarity: 'UR', colors: ['white', 'blue', 'black', 'red', 'green'], hp: 40,
+    kind: 'hero', id: 'prism-sage', name: '虹彩賢者', rarity: 'UR', colors: ['white', 'blue', 'black', 'red', 'green'], hp: 43,
     power: { name: '稜光', cost: 3, target: NONE, effects: [{ type: 'buff', attack: 1, hp: 1, on: 'all' }] },
   },
 ];
@@ -244,7 +244,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'kraken', name: '深海巨妖', rarity: 'SR', colors: ['blue'], race: 'beast',
-    stage: 0, cost: 9, attack: 9, hp: 12,
+    stage: 0, cost: 9, attack: 9, hp: 11,
     entry: { name: '萬觸纏身', target: NONE, effects: [{ type: 'paralyze', all: true }] },
     skills: [{ name: '纏繞', cost: 5, target: CREATURE, effects: [{ type: 'damage', amount: 5 }, { type: 'paralyze' }] }],
   },
@@ -327,10 +327,10 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'abyss-devourer', name: '深淵吞噬者', rarity: 'UR', colors: ['black'], race: 'undead',
-    stage: 0, cost: 8, attack: 9, hp: 11,
+    stage: 0, cost: 8, attack: 7, hp: 9,
     skills: [
-      { name: '深淵獻祭', cost: 0, maxEnergyCost: 5, target: ANY, effects: [{ type: 'damage', amount: 7 }] },
-      hit('深淵之觸', 5, CREATURE, 7),
+      { name: '深淵獻祭', cost: 0, maxEnergyCost: 5, target: ANY, effects: [{ type: 'damage', amount: 6 }] },
+      hit('深淵之觸', 6, CREATURE, 7),
     ],
   },
   {
@@ -439,10 +439,10 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   {
     // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物（見開頭：數值照 R、技能貴 1 費）。
     kind: 'creature', id: 'ancient-bear-god', name: '古樹熊神', rarity: 'UR', colors: ['green'], race: 'beast',
-    stage: 0, cost: 8, attack: 8, hp: 8, keywords: ['lifesteal'],
+    stage: 0, cost: 8, attack: 6, hp: 9, regenerate: 2,
     skills: [
-      { name: '森之怒', cost: 6, target: CREATURE, effects: [{ type: 'damage', amount: 7 }, { type: 'buff', attack: 1, hp: 1, on: 'self' }] },
-      { name: '大地震', cost: 7, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] },
+      { name: '森之怒', cost: 7, target: CREATURE, effects: [{ type: 'damage', amount: 5 }] },
+      { name: '大地震', cost: 7, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] },
     ],
   },
   {
@@ -486,13 +486,13 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     kind: 'creature', id: 'mountain-giant', name: '山嶺巨人', rarity: 'SR', colors: ['green'], race: 'elemental',
     stage: 0, cost: 10, attack: 10, hp: 13,
     entry: { name: '大地之息', target: NONE, effects: [{ type: 'healAll', amount: 5 }] },
-    skills: [{ name: '山崩', cost: 6, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }],
+    skills: [{ name: '山崩', cost: 6, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] }],
   },
   {
     kind: 'creature', id: 'earth-titan', name: '大地泰坦', rarity: 'UR', colors: ['green'], race: 'elemental',
-    stage: 0, cost: 12, attack: 14, hp: 15,
-    entry: { name: '震地', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] },
-    skills: [hit('泰坦之拳', 5, CREATURE, 7), { name: '地裂', cost: 6, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }],
+    stage: 0, cost: 12, attack: 13, hp: 14,
+    entry: { name: '震地', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 1 }] },
+    skills: [hit('泰坦之拳', 5, CREATURE, 7), { name: '地裂', cost: 6, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] }],
   },
   {
     kind: 'spell', id: 'giant-growth', name: '巨化術', rarity: 'R', colors: ['green'], cost: 2,

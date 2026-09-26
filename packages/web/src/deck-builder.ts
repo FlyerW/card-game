@@ -10,7 +10,7 @@ import {
   type DeckCardDef,
 } from '@card-game/engine';
 import { buildDeck } from '@card-game/sim/deck';
-import { esc, kindLabel, pips } from './ui';
+import { cardFace, esc, pips } from './ui';
 
 // 組牌：照正式規則，30 張、同名最多 2 張、UR 最多 1 張、只能放英雄顏色內的卡與無色卡；
 // 而且只能放收藏裡有的卡，張數不超過擁有的。
@@ -148,17 +148,10 @@ const byCost = (x: DeckCardDef, y: DeckCardDef) =>
 
 function poolCard(db: CardDb, card: DeckCardDef, deck: readonly string[], focus: string | null, owned: Owned): string {
   const n = count(deck, card.id);
-  const hp = card.kind === 'creature' ? `<span class="c-hp"><span class="c-atk">⚔${card.attack}</span> <span class="c-heart">♥</span>${card.hp}</span>` : '';
-  const evo = card.kind === 'creature' && card.stage > 0;
   const addWhy = addProblem(db, deck, card.id, owned);
   const have = owned(card);
   return `<div class="pool-card${n ? ' in-deck' : ''}${have === 0 ? ' unowned' : ''}${focus === card.id ? ' focused' : ''}">
-    <button class="card k-${card.kind} r-${card.rarity}" data-focus="${card.id}" aria-label="${esc(card.name)}，看說明">
-      <span class="c-cost${evo ? ' evo' : ''}">${evo ? '+' : ''}${card.cost}</span>
-      <span class="c-top"><span class="rarity">${card.rarity}</span>${pips(card.colors)}</span>
-      <span class="c-name">${esc(card.name)}</span>
-      <span class="c-kind">${kindLabel(card)}</span>${hp}
-    </button>
+    ${cardFace(card, { attrs: `data-focus="${card.id}" aria-label="${esc(card.name)}，看說明"` })}
     <div class="pc-count">
       <button data-remove="${card.id}" ${n === 0 ? 'disabled' : ''} aria-label="拿掉一張${esc(card.name)}">−</button>
       <span>${have === 0 ? '未擁有' : `<b>${n}</b>/${have}`}</span>

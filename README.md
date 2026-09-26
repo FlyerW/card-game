@@ -20,7 +20,7 @@
 - [x] 登入：測試帳號（10000 金幣、全卡，存在瀏覽器）或 Google 帳號（存在伺服器），見下面「Google 登入」
 - [ ] 網頁客戶端
 - [ ] 配對、牌位；牌組存到伺服器（目前存在瀏覽器裡）
-- [ ] 卡牌插圖（AI 畫）
+- [x] 卡牌插圖：AI 畫的試玩用插圖（`python3 packages/web/scripts/art.py`，見 [docs/art.md](docs/art.md)）
 
 範例卡牌見 [docs/cards.md](docs/cards.md)。
 
@@ -144,7 +144,10 @@ packages/web/             網頁試玩版（Vite）
 ├── src/shop.ts           卡包與收藏畫面、開局畫面的金幣與每日任務
 ├── src/online.ts         連線對戰：連到伺服器、斷線自動回到座位
 ├── src/log.ts            把引擎事件翻成對戰紀錄
-├── src/ui.ts             共用的小工具
+├── src/ui.ts             共用的小工具與卡面（名字置中、插圖、右下角攻血）
 ├── src/style.css         牌桌樣式，配色沿用 docs/board.svg
-└── scripts/artifact.mjs  把打包結果合成單一 HTML 檔
+├── public/art/           卡牌插圖（<卡牌 id>.webp）
+├── art/subjects.json     每張卡插圖的畫面描述
+├── scripts/art.py        用 AI 繪圖服務產生插圖
+└── scripts/artifact.mjs  把打包結果合成單一 HTML 檔（插圖另外放在 art/）
 ```

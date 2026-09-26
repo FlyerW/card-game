@@ -7,8 +7,8 @@
 
 | | |
 |---|---|
-| 比例 | 直式 3:4（例如 768×1024），主體在中間偏上，下面三分之一之後會被文字蓋住 |
-| 格式 | WebP，檔名用卡牌 id：`art/seraph.webp`、`art/jelly-empress.webp`（id 見 [cards.md](cards.md) 或 `sample.ts`） |
+| 比例 | 卡面的插圖框是 4:3（320×240），主體放中間 |
+| 格式 | WebP，檔名用卡牌 id：`packages/web/public/art/seraph.webp`（id 見 [cards.md](cards.md) 或 `sample.ts`） |
 | 英雄 | 同樣 3:4，胸像或半身，`art/hero-flame-lord.webp` |
 | 場地、法術 | 場景或效果本身，不一定要有角色 |
 
@@ -65,6 +65,20 @@ text, letters, numbers, logo, watermark, card frame, border, UI, blurry, extra l
 | 士兵（白 衍生物） | a young foot soldier with a spear and round shield, simple standing pose, ivory and gold, plain background |
 | 烈焰吞噬（紅 法術） | a torrent of flame swallowing a silhouetted creature, no clear face, orange-red fire filling the frame |
 | 聖域（白 場地） | a sunlit marble sanctuary with a glowing altar, rays of light through tall columns, no characters |
+
+## 產生卡圖
+
+```bash
+python3 packages/web/scripts/art.py            # 畫所有還沒有圖的卡
+python3 packages/web/scripts/art.py seraph     # 只重畫某幾張（先刪掉舊的 webp）
+```
+
+- 每張卡的畫面描述在 `packages/web/art/subjects.json`（英文），腳本會加上上面的統一風格與顏色的色調。
+  新增卡牌時要在這裡加一行描述，不然腳本會提醒。
+- 目前用 [pollinations.ai](https://pollinations.ai) 的免費 AI 繪圖：一次只接一個請求，大約 45 秒一張；
+  圖的右下角有浮水印，腳本會裁掉，只留上方 4:3 的一塊，存成 320×240 的 WebP（每張 3–6 KB）。
+- 每張卡用固定的 seed，重跑會得到同一張。想換一張就刪掉那張 webp、改描述後再跑。
+- **這是試玩用的圖**。正式上線前請改用有商業授權的繪圖服務，或請畫師照這份指南畫。
 
 ## 注意
 

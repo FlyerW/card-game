@@ -69,7 +69,7 @@ import {
 } from './account';
 import { ONLINE_AVAILABLE, OnlineClient } from './online';
 import { newShop, ownedOf, shopClick, shopScreen, walletBar, type Shop } from './shop';
-import { esc, kindLabel, pips } from './ui';
+import { cardFace, esc, pips } from './ui';
 import './style.css';
 
 const db = sampleDb();
@@ -882,13 +882,10 @@ function hand(view: PlayerView): string {
       const def = card(held.cardId);
       const playable = actsForCard(held.uid).length > 0;
       const selected = app.selection?.kind === 'hand' && app.selection.uid === held.uid;
-      const hp = def.kind === 'creature' ? `<span class="c-hp"><span class="c-atk">⚔${def.attack}</span> <span class="c-heart">♥</span>${def.hp}</span>` : '';
-      const isEvolution = def.kind === 'creature' && def.stage > 0;
-      return `<button class="card k-${def.kind} r-${def.rarity}${playable ? ' playable' : ''}${selected ? ' selected' : ''}" data-hand="${held.uid}">
-        <span class="c-cost${isEvolution ? ' evo' : ''}">${isEvolution ? '+' : ''}${def.cost}</span>
-        <span class="c-top"><span class="rarity">${def.rarity}</span>${pips(def.colors)}</span>
-        <span class="c-name">${esc(def.name)}</span>
-        <span class="c-kind">${kindLabel(def)}</span>${hp}</button>`;
+      return cardFace(def, {
+        attrs: `data-hand="${held.uid}"`,
+        classes: [...(playable ? ['playable'] : []), ...(selected ? ['selected'] : [])],
+      });
     })
     .join('');
   return `<div class="hand" aria-label="你的手牌">${cards || '<p class="empty-hand">沒有手牌</p>'}</div>`;
@@ -902,12 +899,11 @@ function overlay(view: PlayerView): string {
       .map((held) => {
         const def = card(held.cardId);
         const picked = app.picks.includes(held.uid);
-        const stats = def.kind === 'creature' ? `<span class="c-hp"><span class="c-atk">⚔${def.attack}</span> <span class="c-heart">♥</span>${def.hp}</span>` : '';
-        return `<button class="card k-${def.kind} r-${def.rarity}${picked ? ' picked' : ''}" data-pick="${held.uid}" aria-pressed="${picked}">
-          <span class="c-cost">${def.cost}</span>
-          <span class="c-top"><span class="rarity">${def.rarity}</span>${pips(def.colors)}</span>
-          <span class="c-name">${esc(def.name)}</span><span class="c-kind">${kindLabel(def)}</span>${stats}
-          ${picked ? '<span class="c-mark">加入手牌</span>' : ''}</button>`;
+        return cardFace(def, {
+          attrs: `data-pick="${held.uid}" aria-pressed="${picked}"`,
+          classes: picked ? ['picked'] : [],
+          ...(picked ? { mark: '加入手牌' } : {}),
+        });
       })
       .join('');
     const focus = app.picks.length > 0 ? lines(describeCard(card(shown.find((c) => c.uid === app.picks.at(-1))!.cardId), nameOf)) : '';
@@ -925,18 +921,18 @@ function overlay(view: PlayerView): string {
       .map((held) => {
         const def = card(held.cardId);
         const marked = app.redraw.includes(held.uid);
-        return `<button class="card k-${def.kind} r-${def.rarity}${marked ? ' marked' : ''}" data-mull="${held.uid}" aria-pressed="${marked}">
-          <span class="c-cost">${def.cost}</span>
-          <span class="c-top"><span class="rarity">${def.rarity}</span>${pips(def.colors)}</span>
-          <span class="c-name">${esc(def.name)}</span><span class="c-kind">${kindLabel(def)}</span>
-          ${marked ? '<span class="c-mark">重抽</span>' : ''}</button>`;
+        return cardFace(def, {
+          attrs: `data-mull="${held.uid}" aria-pressed="${marked}"`,
+          classes: marked ? ['marked'] : [],
+          ...(marked ? { mark: '重抽' } : {}),
+        });
       })
       .join('');
     const plate = (id: string, label: string) =>
       `<div class="vs-hero"><span class="vs-label">${label}</span>${lines(describeHero(hero(id)))}</div>`;
     return `<div class="overlay"><div class="dialog" role="dialog" aria-label="起手">
       <h2>起手</h2>
-      <p class="d-line">你是<b>${first ? '先攻' : '後攻'}</b>，${first ? '第一回合 1 點能量' : '第一回合 2 點能量'}。先看對手是誰，再決定要不要重抽。</p>
+      <p class="d-line">你是<b>${first ? '先攻' : '後攻'}</b>，${first ? '第一回合 1 點能量' : '第一回合 3 點能量（能量上限 2，後攻多補 1 點）'}。先看對手是誰，再決定要不要重抽。</p>
       <div class="versus">${plate(view.you.heroId, '你')}${plate(view.opponent.heroId, '對手')}</div>
       <p class="d-line">點選要洗回牌庫重抽的牌，可以選任意張，只能重抽一次。</p>
       <div class="mull-hand">${cards}</div>
@@ -1085,7 +1081,7 @@ function setupScreen(): string {
     <section class="howto">
       <h2>怎麼玩</h2>
       <ul>
-        <li>能量：先攻第一回合 1 點、後攻 2 點，之後每回合上限 +2，最高 12。每個回合開始時補滿。</li>
+        <li>能量：先攻第一回合 1 點、後攻 2 點（後攻第一回合再多補 1 點），之後每回合上限 +2，最高 12。每個回合開始時補滿。</li>
         <li>點手牌出牌。生物要選一個空格召喚；道具要選自己的生物；進化卡要點場上對應的生物。</li>
         <li>每隻生物有攻擊力（⚔）和血量（♥）。血量滿的是綠色，受過傷的是紅色。</li>
         <li>點你的生物，再點發光的對手生物或英雄就是攻擊：不花能量，只打得到正前方與左右兩個斜對角的生物，那幾格有一格空著就能打到英雄。打生物時對方會用牠的攻擊力反擊，打英雄不會被反擊。技能要花能量，不會被反擊。攻擊和技能每隻每回合各一次，可以都用；召喚當回合都不行（有【速攻】的例外；進化卡都算有速攻，召喚當回合就能進化、進化完馬上能動）。</li>

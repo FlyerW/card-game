@@ -13,7 +13,7 @@ import {
 } from '@card-game/engine';
 import { ECONOMY, packItems, questDef, type PackCard, type PackItem, type Profile } from '@card-game/economy';
 import type { Backend } from './account';
-import { esc, kindLabel, pips } from './ui';
+import { cardFace, esc, pips } from './ui';
 
 // 卡包與收藏：金幣、開卡包、兌換卷。規則在 @card-game/economy，這裡只負責畫面；
 // 開卡包與兌換交給登入的帳號（測試帳號在瀏覽器裡算，Google 帳號交給伺服器）。
@@ -86,26 +86,8 @@ const costOf = (def: DeckCardDef | HeroDef) => (def.kind === 'hero' ? -1 : def.c
 const RARITY_ORDER = (x: Collectible, y: Collectible) =>
   RARITIES.indexOf(y.rarity) - RARITIES.indexOf(x.rarity) || costOf(x.def) - costOf(y.def) || x.name.localeCompare(y.name, 'zh-Hant');
 
-/** 卡面；UR 英雄畫成英雄的樣子（沒有費用，寫 HP）。 */
-function itemFace(def: DeckCardDef | HeroDef, attrs: string): string {
-  if (def.kind !== 'hero') return face(def, attrs);
-  return `<button class="card k-hero r-UR" ${attrs}>
-      <span class="c-top"><span class="rarity">UR</span>${pips(def.colors)}</span>
-      <span class="c-name">${esc(def.name)}</span>
-      <span class="c-kind">英雄</span><span class="c-hp"><span class="c-heart">♥</span>${def.hp}</span>
-    </button>`;
-}
-
-function face(card: DeckCardDef, attrs: string, extra = ''): string {
-  const hp = card.kind === 'creature' ? `<span class="c-hp"><span class="c-atk">⚔${card.attack}</span> <span class="c-heart">♥</span>${card.hp}</span>` : '';
-  const evo = card.kind === 'creature' && card.stage > 0;
-  return `<button class="card k-${card.kind} r-${card.rarity}" ${attrs}>
-      <span class="c-cost${evo ? ' evo' : ''}">${evo ? '+' : ''}${card.cost}</span>
-      <span class="c-top"><span class="rarity">${card.rarity}</span>${pips(card.colors)}</span>
-      <span class="c-name">${esc(card.name)}</span>
-      <span class="c-kind">${kindLabel(card)}</span>${hp}${extra}
-    </button>`;
-}
+/** 卡面：跟牌桌同一套；UR 英雄沒有費用，寫 HP。 */
+const itemFace = (def: DeckCardDef | HeroDef, attrs: string): string => cardFace(def, { attrs });
 
 function packRow(db: CardDb, profile: Profile, opened: PackCard[], dealing: boolean): string {
   const cards = opened

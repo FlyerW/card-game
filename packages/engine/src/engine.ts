@@ -613,10 +613,13 @@ export function createEngine(db: CardDb) {
         const p = state.players[player];
         p.deck = config.players[player].deck.map((cardId) => ({ uid: state.nextUid++, cardId }));
         shuffle(ctx, p.deck);
-        drawCards(ctx, player, rules.startingHand);
       }
       state.firstPlayer = randomInt(ctx, 2) as PlayerId;
       state.activePlayer = state.firstPlayer;
+      // 後攻補償：後攻的起手多抽幾張。
+      for (const player of [0, 1] as const) {
+        drawCards(ctx, player, rules.startingHand + (player === state.firstPlayer ? 0 : rules.secondPlayerBonusCards));
+      }
     });
   }
 

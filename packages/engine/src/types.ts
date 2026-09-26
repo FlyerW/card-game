@@ -286,6 +286,8 @@ export interface Rules {
   baseCeiling: number;
   /** 後攻玩家第一個回合額外給的一次性能量。舊制用；新制由 startingMaxEnergy 補償，設為 0。 */
   secondPlayerBonusEnergy: number;
+  /** 後攻的起手多抽幾張（後攻補償）。 */
+  secondPlayerBonusCards: number;
 }
 
 // ─── 遊戲狀態 ────────────────────────────────────────────────────────────────

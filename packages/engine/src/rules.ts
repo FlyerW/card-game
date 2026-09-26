@@ -16,7 +16,8 @@ export const DEFAULT_RULES: Rules = {
   startingMaxEnergy: [1, 2],
   energyGrowth: 2,
   baseCeiling: 12,
-  secondPlayerBonusEnergy: 0,
+  secondPlayerBonusEnergy: 1,
+  secondPlayerBonusCards: 0,
 };
 
 /** v0.3 的舊制：雙方從 1 開始每回合 +1，最高 10，後攻第一回合補 1 點。留著方便比較兩種規則。 */

@@ -213,11 +213,24 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 /* ─── 手牌 ─── */
 .hand { display: flex; gap: 8px; overflow-x: auto; padding: 8px 2px 6px; margin-top: 4px; border-top: 1px solid var(--mat-edge); }
 .empty-hand { color: var(--ink-faint); margin: 8px; }
+/* 卡面：上排名字置中（左上角費用、右上角顏色），中間插圖，下排左邊稀有度與種類、右邊 ⚔ ♥ */
 .card {
-  flex: none; width: 104px; min-height: 132px; position: relative; display: grid; grid-template-rows: auto auto 1fr auto auto;
-  gap: 2px; text-align: left; padding: 8px 8px 6px; border-radius: var(--radius);
+  flex: none; width: 104px; min-height: 140px; position: relative; display: grid; grid-template-rows: auto 1fr auto;
+  gap: 4px; text-align: left; padding: 6px 6px 5px; border-radius: var(--radius);
   background: linear-gradient(180deg, #2c3e4c, #22313d); border: 1.5px solid #4c6275;
 }
+.card > .pips { position: absolute; top: 7px; right: 6px; }
+.c-art {
+  display: block; min-height: 52px; border-radius: 5px; box-shadow: inset 0 0 0 1px #0006;
+  background: var(--art) center / cover no-repeat, var(--art-tint, linear-gradient(160deg, #3a4a57, #1d2830));
+}
+.art-white { --art-tint: linear-gradient(160deg, #6b6250, #2e2a22); }
+.art-blue { --art-tint: linear-gradient(160deg, #2c5a7a, #122536); }
+.art-black { --art-tint: linear-gradient(160deg, #4b3b5c, #1a1522); }
+.art-red { --art-tint: linear-gradient(160deg, #7a3a2a, #2a130e); }
+.art-green { --art-tint: linear-gradient(160deg, #3f6a3a, #172616); }
+.c-foot { display: flex; justify-content: space-between; align-items: flex-end; gap: 4px; min-width: 0; }
+.c-foot .rarity { margin-right: 3px; }
 .card.k-spell { background: linear-gradient(180deg, #2c3350, #232a42); }
 .card.k-item { background: linear-gradient(180deg, #3a3346, #2d2838); }
 .card.k-field { background: linear-gradient(180deg, #2c3d2a, #233020); }
@@ -233,16 +246,18 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
   content: ''; position: absolute; inset: 3px; z-index: -1; background: var(--energy);
   border-radius: 4px; transform: rotate(45deg); box-shadow: 0 0 0 1.5px #0c2530;
 }
-.c-top { display: flex; justify-content: space-between; align-items: center; padding-left: 16px; }
-.c-name { font: 700 14px/1.25 var(--display); margin-top: 4px; word-break: break-all; }
-.c-kind { font-size: 11px; color: var(--ink-soft); }
-.c-hp { font: 600 14px var(--num); color: var(--ink); }
+.c-name { font: 700 13.5px/1.25 var(--display); text-align: center; padding: 0 12px 0 14px; word-break: break-all; }
+.c-kind { font-size: 10.5px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.c-hp { font: 600 14px var(--num); color: var(--ink); white-space: nowrap; margin-left: auto; }
 .card.marked { border-color: var(--damage); opacity: .7; }
 .card.picked { border-color: var(--pick); box-shadow: 0 0 0 2px #f0b35a66; }
-/* 選中的牌：標籤放在卡片上緣，不蓋住攻擊與血量 */
-.card.picked .c-mark { inset: -9px auto auto 50%; translate: -50% 0; background: var(--pick); color: #1d1408; padding: 0 6px; border-radius: 4px; white-space: nowrap; }
+/* 標籤放在卡片上緣，不蓋住名字、攻擊與血量 */
+.card.picked .c-mark { background: var(--pick); color: #1d1408; }
 .pick-focus { background: #0003; border-radius: var(--radius); padding: 8px 10px; display: grid; gap: 2px; }
-.c-mark { position: absolute; inset: auto 6px 6px auto; font-size: 11px; font-weight: 700; color: var(--damage); }
+.c-mark {
+  position: absolute; inset: -9px auto auto 50%; translate: -50% 0; padding: 0 6px; border-radius: 4px; white-space: nowrap;
+  font-size: 11px; font-weight: 700; background: var(--damage); color: #2a0d08;
+}
 
 /* ─── 右側：說明與紀錄 ─── */
 .panel { display: grid; grid-template-rows: auto minmax(160px, 1fr) auto; gap: 10px; min-width: 0; max-height: calc(100vh - 24px); position: sticky; top: 12px; }
@@ -360,7 +375,7 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .pack-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 18px 14px; padding: 18px 8px 8px; }
 .p-card { display: grid; justify-items: center; gap: 8px; }
 .pack-row.deal .p-card { animation: deal .45s calc(var(--i) * .18s) both ease-out; }
-.p-card .card { width: 120px; min-height: 150px; }
+.p-card .card { width: 130px; min-height: 170px; }
 .p-card .card.r-SR { box-shadow: 0 0 14px #c38bff88; border-color: var(--r-sr); }
 .p-card .card.r-UR { box-shadow: 0 0 20px #ffcf5aaa; border-color: var(--r-ur); }
 .p-card .card.r-R { border-color: var(--r-r); }
@@ -408,7 +423,7 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .pool { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 14px 10px; padding: 8px 0 0 8px; }
 /* 卡片與下面的 − ＋ 一樣寬，太寬的欄位就置中，＋ 不會跑到卡片外面 */
 .pool-card { display: grid; gap: 4px; min-width: 0; width: 100%; max-width: 132px; justify-self: center; }
-.pool .pool-card .card { width: 100%; min-height: 128px; }
+.pool .pool-card .card { width: 100%; min-height: 150px; }
 .pool-card.in-deck .card { border-color: var(--pick); }
 .pool-card.focused .card { outline: 2px solid var(--ink); outline-offset: 2px; }
 .pc-count { display: grid; grid-template-columns: 30px 1fr 30px; align-items: center; text-align: center; font: 600 13px var(--num); color: var(--ink-soft); }
@@ -457,8 +472,9 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .compact .z-name { font-size: 12.5px; }
 .compact .z-hp b, .compact .z-atk b { font-size: 18px; }
 .compact .hand { padding-top: 6px; margin-top: 0; }
-.compact .card { width: 82px; min-height: 96px; padding: 6px 6px 4px; }
-.compact .card .c-name { font-size: 12.5px; margin-top: 2px; }
+.compact .card { width: 86px; min-height: 112px; padding: 5px 5px 4px; gap: 3px; }
+.compact .card .c-name { font-size: 12px; padding: 0 10px 0 12px; }
+.compact .card .c-art { min-height: 40px; }
 .compact .card .c-hp { font-size: 12.5px; }
 .compact .panel { top: 8px; max-height: calc(100vh - 16px); }
 
@@ -484,7 +500,7 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
   .hero { min-width: 0; padding: 5px 12px; } .h-hand { position: static; translate: none; grid-column: 1 / -1; }
   .hero-row { grid-template-columns: 1fr; } .hero-row .hero, .hero-row .power { grid-column: 1; justify-self: center; }
   .crystal { width: 9px; height: 9px; } .crystals { gap: 3px; }
-  .card { width: 88px; min-height: 118px; }
+  .card { width: 90px; min-height: 124px; }
   .versus { grid-template-columns: 1fr; }
   .pool { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 12px 8px; }
   .b-head { flex-wrap: wrap; }
