@@ -237,6 +237,13 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     target: CREATURE, effects: [{ type: 'damage', amount: 3 }, { type: 'paralyze' }],
   },
   { kind: 'spell', id: 'inspiration', name: '靈感', rarity: 'R', colors: ['blue'], cost: 3, target: NONE, effects: [{ type: 'draw', count: 2 }] },
+  // 看 4 選 2：跟抽 2 一樣多張，但挑得到想要的，比靈感貴 1 費。
+  {
+    kind: 'spell', id: 'tide-divination', name: '潮汐占卜', rarity: 'R', colors: ['blue'], cost: 4,
+    target: NONE, effects: [{ type: 'lookPick', look: 4, pick: 2 }],
+  },
+  // 抽 1 張約 1.5 能量，抽 3 ≈ 4.5，取 5 費。
+  { kind: 'spell', id: 'torrent-of-knowledge', name: '知識洪流', rarity: 'R', colors: ['blue'], cost: 5, target: NONE, effects: [{ type: 'draw', count: 3 }] },
   {
     kind: 'spell', id: 'glacial-rift', name: '冰川裂縫', rarity: 'R', colors: ['blue'], cost: 5,
     target: CREATURE, effects: [{ type: 'damage', amount: 7 }],
@@ -459,10 +466,11 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   { kind: 'spell', id: 'forest-breath', name: '森林之息', rarity: 'N', colors: ['green'], cost: 2, target: NONE, effects: [{ type: 'healAll', amount: 3 }] },
   { kind: 'spell', id: 'hunt', name: '獵殺', rarity: 'N', colors: ['green'], cost: 4, target: CREATURE, effects: [{ type: 'damage', amount: 6 }] },
   { kind: 'spell', id: 'energy-crystal', name: '能量結晶', rarity: 'R', colors: ['green'], cost: 2, target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }] },
-  // 跳費：能量上限 +1 約 2 能量，所以 4 費跳兩費，或 4 費跳一費再抽 1 張。
+  // 跳費：能量上限 +1 約 2 能量，所以 4 費跳兩費。
   { kind: 'spell', id: 'earth-pulse', name: '大地脈動', rarity: 'R', colors: ['green'], cost: 4, target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 2 }] },
+  // 能量上限 +1 ≈ 2 能量、抽 1 ≈ 1.5，原本 4 費太弱，改 3 費。
   {
-    kind: 'spell', id: 'harvest-rite', name: '豐收儀式', rarity: 'R', colors: ['green'], cost: 4,
+    kind: 'spell', id: 'harvest-rite', name: '豐收儀式', rarity: 'R', colors: ['green'], cost: 3,
     target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }, { type: 'draw', count: 1 }],
   },
   { kind: 'item', id: 'bark-armor', name: '樹皮護甲', rarity: 'N', colors: ['green'], cost: 2, hp: 6 },

@@ -81,6 +81,10 @@ export interface PlayerView {
   /** 對手的英雄從重抽階段就看得到，可以先看對手是誰再決定要不要重抽。 */
   you: SideView & { hand: CardRef[] };
   opponent: SideView;
+  /** 你正在從翻開的牌裡選牌：翻開的牌只有你看得到。 */
+  choice: { ability: string; cards: CardRef[]; pick: number } | null;
+  /** 對手正在選牌。 */
+  opponentChoosing: boolean;
 }
 
 function creatureView(db: CardDb, state: GameState, creature: Creature): CreatureView {
@@ -152,5 +156,10 @@ export function viewFor(db: CardDb, state: GameState, player: PlayerId): PlayerV
     result: state.result,
     you: { ...sideView(db, state, player), hand: state.players[player].hand.map((card) => ({ ...card })) },
     opponent: sideView(db, state, other(player)),
+    choice:
+      state.choice?.player === player
+        ? { ability: state.choice.ability, cards: state.choice.cards.map((card) => ({ ...card })), pick: state.choice.pick }
+        : null,
+    opponentChoosing: state.choice !== null && state.choice.player !== player,
   };
 }

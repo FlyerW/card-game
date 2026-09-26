@@ -21,6 +21,7 @@ import {
   clearStatuses,
   combat,
   drawCards,
+  drawTaken,
   endGame,
   randomInt,
   resolveAbility,
@@ -458,6 +459,21 @@ function dismiss(ctx: Ctx, a: ActionOf<'dismiss'>): void {
   ctx.events.push({ type: 'dismissed', player: a.player, zone: a.zone, cardId: currentCardId(creature) });
 }
 
+/** 看牌庫頂選牌：選的加入手牌，其餘依原本的順序放回牌庫底。 */
+function choose(ctx: Ctx, a: ActionOf<'choose'>): void {
+  const choice = ctx.state.choice!;
+  const uids = new Set(a.cards);
+  if (uids.size !== a.cards.length) fail('INVALID_CHOICE', '同一張卡不能選兩次');
+  if (a.cards.length !== choice.pick) fail('INVALID_CHOICE', `要剛好選 ${choice.pick} 張`);
+  if (!a.cards.every((uid) => choice.cards.some((card) => card.uid === uid))) fail('INVALID_CHOICE', '只能選翻開的牌');
+  const chosen = choice.cards.filter((card) => uids.has(card.uid));
+  const rest = choice.cards.filter((card) => !uids.has(card.uid));
+  ctx.state.players[a.player].deck.push(...rest);
+  ctx.state.choice = null;
+  drawTaken(ctx, a.player, chosen);
+  ctx.events.push({ type: 'picked', player: a.player, count: chosen.length, rest: rest.length });
+}
+
 /** 回合結束：自己灼燒的生物受到傷害，然後換對手。 */
 function endTurn(ctx: Ctx, a: ActionOf<'endTurn'>): void {
   tickBurn(ctx, a.player);
@@ -474,6 +490,13 @@ function dispatch(ctx: Ctx, action: Action): void {
   if (action.type === 'mulligan') return mulligan(ctx, action);
 
   if (state.phase !== 'main') fail('WRONG_PHASE', '雙方都完成重抽後才能開始行動');
+  if (state.choice !== null) {
+    // 正在等選牌：只有選的人能動，而且只能選牌。
+    if (action.player !== state.choice.player) fail('CHOICE_PENDING', '正在等對手選牌');
+    if (action.type !== 'choose') fail('CHOICE_PENDING', `先從翻開的牌裡選 ${state.choice.pick} 張`);
+    return choose(ctx, action);
+  }
+  if (action.type === 'choose') fail('NO_CHOICE', '現在沒有要選的牌');
   if (action.player !== state.activePlayer) fail('NOT_YOUR_TURN', '現在不是你的回合');
 
   switch (action.type) {
@@ -558,6 +581,7 @@ export function createEngine(db: CardDb) {
       players: [newPlayer(config.players[0].heroId), newPlayer(config.players[1].heroId)],
       result: null,
       nextUid: 1,
+      choice: null,
     };
 
     return run(initial, (ctx) => {
@@ -617,6 +641,14 @@ export function createEngine(db: CardDb) {
       if (ability.target.kind === 'none') candidates.push(base);
       else for (const target of targets) candidates.push({ ...base, target });
     };
+    if (state.choice !== null) {
+      // 等選牌：列出所有選法（翻開 4 張選 2 張就是 6 種）。
+      if (state.choice.player !== player) return [];
+      const { cards, pick } = state.choice;
+      const combos = (from: number, left: number): number[][] =>
+        left === 0 ? [[]] : cards.slice(from).flatMap((card, i) => combos(from + i + 1, left - 1).map((rest) => [card.uid, ...rest]));
+      return expand(state, combos(0, pick).map((uids) => ({ type: 'choose', player, cards: uids })));
+    }
     if (state.activePlayer !== player) return [];
 
     const zones = Array.from({ length: state.rules.zones }, (_, zone) => zone);
@@ -667,10 +699,10 @@ export function createEngine(db: CardDb) {
     return out;
   }
 
-  /** 現在輪到誰做決定：輪到的玩家；重抽階段是還沒重抽的一方。 */
+  /** 現在輪到誰做決定：輪到的玩家（或正在選牌的人）；重抽階段是還沒重抽的一方。 */
   function actor(state: GameState): PlayerId {
     if (state.phase === 'mulligan') return state.players[0].mulliganDone ? 1 : 0;
-    return state.activePlayer;
+    return state.choice?.player ?? state.activePlayer;
   }
 
   /** 列出這位玩家現在所有合法的動作。 */

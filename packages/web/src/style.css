@@ -233,6 +233,10 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .c-kind { font-size: 11px; color: var(--ink-soft); }
 .c-hp { font: 600 14px var(--num); color: var(--ink); }
 .card.marked { border-color: var(--damage); opacity: .7; }
+.card.picked { border-color: var(--pick); box-shadow: 0 0 0 2px #f0b35a66; }
+/* 選中的牌：標籤放在卡片上緣，不蓋住攻擊與血量 */
+.card.picked .c-mark { inset: -9px auto auto 50%; translate: -50% 0; background: var(--pick); color: #1d1408; padding: 0 6px; border-radius: 4px; white-space: nowrap; }
+.pick-focus { background: #0003; border-radius: var(--radius); padding: 8px 10px; display: grid; gap: 2px; }
 .c-mark { position: absolute; inset: auto 6px 6px auto; font-size: 11px; font-weight: 700; color: var(--damage); }
 
 /* ─── 右側：說明與紀錄 ─── */

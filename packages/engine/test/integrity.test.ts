@@ -44,6 +44,7 @@ function checkInvariants(state: GameState): void {
     }
     if (p.field !== null) cards.push(p.field);
     if (p.heroEvolution !== null) cards.push(p.heroEvolution);
+    if (state.choice?.player === player) cards.push(...state.choice.cards); // 翻開等著選的牌
     expect(cards).toHaveLength(DECK_SIZE); // 卡片不會憑空出現或消失
     uids.push(...cards.map((card) => card.uid));
     expect(p.energy).toBeGreaterThanOrEqual(0);

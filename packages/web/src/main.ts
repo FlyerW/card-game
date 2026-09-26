@@ -50,7 +50,7 @@ const THEM = (): PlayerId => other(YOU);
 const BOT: PlayerId = 1;
 const BOT_STEP_MS = 750;
 /** 存檔格式。引擎的狀態改了就加一，舊版存下來的對局就不接著打。 */
-const SAVE_FORMAT = 4;
+const SAVE_FORMAT = 5;
 
 // ─── 狀態 ────────────────────────────────────────────────────────────────────
 
@@ -95,6 +95,8 @@ interface App extends Saved {
   playerName: string;
   /** 開局畫面上輸入的房號；網址帶 ?room= 時預先填好。 */
   roomCode: string;
+  /** 看牌庫頂選牌時，已經點選的牌。 */
+  picks: number[];
 }
 
 const app: App = {
@@ -116,6 +118,7 @@ const app: App = {
   compactPref: loadDensity(),
   playerName: loadName(),
   roomCode: new URLSearchParams(location.search).get('room')?.toUpperCase() ?? '',
+  picks: [],
 };
 
 function loadName(): string {
@@ -289,6 +292,7 @@ function floatsFrom(events: GameEvent[]): Float[] {
 function step(before: PlayerView, after: PlayerView, legalActions: Action[], events: GameEvent[]): void {
   app.view = after;
   app.legalActions = legalActions;
+  if (!after.choice) app.picks = [];
   app.log.push(...describeEvents(db, events, before, after, themName()));
   if (app.log.length > 300) app.log.splice(0, app.log.length - 300);
   app.selection = null;
@@ -472,6 +476,9 @@ function detail(view: PlayerView): string {
   if (sel === null) {
     if (view.phase === 'over') return away + toast + '<p class="d-head">對局結束</p>';
     if (away) return away + toast;
+    if (view.opponentChoosing) {
+      return toast + `<p class="d-head">${esc(themName())}正在選牌</p><p class="d-line">對手翻開了牌庫頂的牌，選好就會繼續。</p>`;
+    }
     if (!myTurn) {
       return toast + `<p class="d-head">${esc(themName())}的回合</p><p class="d-line">右邊的紀錄會一步一步列出對手做了什麼。</p>`;
     }
@@ -683,6 +690,30 @@ function hand(view: PlayerView): string {
 }
 
 function overlay(view: PlayerView): string {
+  if (view.choice && view.phase === 'main') {
+    // 看牌庫頂選牌：翻開的牌只有你看得到，選好張數才能確定。
+    const { cards: shown, pick } = view.choice;
+    const cards = shown
+      .map((held) => {
+        const def = card(held.cardId);
+        const picked = app.picks.includes(held.uid);
+        const stats = def.kind === 'creature' ? `<span class="c-hp"><span class="c-atk">⚔${def.attack}</span> <span class="c-heart">♥</span>${def.hp}</span>` : '';
+        return `<button class="card k-${def.kind} r-${def.rarity}${picked ? ' picked' : ''}" data-pick="${held.uid}" aria-pressed="${picked}">
+          <span class="c-cost">${def.cost}</span>
+          <span class="c-top"><span class="rarity">${def.rarity}</span>${pips(def.colors)}</span>
+          <span class="c-name">${esc(def.name)}</span><span class="c-kind">${kindLabel(def)}</span>${stats}
+          ${picked ? '<span class="c-mark">加入手牌</span>' : ''}</button>`;
+      })
+      .join('');
+    const focus = app.picks.length > 0 ? lines(describeCard(card(shown.find((c) => c.uid === app.picks.at(-1))!.cardId), nameOf)) : '';
+    return `<div class="overlay"><div class="dialog" role="dialog" aria-label="選牌">
+      <h2>${esc(view.choice.ability)}</h2>
+      <p class="d-line">牌庫頂的 ${shown.length} 張，選 ${pick} 張加入手牌，其餘放回牌庫底。對手看不到你翻開了什麼。</p>
+      <div class="mull-hand">${cards}</div>
+      ${focus ? `<div class="pick-focus">${focus}</div>` : ''}
+      <button class="primary" data-do="choose" ${app.picks.length === pick ? '' : 'disabled'}>加入手牌（${app.picks.length}/${pick}）</button>
+    </div></div>`;
+  }
   if (view.phase === 'mulligan' && !view.you.mulliganDone) {
     const first = view.firstPlayer === YOU;
     const cards = view.you.hand
@@ -949,7 +980,7 @@ function builderClick(el: HTMLElement, command: string | undefined): boolean {
 
 root.addEventListener('click', (event) => {
   const el = (event.target as HTMLElement).closest<HTMLElement>(
-    '[data-do],[data-key],[data-hand],[data-skill],[data-hero],[data-mull],[data-add],[data-remove],[data-focus],[data-filter]',
+    '[data-do],[data-key],[data-hand],[data-skill],[data-hero],[data-mull],[data-pick],[data-add],[data-remove],[data-focus],[data-filter]',
   );
   if (!el) {
     if (app.selection) {
@@ -958,7 +989,7 @@ root.addEventListener('click', (event) => {
     }
     return;
   }
-  const { do: command, key, hand: handUid, skill, hero: heroId, mull } = el.dataset;
+  const { do: command, key, hand: handUid, skill, hero: heroId, mull, pick } = el.dataset;
   if (app.screen === 'deck' && builderClick(el, command)) return;
 
   if (heroId) {
@@ -967,6 +998,12 @@ root.addEventListener('click', (event) => {
   } else if (mull) {
     const uid = Number(mull);
     app.redraw = app.redraw.includes(uid) ? app.redraw.filter((u) => u !== uid) : [...app.redraw, uid];
+    render();
+  } else if (pick) {
+    const uid = Number(pick);
+    const limit = app.view?.choice?.pick ?? 0;
+    if (app.picks.includes(uid)) app.picks = app.picks.filter((u) => u !== uid);
+    else if (app.picks.length < limit) app.picks = [...app.picks, uid];
     render();
   } else if (handUid) {
     const uid = Number(handUid);
@@ -1026,6 +1063,10 @@ root.addEventListener('click', (event) => {
     perform({ type: 'mulligan', player: YOU, cards });
   } else if (command === 'end') {
     perform({ type: 'endTurn', player: YOU });
+  } else if (command === 'choose') {
+    const cards = app.picks;
+    app.picks = [];
+    perform({ type: 'choose', player: YOU, cards });
   } else if (command === 'density') {
     app.compactPref = !compact();
     try {

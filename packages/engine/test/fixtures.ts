@@ -143,6 +143,9 @@ export const TEST_CARDS: DeckCardDef[] = [
     entry: { name: 'flare', target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'damage', amount: 4 }] },
   },
 
+  // 看牌庫頂選牌
+  { kind: 'spell', id: 'peek', name: 'peek', rarity: 'R', colors: [], cost: 1, target: NONE, effects: [{ type: 'lookPick', look: 4, pick: 2 }] },
+
   // 攻擊：數值各不相同的生物
   creature('brute', [hit('smash', ANY, 4)], { attack: 5, hp: 6 }),
   creature('relic', [hit('x', ANY, 1), hit('y', ANY, 1)], { rarity: 'UR' }),

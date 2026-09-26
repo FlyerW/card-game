@@ -56,6 +56,12 @@ export function describeEvents(
       case 'searched':
         lines.push({ text: `　${who(event.player)}從牌庫找到 ${name(event.cardId)}`, tone: 'turn' });
         break;
+      case 'revealing':
+        lines.push({ text: `　${who(event.player)}翻開牌庫頂 ${event.count} 張，要選 ${event.pick} 張`, tone: 'turn' });
+        break;
+      case 'picked':
+        lines.push({ text: `　${who(event.player)}選了 ${event.count} 張加入手牌，其餘 ${event.rest} 張放回牌庫底`, tone: 'turn' });
+        break;
       case 'mulliganed':
         lines.push({
           text: event.count === 0 ? `${who(event.player)}保留了起手牌` : `${who(event.player)}重抽了 ${event.count} 張`,

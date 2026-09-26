@@ -40,6 +40,8 @@ export function describeEffect(effect: Effect): string {
       return `我方英雄與每隻生物各回復 ${effect.amount}♥`;
     case 'destroyCreature':
       return '消滅（直接送進棄牌區，不算傷害）';
+    case 'lookPick':
+      return `看牌庫頂 ${effect.look} 張，選 ${effect.pick} 張加入手牌，其餘放回牌庫底`;
     case 'halveHp':
       return `${effect.all ? '對手每隻生物' : ''}剩餘 ♥ 減半`;
     case 'taunt':
@@ -50,7 +52,7 @@ export function describeEffect(effect: Effect): string {
       const parts: string[] = [];
       if (effect.attack > 0) parts.push(`⚔ +${effect.attack}`);
       if (effect.hp > 0) parts.push(`♥ 上限 +${effect.hp}`);
-      return `${who}${parts.join('、')}`;
+      return `${who} ${parts.join('、')}`;
     }
     case 'gainMaxEnergy':
       return `能量上限 +${effect.amount}`;

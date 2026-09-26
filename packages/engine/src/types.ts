@@ -61,6 +61,8 @@ export type Effect =
   | { type: 'healAll'; amount: number }
   /** 消滅目標生物：直接送進棄牌區，不算傷害，減傷擋不住。 */
   | { type: 'destroyCreature' }
+  /** 看牌庫頂 look 張，選 pick 張加入手牌，其餘放回牌庫底。選的時候對局停下來等這位玩家決定。 */
+  | { type: 'lookPick'; look: number; pick: number }
   /**
    * 目標剩餘 HP 減半、無條件捨去。算失去 HP 不算傷害：減傷擋不住，也不受挑釁限制。
    * all 為 true 時不選目標，對手每隻生物都減半。
@@ -345,6 +347,18 @@ export interface GameState {
   players: [PlayerState, PlayerState];
   result: GameResult | null;
   nextUid: number;
+  /** 正在等這位玩家從翻開的牌裡選牌；null 表示沒有。 */
+  choice: PendingChoice | null;
+}
+
+/** 看牌庫頂選牌：翻開的牌只有選的人看得到。 */
+export interface PendingChoice {
+  player: PlayerId;
+  /** 發動的技能或法術名稱，顯示用。 */
+  ability: string;
+  cards: CardRef[];
+  /** 要選幾張。 */
+  pick: number;
 }
 
 // ─── 玩家動作 ────────────────────────────────────────────────────────────────
@@ -371,6 +385,8 @@ export type Action =
   /** 讓自己的生物退場：連同身上的道具送進棄牌區，空出格子。不花能量。 */
   | { type: 'dismiss'; player: PlayerId; zone: number }
   | { type: 'endTurn'; player: PlayerId }
+  /** 從翻開的牌裡選牌（uid），張數要剛好。 */
+  | { type: 'choose'; player: PlayerId; cards: number[] }
   | { type: 'concede'; player: PlayerId };
 
 // ─── 事件 ────────────────────────────────────────────────────────────────────
@@ -384,6 +400,10 @@ export type GameEvent =
   /** 手牌滿了，抽到的牌直接進棄牌區。 */
   | { type: 'burned'; player: PlayerId; cardId: string }
   | { type: 'searched'; player: PlayerId; cardId: string }
+  /** 翻開牌庫頂等著選；選完是 picked。 */
+  | { type: 'revealing'; player: PlayerId; count: number; pick: number }
+  /** 選完了：選的牌加入手牌（見 drew 事件），其餘 rest 張放回牌庫底。 */
+  | { type: 'picked'; player: PlayerId; count: number; rest: number }
   | { type: 'mulliganed'; player: PlayerId; count: number }
   | { type: 'summoned'; player: PlayerId; zone: number; cardId: string }
   | { type: 'evolved'; player: PlayerId; zone: number; from: string; to: string }

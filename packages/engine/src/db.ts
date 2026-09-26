@@ -54,6 +54,9 @@ function checkAbility(ability: Ability, where: string, isCreatureSkill: boolean)
   if (!Number.isInteger(ability.cost) || ability.cost < 0) problems.push(`${at}：費用必須是非負整數`);
   if (ability.uses !== undefined && (!Number.isInteger(ability.uses) || ability.uses <= 0)) problems.push(`${at}：次數必須是正整數`);
   if (ability.effects.length === 0) problems.push(`${at}：沒有任何效果`);
+  for (const effect of ability.effects) {
+    if (effect.type === 'lookPick' && (effect.pick <= 0 || effect.pick >= effect.look)) problems.push(`${at}：選的張數要比翻開的少，而且至少 1 張`);
+  }
   if (ability.target.kind === 'lane' && !isCreatureSkill) problems.push(`${at}：位置技能只能用在生物身上`);
   if (!isCreatureSkill && ability.effects.some((e) => e.type === 'searchEvolution' || e.type === 'evolveFromDeck')) {
     problems.push(`${at}：找進化卡、直接進化只能用在生物技能上`);

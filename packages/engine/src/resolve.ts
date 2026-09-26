@@ -63,6 +63,12 @@ function toHand(ctx: Ctx, player: PlayerId, card: CardRef): boolean {
   return true;
 }
 
+/** 把已經從牌庫拿出來的牌加入手牌（手牌滿就進棄牌區），記成抽牌事件，對手看不到是哪幾張。 */
+export function drawTaken(ctx: Ctx, player: PlayerId, cards: CardRef[]): void {
+  const drawn = cards.filter((card) => toHand(ctx, player, card));
+  if (drawn.length > 0) ctx.events.push({ type: 'drew', player, cards: drawn });
+}
+
 /** 抽到牌庫空為止。只有「回合開始時」抽不到牌才會落敗，那個判斷在 startTurn。 */
 export function drawCards(ctx: Ctx, player: PlayerId, count: number): void {
   const p = ctx.state.players[player];
@@ -297,6 +303,7 @@ function applyEffect(
   sourceCreature: Creature | null,
   target: Target | null,
   targetUid: number | null,
+  abilityName: string,
 ): void {
   const { db, state } = ctx;
   const me = source.player;
@@ -356,6 +363,18 @@ function applyEffect(
     case 'destroyCreature':
       if (creature !== null && target?.kind === 'creature') removeCreature(ctx, target.player, target.zone);
       return;
+
+    case 'lookPick': {
+      const cards = player.deck.splice(0, effect.look);
+      if (cards.length <= effect.pick) {
+        // 牌庫剩的不夠選，全部拿走，不用等。
+        drawTaken(ctx, me, cards);
+        return;
+      }
+      state.choice = { player: me, ability: abilityName, cards, pick: effect.pick };
+      ctx.events.push({ type: 'revealing', player: me, count: cards.length, pick: effect.pick });
+      return;
+    }
 
     case 'halveHp': {
       const halve = (each: Creature, at: Target) => {
@@ -481,7 +500,7 @@ export function resolveAbility(ctx: Ctx, ability: Ability, source: AbilitySource
   const sourceCreature = source.kind === 'creature' ? (state.players[source.player].zones[source.zone] ?? null) : null;
   for (const effect of ability.effects) {
     if (state.phase === 'over') return;
-    applyEffect(ctx, effect, source, sourceCreature, target, targetUid);
+    applyEffect(ctx, effect, source, sourceCreature, target, targetUid, ability.name);
     cleanup(ctx);
   }
 }
