@@ -83,7 +83,6 @@ export function place(
     skillUsedTurn: null,
     tauntUntilTurn: null,
     poison: 0,
-    maxHpLost: 0,
     burn: 0,
     paralyzedUntilTurn: null,
     silencedUntilTurn: null,

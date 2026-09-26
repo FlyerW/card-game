@@ -10,13 +10,14 @@
 ## 目前進度
 
 - [x] 規則設計：[docs/design.md](docs/design.md)（v0.8）
-- [x] 規則引擎：[`packages/engine`](packages/engine)，包括異常狀態、吸血與再生；182 個測試
+- [x] 規則引擎：[`packages/engine`](packages/engine)，包括異常狀態、吸血與再生；184 個測試
 - [x] 平衡模擬：[`packages/sim`](packages/sim)，讓機器人大量對打，比較不同規則、估算一局要打多久。結果見 [docs/balance-results.md](docs/balance-results.md)
 - [x] 網頁試玩版：[`packages/web`](packages/web)，跟電腦對戰，可以自己組牌。引擎和電腦對手都在瀏覽器裡跑，不需要伺服器
 - [x] 伺服器：兩人連線對戰（[`packages/server`](packages/server)），見下面「跟朋友連線對戰」
-- [x] 金幣、每日任務、卡包、兌換卷：規則在 [`packages/economy`](packages/economy)，試玩版的收藏存在瀏覽器裡
+- [x] 金幣、每日任務、卡包、兌換卷：規則在 [`packages/economy`](packages/economy)
+- [x] 登入：測試帳號（10000 金幣、全卡，存在瀏覽器）或 Google 帳號（存在伺服器），見下面「Google 登入」
 - [ ] 網頁客戶端
-- [ ] 帳號、配對、牌位；牌組與收藏存到伺服器（試玩版先存在瀏覽器裡）
+- [ ] 配對、牌位；牌組存到伺服器（目前存在瀏覽器裡）
 - [ ] 卡牌插圖（AI 畫）
 
 範例卡牌見 [docs/cards.md](docs/cards.md)。
@@ -62,6 +63,25 @@ npm run server                 # 預設埠 8787；要換埠：PORT=9000 npm run 
 - 房間與對局只存在伺服器的記憶體裡：伺服器重開，進行中的對局就沒了。沒有人連著的房間 30 分鐘後收掉。
 - 發布在 claude.ai 的試玩版只能跟電腦打；連線對戰要從這個伺服器打開網頁。
 
+## Google 登入
+
+測試帳號哪裡都能用；Google 登入要從遊戲伺服器打開網頁，而且要先申請一個 OAuth client id：
+
+1. 到 [Google Cloud Console](https://console.cloud.google.com/apis/credentials) 建一個專案，
+   「建立憑證」→「OAuth 用戶端 ID」→ 應用程式類型選「網頁應用程式」。
+2. 「已授權的 JavaScript 來源」加上你打開遊戲的網址，例如 `http://localhost:8787`、
+   `https://xxxx.trycloudflare.com`（localhost 以外一定要 https；通道網址每次重開會變，要重新加）。重新導向 URI 不用填。
+3. 第一次用要設定「OAuth 同意畫面」，測試階段把要登入的 Google 帳號加進「測試使用者」。
+4. 用拿到的 client id 啟動伺服器：
+
+```bash
+GOOGLE_CLIENT_ID=123456-xxxx.apps.googleusercontent.com npm run server
+```
+
+- 帳號資料存在專案的 `data/accounts.json`（已經加進 .gitignore），`DATA_DIR=/some/path` 可以換地方。要備份就備份這個檔案。
+- 伺服器只信任自己驗證過的 Google ID token：檢查簽章、發給誰、誰發的、有沒有過期。瀏覽器拿到的是 30 天的 session token，檔案裡只存它的雜湊。
+- 跟電腦打的勝負是瀏覽器回報的，還防不了作弊，見 docs/design.md 的「經濟系統」。
+
 ## 新增或修改卡牌
 
 卡牌是資料，不寫死在程式裡。改 [`packages/engine/src/cards/sample.ts`](packages/engine/src/cards/sample.ts) 之後：
@@ -103,11 +123,14 @@ packages/sim/             平衡模擬
 ├── src/pace.ts           用動作數估算真人一局要打多久
 └── src/run.ts            多程序平行跑大量對局，統計並寫出報告
 
-packages/economy/         金幣、每日任務、卡包、兌換卷：純函式，網頁與之後的伺服器共用
+packages/economy/         金幣、每日任務、卡包、兌換卷：純函式，網頁與伺服器共用
 └── src/index.ts
 
 packages/server/          連線對戰伺服器（Node + WebSocket），也負責提供網頁
 ├── src/lobby.ts          房間與對局：驗證動作、分別送出各自的視角
+├── src/api.ts            帳號與經濟的 HTTP API（/api/…）
+├── src/accounts.ts       Google 帳號的資料與 session，存成 JSON 檔
+├── src/google.ts         驗證 Google 的 ID token
 ├── src/protocol.ts       伺服器與網頁之間的訊息格式
 ├── src/server.ts         HTTP 與 WebSocket
 └── src/main.ts           npm run server 的進入點
@@ -115,7 +138,8 @@ packages/server/          連線對戰伺服器（Node + WebSocket），也負�
 packages/web/             網頁試玩版（Vite）
 ├── src/main.ts           牌桌畫面與操作；能點的東西全部由引擎的合法動作推出來
 ├── src/deck-builder.ts   組牌畫面，牌組存在瀏覽器裡，只能放收藏裡有的卡
-├── src/shop.ts           卡包與收藏畫面、開局畫面的金幣與每日任務；玩家資料存在瀏覽器裡
+├── src/account.ts        登入：測試帳號與 Google 帳號，開卡包、記對局交給誰算
+├── src/shop.ts           卡包與收藏畫面、開局畫面的金幣與每日任務
 ├── src/online.ts         連線對戰：連到伺服器、斷線自動回到座位
 ├── src/log.ts            把引擎事件翻成對戰紀錄
 ├── src/ui.ts             共用的小工具

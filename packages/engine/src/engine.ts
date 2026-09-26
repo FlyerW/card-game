@@ -460,10 +460,10 @@ function choose(ctx: Ctx, a: ActionOf<'choose'>): void {
   ctx.events.push({ type: 'picked', player: a.player, count: chosen.length, rest: rest.length });
 }
 
-/** 回合結束：自己中毒的生物失去 HP 與上限、灼燒的受到傷害，然後換對手。 */
+/** 回合結束：施放者的回合結束時觸發，所以是對手那邊中毒、灼燒的生物扣血；然後換對手。 */
 function endTurn(ctx: Ctx, a: ActionOf<'endTurn'>): void {
-  tickPoison(ctx, a.player);
-  if (ctx.state.phase === 'main') tickBurn(ctx, a.player);
+  tickPoison(ctx, other(a.player));
+  if (ctx.state.phase === 'main') tickBurn(ctx, other(a.player));
   if (ctx.state.phase !== 'main') return;
   startTurn(ctx, other(a.player));
 }

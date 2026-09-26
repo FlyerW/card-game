@@ -4,14 +4,18 @@ import { extname, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createEngine, sampleDb } from '@card-game/engine';
 import { WebSocketServer, type WebSocket } from 'ws';
+import { AccountStore } from './accounts';
+import { handleApi } from './api';
+import { googleVerifier, type GoogleIdentity } from './google';
 import { Lobby, type Client } from './lobby';
 import type { ClientMessage } from './protocol';
 
 // 連線對戰伺服器：同一個埠提供網頁（packages/web/dist）與 WebSocket（/ws）。
 
 const DIST = fileURLToPath(new URL('../../web/dist/', import.meta.url));
-/** 網頁看到這個就知道可以連線對戰。 */
-const ONLINE_FLAG = '<script>window.CARD_GAME_ONLINE = true</script>';
+/** 網頁看到這個就知道可以連線對戰、能不能用 Google 登入。 */
+const pageFlags = (googleClientId: string | null) =>
+  `<script>window.CARD_GAME_ONLINE = true; window.CARD_GAME_GOOGLE_CLIENT_ID = ${JSON.stringify(googleClientId).replace(/</g, '\\u003c')}</script>`;
 const MAX_MESSAGE_BYTES = 64 * 1024;
 
 const TYPES: Record<string, string> = {
@@ -30,12 +34,33 @@ export interface Running {
   close(): Promise<void>;
 }
 
-export async function startServer(options: { port: number; host?: string; dist?: string }): Promise<Running> {
+export interface ServerOptions {
+  port: number;
+  host?: string;
+  dist?: string;
+  /** 帳號資料存在哪個資料夾；null 只放在記憶體（測試用）。 */
+  dataDir?: string | null;
+  /** Google 登入的 OAuth client id；沒有就不能用 Google 登入。 */
+  googleClientId?: string | null;
+  /** 測試時換掉 Google 的驗證。 */
+  verify?: (credential: string) => Promise<GoogleIdentity>;
+}
+
+export async function startServer(options: ServerOptions): Promise<Running> {
   const dist = options.dist ?? DIST;
-  const lobby = new Lobby(createEngine(sampleDb()));
+  const db = sampleDb();
+  const lobby = new Lobby(createEngine(db));
+  const googleClientId = options.googleClientId ?? null;
+  const api = {
+    store: await AccountStore.open(options.dataDir ?? null, db),
+    db,
+    googleClientId,
+    verify: options.verify ?? (googleClientId ? googleVerifier(googleClientId) : null),
+  };
 
   const server = createServer(async (request, response) => {
     const path = decodeURIComponent(new URL(request.url ?? '/', 'http://localhost').pathname);
+    if (await handleApi(request, response, path, api)) return;
     const file = resolve(dist, normalize(path === '/' ? 'index.html' : path.slice(1)));
     if (!file.startsWith(resolve(dist) + sep) && file !== resolve(dist)) {
       response.writeHead(403).end();
@@ -43,7 +68,7 @@ export async function startServer(options: { port: number; host?: string; dist?:
     }
     try {
       let body: Buffer | string = await readFile(file);
-      if (file.endsWith('index.html')) body = body.toString('utf8').replace('</head>', `${ONLINE_FLAG}</head>`);
+      if (file.endsWith('index.html')) body = body.toString('utf8').replace('</head>', `${pageFlags(googleClientId)}</head>`);
       response.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' }).end(body);
     } catch {
       const hint = path === '/' ? '找不到網頁。先執行 npm run build:web，或直接用 npm run server。' : 'Not found';

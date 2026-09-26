@@ -94,9 +94,9 @@ export type Effect =
   | { type: 'evolveFromDeck' }
   // 異常狀態：只作用在生物身上，打到英雄沒有效果；進化會解除全部。
   // all 為 true 時不選目標，對手每隻生物都中。
-  /** 中毒 N：牠的擁有者回合結束時失去 N HP，HP 上限也跟著少 N（不算傷害，回復補不回來）。再中一次數字相加。 */
+  /** 中毒 N：施放者的回合結束時失去 N HP（不算傷害，減傷擋不住）。再中一次數字相加。 */
   | { type: 'poison'; amount: number; all?: boolean }
-  /** 灼燒 N：牠的擁有者回合結束時受到 N 傷害（算傷害，減傷擋得住）。再中一次取大的。 */
+  /** 灼燒 N：施放者的回合結束時受到 N 傷害（算傷害，減傷擋得住）。再中一次取大的。 */
   | { type: 'burn'; amount: number; all?: boolean }
   /** 麻痺：不能攻擊、不能發動技能，直到擁有者的下一個回合結束。 */
   | { type: 'paralyze'; all?: boolean }
@@ -302,8 +302,6 @@ export interface Creature {
   tauntUntilTurn: number | null;
   /** 中毒的數字，0 表示沒有中毒。 */
   poison: number;
-  /** 中毒讓 HP 上限少了多少。進化解除中毒，但少掉的上限不會回來。 */
-  maxHpLost: number;
   /** 灼燒的數字，0 表示沒有灼燒。 */
   burn: number;
   /** 麻痺到這個回合結束（含）。 */

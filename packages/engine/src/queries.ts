@@ -91,8 +91,7 @@ export const maxHp = (db: CardDb, state: GameState, creature: Creature): number 
   creatureDef(db, creature).hp +
   creature.hpCounters +
   (itemDef(db, creature)?.hp ?? 0) +
-  aura(db, state, creature.owner).hp -
-  creature.maxHpLost;
+  aura(db, state, creature.owner).hp;
 
 export const currentHp = (db: CardDb, state: GameState, creature: Creature): number =>
   maxHp(db, state, creature) - creature.damage;

@@ -51,13 +51,11 @@ describe('再生', () => {
     expect(at(state, b, 0)!.damage).toBe(0);
   });
 
-  it('再生補得回傷害，補不回中毒少掉的上限', () => {
-    let { state, a } = start();
-    place(state, a, 0, 'moss', { damage: 4, poison: 2 }); // HP 10，剩 6
-    state = endTurn(state); // a 的回合結束：中毒，上限 10 → 8，剩 4
-    state = endTurn(state); // a 的回合開始：再生 2，剩 6
-    const moss = at(state, a, 0)!;
-    expect(moss).toMatchObject({ damage: 2, maxHpLost: 2 });
+  it('中毒在施放者的回合結束扣，再生在擁有者的回合開始補', () => {
+    let { state, b } = start();
+    place(state, b, 0, 'moss', { damage: 4, poison: 2 }); // HP 10，剩 6
+    state = endTurn(state); // a 的回合結束：b 的苔蘚中毒扣 2，剩 4；b 的回合開始：再生 2，剩 6
+    expect(at(state, b, 0)!.damage).toBe(4);
   });
 
   it('英雄被動給的再生跟卡上的相加', () => {

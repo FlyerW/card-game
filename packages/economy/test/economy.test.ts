@@ -4,12 +4,14 @@ import {
   ECONOMY,
   emptyTally,
   exchange,
+  fullProfile,
   newProfile,
   openPack,
   ownedDeck,
   ownershipProblems,
   packableCards,
   parseProfile,
+  parseSummary,
   QUESTS,
   questFor,
   recordGame,
@@ -243,5 +245,22 @@ describe('收藏與牌組', () => {
     expect(parseProfile({ ...profile, version: 2 })).toBeNull();
     expect(parseProfile({ ...profile, gold: 'lots' })).toBeNull();
     expect(parseProfile({ ...profile, collection: { x: -1 } })).toBeNull();
+  });
+});
+
+describe('測試帳號與伺服器', () => {
+  it('測試帳號每張卡都收滿，有 10000 金幣', () => {
+    const profile = fullProfile(db, DEFAULT_RULES, DAY);
+    expect(profile.gold).toBe(10000);
+    for (const card of packableCards(db)) expect(profile.collection[card.id], card.id).toBe(copyLimit(DEFAULT_RULES, card));
+    for (const hero of SAMPLE_HEROES) expect(ownershipProblems(profile, db, ownedDeck(profile, db, DEFAULT_RULES, hero.id, 3))).toEqual([]);
+  });
+
+  it('瀏覽器回報的對局數字：格式不對不收，數字壓在範圍內，不認得的顏色拿掉', () => {
+    expect(parseSummary({ won: true, conceded: false, deckColors: ['red', 'pink'], summoned: 9999, drew: -3, spells: 2.7 })).toEqual({
+      won: true, conceded: false, deckColors: ['red'], summoned: 200, drew: 0, spells: 2,
+    });
+    expect(parseSummary({ won: 'yes', conceded: false, deckColors: [], summoned: 1, drew: 1, spells: 1 })).toBeNull();
+    expect(parseSummary(null)).toBeNull();
   });
 });

@@ -129,6 +129,12 @@ export function newProfile(day: string, starterDecks: readonly (readonly string[
   };
 }
 
+/** 測試帳號：每張卡都收滿（2 張，UR 1 張），另外給一大筆金幣。 */
+export function fullProfile(db: CardDb, rules: Rules, day: string, gold = 10000): Profile {
+  const collection = Object.fromEntries(packableCards(db).map((card) => [card.id, copyLimit(rules, card)]));
+  return { ...newProfile(day, []), gold, collection };
+}
+
 /** 換日：贏場金幣重新算，換成今天的任務。同一天呼叫不會改變任何東西。 */
 export function refreshDay(profile: Profile, day: string): Profile {
   if (profile.day === day) return profile;
@@ -285,6 +291,18 @@ export function ownershipProblems(profile: Profile, db: CardDb, deck: readonly s
     if (n > owned) problems.push(`${db.cards.get(id)?.name ?? id} 只有 ${owned} 張，牌組放了 ${n} 張`);
   }
   return problems;
+}
+
+/** 伺服器收到瀏覽器回報的對局數字時用：格式不對回傳 null，數字壓在合理的範圍內。 */
+export function parseSummary(value: unknown): GameSummary | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const v = value as Record<string, unknown>;
+  const count = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) ? Math.max(0, Math.min(200, Math.floor(n))) : null);
+  const [summoned, drew, spells] = [count(v.summoned), count(v.drew), count(v.spells)];
+  if (typeof v.won !== 'boolean' || typeof v.conceded !== 'boolean' || summoned === null || drew === null || spells === null) return null;
+  if (!Array.isArray(v.deckColors)) return null;
+  const deckColors = COLORS.filter((color) => (v.deckColors as unknown[]).includes(color));
+  return { won: v.won, conceded: v.conceded, deckColors, summoned, drew, spells };
 }
 
 /** 讀回存檔：格式不對就回傳 null，讓呼叫的人建新的。 */

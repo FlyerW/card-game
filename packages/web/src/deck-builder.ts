@@ -14,7 +14,7 @@ import { esc, kindLabel, pips } from './ui';
 
 // 組牌：照正式規則，30 張、同名最多 2 張、UR 最多 1 張、只能放英雄顏色內的卡與無色卡；
 // 而且只能放收藏裡有的卡，張數不超過擁有的。
-// 牌組每個英雄各存一副，存在這個瀏覽器裡；沒有自訂牌組就每局用收藏自動組一副。
+// 牌組每個帳號、每個英雄各存一副，存在這個瀏覽器裡；沒有自訂牌組就每局用收藏自動組一副。
 
 /** 每張卡最多能放幾張：規則上限與擁有張數取小的。電腦組牌不看收藏，用 copyLimit。 */
 export type Owned = (card: DeckCardDef) => number;
@@ -38,10 +38,13 @@ export interface Builder {
   focus: string | null;
 }
 
-/** 讀出存著的牌組。讀不到（隱私模式、被清掉）就當作沒有；不認得的卡直接拿掉。 */
-export function loadDecks(db: CardDb): Record<string, string[]> {
+/** 每個帳號的牌組分開存，測試帳號的全卡牌組不會跑到 Google 帳號上。 */
+const keyFor = (accountId: string) => `${STORAGE_KEY}:${accountId}`;
+
+/** 讀出這個帳號存著的牌組。讀不到（隱私模式、被清掉）就當作沒有；不認得的卡直接拿掉。 */
+export function loadDecks(db: CardDb, accountId: string): Record<string, string[]> {
   try {
-    const raw: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
+    const raw: unknown = JSON.parse(localStorage.getItem(keyFor(accountId)) ?? '{}');
     if (typeof raw !== 'object' || raw === null) return {};
     const decks: Record<string, string[]> = {};
     for (const [heroId, deck] of Object.entries(raw)) {
@@ -53,9 +56,9 @@ export function loadDecks(db: CardDb): Record<string, string[]> {
   }
 }
 
-export function saveDecks(decks: Record<string, string[]>): void {
+export function saveDecks(decks: Record<string, string[]>, accountId: string): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(decks));
+    localStorage.setItem(keyFor(accountId), JSON.stringify(decks));
   } catch {
     // 存不了就只留在這次開著的頁面裡。
   }

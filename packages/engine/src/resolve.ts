@@ -102,7 +102,6 @@ export function newCreature(uid: number, owner: PlayerId, cardId: string, turn: 
     skillUsedTurn: null,
     tauntUntilTurn: null,
     poison: 0,
-    maxHpLost: 0,
     burn: 0,
     paralyzedUntilTurn: null,
     silencedUntilTurn: null,
@@ -221,7 +220,7 @@ function inflict(ctx: Ctx, creature: Creature, player: PlayerId, zone: number, e
   ctx.events.push({ type: 'statusApplied', player, zone, status, ...(amount === undefined ? {} : { amount }) });
 }
 
-/** 進化會解除全部異常狀態。中毒少掉的 HP 上限不會回來。 */
+/** 進化會解除全部異常狀態。 */
 export function clearStatuses(ctx: Ctx, creature: Creature, player: PlayerId, zone: number): void {
   const had =
     creature.poison > 0 ||
@@ -238,8 +237,8 @@ export function clearStatuses(ctx: Ctx, creature: Creature, player: PlayerId, zo
 }
 
 /**
- * 回合結束：這位玩家中毒的生物失去 HP，HP 上限也跟著少（所以回復補不回來）。
- * 失去 HP 不算傷害，減傷擋不住。
+ * 施放者的回合結束：player 這一方中毒的生物失去 HP。失去 HP 不算傷害，減傷擋不住。
+ * 異常狀態只能施加在對手的生物上，所以施放者就是 player 的對手。
  */
 export function tickPoison(ctx: Ctx, player: PlayerId): void {
   const { db, state } = ctx;
@@ -248,7 +247,7 @@ export function tickPoison(ctx: Ctx, player: PlayerId): void {
     const target: Target = { kind: 'creature', player, zone };
     const lost = Math.min(creature.poison, currentHp(db, state, creature));
     ctx.events.push({ type: 'statusTriggered', player, zone, status: 'poison', amount: creature.poison });
-    creature.maxHpLost += lost;
+    creature.damage += lost;
     ctx.events.push({ type: 'hpLost', target, amount: lost });
   });
   cleanup(ctx);
@@ -309,7 +308,7 @@ export function combat(ctx: Ctx, player: PlayerId, zone: number, target: Target)
   cleanup(ctx);
 }
 
-/** 回合結束：這位玩家灼燒的生物受到傷害（在中毒之後）。算傷害，減傷擋得住。 */
+/** 施放者的回合結束：player 這一方灼燒的生物受到傷害（在中毒之後）。算傷害，減傷擋得住。 */
 export function tickBurn(ctx: Ctx, player: PlayerId): void {
   ctx.state.players[player].zones.forEach((creature, zone) => {
     if (creature === null || creature.burn === 0) return;

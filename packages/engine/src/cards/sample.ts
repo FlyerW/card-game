@@ -33,7 +33,7 @@ const hit = (name: string, cost: number, target: TargetSpec, amount: number): Ab
 export const SAMPLE_HEROES: HeroDef[] = [
   // 英雄 HP 的起點是 55 − 3 ×（顏色數 − 1）− 效果強度，再照模擬調整。
   {
-    kind: 'hero', id: 'nameless-swordsman', name: '無名劍士', colors: ['white'], hp: 53,
+    kind: 'hero', id: 'nameless-swordsman', name: '無名劍士', colors: ['white'], hp: 59,
     passive: { name: '劍士之道', creatures: { attack: 1 } },
   },
   {

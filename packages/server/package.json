@@ -7,6 +7,7 @@
     "./protocol": "./src/protocol.ts"
   },
   "dependencies": {
+    "@card-game/economy": "*",
     "@card-game/engine": "*",
     "ws": "^8.18.3"
   },

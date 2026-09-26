@@ -38,8 +38,6 @@ export interface CreatureView {
   paralyzed: boolean;
   silenced: boolean;
   weakened: boolean;
-  /** 中毒讓 HP 上限少了多少。 */
-  maxHpLost: number;
   /** 這回合攻擊過（或休息了）。 */
   attackedThisTurn: boolean;
   skillUsedThisTurn: boolean;
@@ -106,7 +104,6 @@ function creatureView(db: CardDb, state: GameState, creature: Creature): Creatur
     paralyzed: isParalyzed(state, creature),
     silenced: isSilenced(state, creature),
     weakened: isWeakened(state, creature),
-    maxHpLost: creature.maxHpLost,
     attackedThisTurn: creature.attackedTurn === state.turn,
     skillUsedThisTurn: creature.skillUsedTurn === state.turn,
     summonedThisTurn: creature.summonedTurn === state.turn,

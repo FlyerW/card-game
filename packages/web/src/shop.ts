@@ -9,56 +9,12 @@ import {
   type DeckCardDef,
   type Rarity,
 } from '@card-game/engine';
-import {
-  ECONOMY,
-  exchange,
-  newProfile,
-  openPack,
-  packableCards,
-  parseProfile,
-  questDef,
-  refreshDay,
-  starterDecks,
-  type PackCard,
-  type Profile,
-} from '@card-game/economy';
+import { ECONOMY, packableCards, questDef, type PackCard, type Profile } from '@card-game/economy';
+import type { Backend } from './account';
 import { esc, kindLabel, pips } from './ui';
 
-// 卡包與收藏：金幣、開卡包、兌換卷。規則在 @card-game/economy，這裡只負責畫面與存檔。
-// 玩家資料存在這個瀏覽器裡；之後有帳號就改存在伺服器上。
-
-const PROFILE_KEY = 'card-game.profile.v1';
-
-/** 今天的日期（本地時間），每日任務與贏場金幣照這個換日。 */
-export function today(): string {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
-
-/** 讀出玩家資料；沒有或壞掉就建一個新的（五個英雄的起始牌組）。不認得的卡直接拿掉。 */
-export function loadProfile(db: CardDb): Profile {
-  try {
-    const saved = parseProfile(JSON.parse(localStorage.getItem(PROFILE_KEY) ?? 'null'));
-    if (saved) {
-      const collection = Object.fromEntries(Object.entries(saved.collection).filter(([id]) => db.cards.has(id)));
-      return refreshDay({ ...saved, collection }, today());
-    }
-  } catch {
-    // 讀不到就當新玩家。
-  }
-  const profile = newProfile(today(), starterDecks(db));
-  saveProfile(profile);
-  return profile;
-}
-
-export function saveProfile(profile: Profile): void {
-  try {
-    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-  } catch {
-    // 存不了就只留在這次開著的頁面裡。
-  }
-}
+// 卡包與收藏：金幣、開卡包、兌換卷。規則在 @card-game/economy，這裡只負責畫面；
+// 開卡包與兌換交給登入的帳號（測試帳號在瀏覽器裡算，Google 帳號交給伺服器）。
 
 /** 每張卡最多能放進牌組幾張：規則上限與擁有張數取小的。 */
 export const ownedOf = (profile: Profile) => (card: DeckCardDef): number =>
@@ -80,9 +36,20 @@ export interface Shop {
   dealing: boolean;
   /** 兌換成功之類的提示。 */
   notice: string | null;
+  /** 正在等開卡包或兌換的結果。 */
+  busy: boolean;
 }
 
-export const newShop = (): Shop => ({ rarity: 'all', color: 'all', missing: false, focus: null, opened: null, dealing: false, notice: null });
+export const newShop = (): Shop => ({
+  rarity: 'all',
+  color: 'all',
+  missing: false,
+  focus: null,
+  opened: null,
+  dealing: false,
+  notice: null,
+  busy: false,
+});
 
 /** 開局畫面上的金幣與今日任務。 */
 export function walletBar(profile: Profile): string {
@@ -172,7 +139,7 @@ export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: stri
       .map((line, i) => (i === 0 ? `<p class="d-head">${esc(line)}</p>` : `<p class="d-line">${esc(line)}</p>`))
       .join('')}
       <p class="d-line">擁有 <b>${n}</b> 張，牌組最多放 ${copyLimit(DEFAULT_RULES, focus)} 張。</p>
-      <button class="primary" data-exchange="${focus.id}" ${why ? 'disabled' : ''}>用 ${ECONOMY.vouchersPerCard} 張 ${focus.rarity} 兌換卷換一張</button>
+      <button class="primary" data-exchange="${focus.id}" ${why || shop.busy ? 'disabled' : ''}>用 ${ECONOMY.vouchersPerCard} 張 ${focus.rarity} 兌換卷換一張</button>
       ${why ? `<p class="d-line">${why}</p>` : ''}</div>`;
   }
 
@@ -194,7 +161,7 @@ export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: stri
           已經有 ${DEFAULT_RULES.maxCopies} 張（UR ${DEFAULT_RULES.maxUrCopies} 張）的卡再開到，換成一張同稀有度的兌換卷。</p>
         <p class="vouchers"><span class="w-label">兌換卷</span>${vouchers}</p>
       </div>
-      <button class="primary big" data-do="open-pack" ${canBuy ? '' : 'disabled'}>${canBuy ? '開一包' : `金幣不夠（${profile.gold}/${ECONOMY.packPrice}）`}</button>
+      <button class="primary big" data-do="open-pack" ${canBuy && !shop.busy ? '' : 'disabled'}>${shop.busy ? '開卡包中……' : canBuy ? '開一包' : `金幣不夠（${profile.gold}/${ECONOMY.packPrice}）`}</button>
     </section>
     ${toast ? `<p class="toast" role="alert">${esc(toast)}</p>` : ''}
     ${shop.notice ? `<p class="notice" role="status">${esc(shop.notice)}</p>` : ''}
@@ -220,8 +187,15 @@ export interface ShopHost {
   toast: string | null;
 }
 
-/** 卡包畫面的點擊。處理了就回傳 true。 */
-export function shopClick(db: CardDb, host: ShopHost, el: HTMLElement, command: string | undefined): boolean {
+/** 卡包畫面的點擊。處理了就回傳 true。開卡包與兌換要等帳號回覆，好了再呼叫 rerender。 */
+export function shopClick(
+  db: CardDb,
+  host: ShopHost,
+  backend: Backend,
+  el: HTMLElement,
+  command: string | undefined,
+  rerender: () => void,
+): boolean {
   const { focus, rarity, color, missing, exchange: exchangeId } = el.dataset;
   host.toast = null;
   host.shop.dealing = false;
@@ -234,23 +208,32 @@ export function shopClick(db: CardDb, host: ShopHost, el: HTMLElement, command: 
     host.shop.color = color as ColorFilter;
   } else if (missing) {
     host.shop.missing = missing === 'true';
-  } else if (command === 'open-pack') {
-    const opened = openPack(refreshDay(host.profile, today()), db, DEFAULT_RULES, Math.random);
-    if (opened.ok) {
-      host.profile = opened.profile;
-      host.shop.opened = opened.cards;
-      host.shop.dealing = true;
-      host.shop.focus = null;
-      saveProfile(host.profile);
-    } else host.toast = opened.reason;
-  } else if (exchangeId) {
-    const swapped = exchange(host.profile, db, DEFAULT_RULES, exchangeId);
-    if (swapped.ok) {
-      host.profile = swapped.profile;
-      saveProfile(host.profile);
-      const card = db.cards.get(exchangeId)!;
-      host.shop.notice = `換到了 ${card.name}（現在 ${host.profile.collection[exchangeId]} 張）`;
-    } else host.toast = swapped.reason;
+  } else if ((command === 'open-pack' || exchangeId) && !host.shop.busy) {
+    host.shop.busy = true;
+    const done = () => {
+      host.shop.busy = false;
+      rerender();
+    };
+    if (command === 'open-pack') {
+      void backend.openPack(host.profile).then((opened) => {
+        if (opened.ok) {
+          host.profile = opened.profile;
+          host.shop.opened = opened.cards;
+          host.shop.dealing = true;
+          host.shop.focus = null;
+        } else host.toast = opened.reason;
+        done();
+      });
+    } else {
+      const cardId = exchangeId!;
+      void backend.exchange(host.profile, cardId).then((swapped) => {
+        if (swapped.ok) {
+          host.profile = swapped.profile;
+          host.shop.notice = `換到了 ${db.cards.get(cardId)!.name}（現在 ${host.profile.collection[cardId]} 張）`;
+        } else host.toast = swapped.reason;
+        done();
+      });
+    }
   } else {
     return false;
   }

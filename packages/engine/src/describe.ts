@@ -73,9 +73,9 @@ export function describeEffect(effect: Effect, names: Names = ids): string {
     case 'evolveFromDeck':
       return '用牌庫裡自己的進化卡直接進化';
     case 'poison':
-      return `${effect.all ? '對手每隻生物' : ''}中毒 ${effect.amount}（牠的回合結束時失去 ${effect.amount}♥，♥ 上限也少 ${effect.amount}）`;
+      return `${effect.all ? '對手每隻生物' : ''}中毒 ${effect.amount}（你的每個回合結束時，牠失去 ${effect.amount}♥）`;
     case 'burn':
-      return `${effect.all ? '對手每隻生物' : ''}灼燒 ${effect.amount}（牠的回合結束時受到 ${effect.amount} 傷害）`;
+      return `${effect.all ? '對手每隻生物' : ''}灼燒 ${effect.amount}（你的每個回合結束時，牠受到 ${effect.amount} 傷害）`;
     case 'paralyze':
       return `${effect.all ? '對手每隻生物' : ''}麻痺（到牠的下個回合結束前不能攻擊、不能發動技能）`;
     case 'silence':

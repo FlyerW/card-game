@@ -5,49 +5,43 @@ import { act, at, creatureAt, endTurn, engine, give, hero, place, reject, start 
 // 異常狀態：只作用在生物身上，進化會解除全部。
 
 describe('中毒', () => {
-  it('擁有者的回合結束時失去 N HP，HP 上限也少 N；減傷擋不住；再中一次數字相加', () => {
+  it('施放者的回合結束時失去 N HP；減傷擋不住；再中一次數字相加', () => {
     let { state, a, b } = start();
     place(state, a, 0, 'venom');
-    const target = place(state, b, 0, 'hitter', { item: { uid: 900, cardId: 'armor' } });
+    place(state, b, 0, 'hitter', { item: { uid: 900, cardId: 'armor' } });
     state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0, target: creatureAt(b, 0) });
     expect(at(state, b, 0)!.poison).toBe(2);
-    const full = maxHp(engine.db, state, at(state, b, 0)!);
+    expect(at(state, b, 0)!.damage).toBe(0); // 施加當下不扣
 
-    state = endTurn(state); // a 的回合結束：中毒的是 b 的生物，不發作
-    expect(currentHp(engine.db, state, at(state, b, 0)!)).toBe(full);
-    state = endTurn(state); // b 的回合結束：失去 2（鐵甲減 2 也擋不住），上限也少 2
-    expect(target.uid).toBe(at(state, b, 0)!.uid);
-    expect(maxHp(engine.db, state, at(state, b, 0)!)).toBe(full - 2);
-    expect(currentHp(engine.db, state, at(state, b, 0)!)).toBe(full - 2);
-    expect(at(state, b, 0)!.damage).toBe(0);
+    state = endTurn(state); // a（施放者）的回合結束：失去 2，鐵甲減 2 也擋不住
+    expect(at(state, b, 0)!.damage).toBe(2);
+    state = endTurn(state); // b 的回合結束：不發作
+    expect(at(state, b, 0)!.damage).toBe(2);
 
     state.players[a].energy = 5;
     state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 0, target: creatureAt(b, 0) });
     expect(at(state, b, 0)!.poison).toBe(4);
-    state = endTurn(endTurn(state));
-    expect(maxHp(engine.db, state, at(state, b, 0)!)).toBe(full - 6);
+    state = endTurn(state);
+    expect(at(state, b, 0)!.damage).toBe(6);
   });
 
-  it('少掉的上限回復補不回來，進化解除中毒後也不會回來', () => {
-    let { state, a } = start();
-    place(state, a, 0, 'pup', { poison: 2 });
-    state = endTurn(state);
-    const pup = at(state, a, 0)!;
-    expect(pup.maxHpLost).toBe(2);
-    state = endTurn(state); // a 的回合
-    state.players[a].energy = 5;
-    state = act(state, { type: 'castSpell', player: a, card: give(state, a, 'bloom') });
-    expect(currentHp(engine.db, state, at(state, a, 0)!)).toBe(6 - 2);
-    state = act(state, { type: 'evolve', player: a, card: give(state, a, 'hound'), zone: 0 });
-    expect(at(state, a, 0)).toMatchObject({ poison: 0, maxHpLost: 2 });
+  it('跟一般的傷害一樣，回復補得回來', () => {
+    let { state, a, b } = start();
+    place(state, b, 0, 'pup', { poison: 2 });
+    state = endTurn(state); // a 的回合結束：b 的生物中毒發作
+    expect(at(state, b, 0)).toMatchObject({ damage: 2 });
+    state.players[b].energy = 5;
+    state = act(state, { type: 'castSpell', player: b, card: give(state, b, 'bloom') });
+    expect(at(state, b, 0)!.damage).toBe(0);
   });
 
   it('扣到 0 就被擊倒', () => {
     let { state, a, b } = start();
-    place(state, a, 0, 'wolf', { damage: 5, poison: 2 });
+    place(state, b, 0, 'wolf', { damage: 5, poison: 2 });
     state = endTurn(state);
     expect(state.activePlayer).toBe(b);
-    expect(at(state, a, 0)).toBeNull();
+    expect(at(state, b, 0)).toBeNull();
+    expect(state.players[a].zones.every((z) => z === null)).toBe(true);
   });
 
   it('打到英雄沒有效果，同一個法術的傷害照樣結算', () => {
@@ -59,16 +53,16 @@ describe('中毒', () => {
 });
 
 describe('灼燒', () => {
-  it('擁有者的回合結束時受到 N 傷害；減傷擋得住；再中一次取大的', () => {
+  it('施放者的回合結束時受到 N 傷害；減傷擋得住；再中一次取大的', () => {
     let { state, a, b } = start();
     place(state, a, 0, 'venom');
     place(state, b, 0, 'hitter', { item: { uid: 900, cardId: 'armor' } });
     state = act(state, { type: 'useSkill', player: a, zone: 0, skill: 1, target: creatureAt(b, 0) });
     expect(at(state, b, 0)!.burn).toBe(3);
 
-    state = endTurn(state); // a 的回合結束：灼燒的是 b 的生物，不發作
-    expect(at(state, b, 0)!.damage).toBe(0);
-    state = endTurn(state); // b 的回合結束：3 − 鐵甲 2 = 1
+    state = endTurn(state); // a（施放者）的回合結束：3 − 鐵甲 2 = 1
+    expect(at(state, b, 0)!.damage).toBe(1);
+    state = endTurn(state); // b 的回合結束：不發作
     expect(at(state, b, 0)!.damage).toBe(1);
 
     at(state, b, 0)!.burn = 5;

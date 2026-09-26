@@ -22,7 +22,7 @@ import {
   type SideView,
   type Target,
 } from '@card-game/engine';
-import { ECONOMY, emptyTally, gameSummary, questDef, recordGame, refreshDay, tallyEvents, type GameTally, type Profile } from '@card-game/economy';
+import { ECONOMY, emptyTally, gameSummary, newProfile, questDef, refreshDay, tallyEvents, type GameTally, type Profile } from '@card-game/economy';
 import { chooseAction, STYLES } from '@card-game/sim/bot';
 import { describeEvents, ZONE, type LogLine } from './log';
 import {
@@ -37,8 +37,24 @@ import {
   type Builder,
   type KindFilter,
 } from './deck-builder';
+import {
+  backendFor,
+  fetchMe,
+  GOOGLE_CLIENT_ID,
+  googleLogin,
+  loadSession,
+  logout,
+  mountGoogleButton,
+  resetTestProfile,
+  saveSession,
+  saveTestProfile,
+  testProfile,
+  today,
+  type Backend,
+  type Session,
+} from './account';
 import { ONLINE_AVAILABLE, OnlineClient } from './online';
-import { loadProfile, newShop, ownedOf, saveProfile, shopClick, shopScreen, today, walletBar, type Shop } from './shop';
+import { newShop, ownedOf, shopClick, shopScreen, walletBar, type Shop } from './shop';
 import { esc, kindLabel, pips } from './ui';
 import './style.css';
 
@@ -75,11 +91,13 @@ interface Reward {
   quest: string;
   /** 自己投降的對局不算。 */
   conceded: boolean;
+  /** 沒記到（例如連不上伺服器）的原因。 */
+  error?: string;
 }
 
 interface Saved {
   format: number;
-  screen: 'setup' | 'deck' | 'lobby' | 'play' | 'shop';
+  screen: 'login' | 'setup' | 'deck' | 'lobby' | 'play' | 'shop';
   heroId: string;
   /** 每個英雄的自訂牌組；沒有就每局自動組。 */
   decks: Record<string, string[]>;
@@ -115,16 +133,22 @@ interface App extends Saved {
   roomCode: string;
   /** 看牌庫頂選牌時，已經點選的牌。 */
   picks: number[];
-  /** 金幣、收藏、每日任務，存在這個瀏覽器裡。 */
+  /** 登入的帳號；null 就停在登入畫面。 */
+  session: Session | null;
+  /** 開卡包、兌換、記對局：測試帳號在瀏覽器裡算，Google 帳號交給伺服器。 */
+  backend: Backend | null;
+  /** 正在登入（等 Google 或伺服器回覆）。 */
+  loggingIn: boolean;
+  /** 金幣、收藏、每日任務。 */
   profile: Profile;
   shop: Shop;
 }
 
 const app: App = {
   format: SAVE_FORMAT,
-  screen: 'setup',
+  screen: 'login',
   heroId: SAMPLE_HEROES[1]!.id,
-  decks: loadDecks(db),
+  decks: {},
   builder: { heroId: SAMPLE_HEROES[1]!.id, filter: 'all', focus: null },
   state: null,
   mode: 'bot',
@@ -143,31 +167,108 @@ const app: App = {
   gameDeck: [],
   tally: emptyTally(),
   reward: null,
-  profile: loadProfile(db),
+  session: null,
+  backend: null,
+  loggingIn: false,
+  profile: newProfile(today(), []),
   shop: newShop(),
 };
 
+/** 登入成功：記住帳號、換成這個帳號的資料與牌組。 */
+function signIn(session: Session, profile: Profile): void {
+  saveSession(session);
+  Object.assign(app, {
+    session,
+    backend: backendFor(session, db),
+    profile,
+    decks: loadDecks(db, session.account.id),
+    loggingIn: false,
+    toast: null,
+    shop: newShop(),
+  });
+  if (app.screen === 'login') app.screen = 'setup';
+  render();
+}
+
+async function signOut(): Promise<void> {
+  if (app.session) await logout(app.session);
+  Object.assign(app, { session: null, backend: null, screen: 'login', decks: {}, state: null, view: null, toast: null });
+  render();
+}
+
+/** Google 選好帳號後：交給伺服器驗證。 */
+function onGoogleCredential(credential: string): void {
+  app.loggingIn = true;
+  render();
+  googleLogin(credential).then(
+    ({ session, profile }) => signIn(session, profile),
+    (error: unknown) => {
+      Object.assign(app, { loggingIn: false, toast: error instanceof Error ? error.message : 'Google 登入失敗' });
+      render();
+    },
+  );
+}
+
+/** 重新整理後回到上次登入的帳號；Google 帳號要問伺服器 session 還有沒有效。 */
+function restoreSession(): void {
+  const session = loadSession();
+  if (session?.kind === 'test') {
+    signIn(session, testProfile(db));
+  } else if (session?.kind === 'google') {
+    if (!ONLINE_AVAILABLE) return saveSession(null);
+    app.loggingIn = true;
+    fetchMe(session).then(
+      (me) => {
+        if (me) signIn({ ...session, account: me.account }, me.profile);
+        else {
+          saveSession(null);
+          Object.assign(app, { loggingIn: false, screen: 'login', toast: '登入已經過期，請重新登入' });
+          render();
+        }
+      },
+      (error: unknown) => {
+        Object.assign(app, { loggingIn: false, screen: 'login', toast: error instanceof Error ? error.message : '連不上遊戲伺服器' });
+        render();
+      },
+    );
+  }
+}
+
 /** 開始新的一局：清掉上一局的累計與獎勵。 */
 function resetGameRecord(deck: string[]): void {
+  settling = false;
   Object.assign(app, { gameDeck: deck, tally: emptyTally(), reward: null });
 }
 
+/** 這局已經送去結算了，避免重複。 */
+let settling = false;
+
 /** 對局結束：照勝負、這局的累計與牌組發金幣、推進每日任務。每局只結算一次。 */
 function settle(view: PlayerView): void {
-  if (app.reward || !view.result) return;
+  if (app.reward || settling || !view.result || !app.backend) return;
   const { winner, reason } = view.result;
   const conceded = reason === 'concede' && winner !== YOU;
   const summary = gameSummary(db, app.tally, app.gameDeck, winner === YOU, conceded);
-  const result = recordGame(app.profile, summary, today());
-  app.profile = result.profile;
-  saveProfile(app.profile);
-  const quest = questDef(app.profile.quest.id);
-  app.reward = {
-    winGold: result.winGold,
-    questGold: result.questGold,
-    quest: quest ? `${quest.text} ${app.profile.quest.progress}/${quest.goal}` : '',
-    conceded,
-  };
+  settling = true;
+  app.backend.recordGame(app.profile, summary).then(
+    (result) => {
+      settling = false;
+      app.profile = result.profile;
+      const quest = questDef(app.profile.quest.id);
+      app.reward = {
+        winGold: result.winGold,
+        questGold: result.questGold,
+        quest: quest ? `${quest.text} ${app.profile.quest.progress}/${quest.goal}` : '',
+        conceded,
+      };
+      render();
+    },
+    (error: unknown) => {
+      settling = false;
+      app.reward = { winGold: 0, questGold: 0, quest: '', conceded, error: error instanceof Error ? error.message : '出錯了' };
+      render();
+    },
+  );
 }
 
 function loadName(): string {
@@ -516,9 +617,8 @@ function creatureStatus(cv: CreatureView): string {
   if (cv.damageReduction) tags.push(`受到傷害 −${cv.damageReduction}`);
   if (cv.item) tags.push(`道具：${nameOf(cv.item)}`);
   if (cv.taunting) tags.push('挑釁中');
-  if (cv.poison) tags.push(`中毒 ${cv.poison}：牠的回合結束時失去 ${cv.poison}♥，♥ 上限也少 ${cv.poison}`);
-  if (cv.maxHpLost) tags.push(`中毒讓 ♥ 上限少了 ${cv.maxHpLost}`);
-  if (cv.burn) tags.push(`灼燒 ${cv.burn}：牠的回合結束時受到 ${cv.burn} 傷害`);
+  if (cv.poison) tags.push(`中毒 ${cv.poison}：施放者的回合結束時失去 ${cv.poison}♥`);
+  if (cv.burn) tags.push(`灼燒 ${cv.burn}：施放者的回合結束時受到 ${cv.burn} 傷害`);
   if (cv.paralyzed) tags.push('麻痺：不能攻擊、不能發動技能');
   if (cv.silenced) tags.push('沉默：不能發動技能，吸血與再生失效');
   if (cv.weakened) tags.push('虛弱：不能攻擊，也不會反擊');
@@ -834,6 +934,7 @@ function overlay(view: PlayerView): string {
 function rewardLines(): string {
   const reward = app.reward;
   if (!reward) return '';
+  if (reward.error) return `<p class="d-line reward">這局的金幣沒有記到：${esc(reward.error)}</p>`;
   if (reward.conceded) return '<p class="d-line reward">投降的對局不算金幣與任務進度。</p>';
   const lines: string[] = [];
   if (reward.winGold > 0) lines.push(`<span class="gain">+${reward.winGold} 金幣</span>（今天贏場 ${app.profile.winGoldToday}/${ECONOMY.dailyWinGoldCap}）`);
@@ -876,6 +977,33 @@ function playScreen(): string {
   </div>${overlay(view)}`;
 }
 
+/** 登入畫面：測試帳號，或 Google 帳號（要從遊戲伺服器打開、而且伺服器設定了 Google 登入）。 */
+function loginScreen(): string {
+  const google = !ONLINE_AVAILABLE
+    ? '<p class="d-line warn">這個網頁不是從遊戲伺服器打開的，不能用 Google 登入。要用的話，照 README 開遊戲伺服器。</p>'
+    : !GOOGLE_CLIENT_ID
+      ? '<p class="d-line warn">遊戲伺服器還沒設定 Google 登入（要設定 GOOGLE_CLIENT_ID，見 README）。</p>'
+      : app.loggingIn
+        ? '<p class="d-line">登入中……</p>'
+        : '<div id="google-button" class="google-slot"></div>';
+  return `<main class="setup login">
+    <header><h1>卡牌試玩桌</h1><p>登入後開始收集卡片、拿金幣、解每日任務。</p></header>
+    <div class="login-options">
+      <section class="login-card">
+        <p class="d-head">測試帳號</p>
+        <p class="d-line">一進來就有 10000 金幣、全部的卡都收滿，方便試玩各種牌組。資料存在這個瀏覽器裡，隨時可以重設。</p>
+        <button class="primary big" data-do="login-test" ${app.loggingIn ? 'disabled' : ''}>用測試帳號進入</button>
+      </section>
+      <section class="login-card">
+        <p class="d-head">Google 帳號</p>
+        <p class="d-line">金幣與收藏存在遊戲伺服器上，換電腦也還在。新帳號送五個英雄的起始牌組與 100 金幣。</p>
+        ${google}
+      </section>
+    </div>
+    ${app.toast ? `<p class="toast" role="alert">${esc(app.toast)}</p>` : ''}
+  </main>`;
+}
+
 function setupScreen(): string {
   const heroes = SAMPLE_HEROES.map((h) => {
     const [head, ...body] = describeHero(h);
@@ -895,12 +1023,18 @@ function setupScreen(): string {
     : problems.length
       ? `自訂牌組還不能用：${problems[0]}`
       : `用你的自訂牌組（${custom.length} 張）。`;
+  const who = app.session;
   return `<main class="setup">
-    <header><h1>卡牌試玩桌</h1><p>${
+    <header class="setup-head"><div><h1>卡牌試玩桌</h1><p>${
       ONLINE_AVAILABLE
         ? '選一名英雄，跟電腦打，或開一個房間跟朋友連線對戰。'
         : '選一名英雄，跟電腦打一局。對手的英雄隨機，開局時會先告訴你是誰。'
-    }</p></header>
+    }</p></div>
+      ${who ? `<div class="who">${who.account.picture ? `<img src="${esc(who.account.picture)}" alt="" referrerpolicy="no-referrer">` : ''}
+        <span>${esc(who.account.name)}${who.kind === 'test' ? '' : '<small>Google</small>'}</span>
+        ${who.kind === 'test' ? '<button class="ghost small" data-do="reset-test">重設</button>' : ''}
+        <button class="ghost small" data-do="logout">登出</button></div>` : ''}
+    </header>
     ${walletBar(app.profile)}
     <div class="heroes">${heroes}</div>
     <section class="deck-bar">
@@ -921,12 +1055,12 @@ function setupScreen(): string {
         <li>對手的生物在挑釁時，只能攻擊牠；選得到牠的技能也必須打牠，只打英雄的技能不受影響。</li>
         <li>手牌上限 10 張，滿手時抽到的牌直接進棄牌區。場地卡放在自己的場地區，只強化自己的生物。</li>
         <li>有些英雄有英雄進化卡：血量上限增加、天生技變強，每局只能進化一次。</li>
-        <li>異常狀態只會中在生物身上：中毒（牠的回合結束時失去血量，血量上限也跟著少）、灼燒（牠的回合結束時受到傷害）、麻痺（不能攻擊也不能發動技能）、沉默（不能發動技能、吸血與再生失效，身上的增益與挑釁直接消失）、虛弱（不能攻擊，也不會反擊）。後面三種都到牠的下個回合結束，進化會解除全部（中毒少掉的上限不會回來）。</li>
+        <li>異常狀態只會中在生物身上：中毒（施放者的回合結束時失去血量，減傷擋不住）、灼燒（施放者的回合結束時受到傷害）、麻痺（不能攻擊也不能發動技能）、沉默（不能發動技能、吸血與再生失效，身上的增益與挑釁直接消失）、虛弱（不能攻擊，也不會反擊）。後面三種都到牠的下個回合結束，進化會解除全部。</li>
         <li>把對手英雄的血量打到 0 就贏了。</li>
       </ul>
       <p class="note">試玩說明：範例卡有 ${SAMPLE_CARDS.length} 張，牌組照正式規則：${DEFAULT_RULES.deckSize} 張、同名最多 ${DEFAULT_RULES.maxCopies} 張、UR 最多 ${DEFAULT_RULES.maxUrCopies} 張、只能放英雄顏色內的卡與無色卡。
         你可以用收藏裡的卡自己組牌；電腦每局從全部的卡自動組一副。電腦用的是模擬平衡時的均衡打法。
-        金幣、收藏與牌組存在這個瀏覽器裡，換瀏覽器或清掉網站資料就會重來。</p>
+        測試帳號的金幣與收藏存在這個瀏覽器裡；Google 帳號的存在遊戲伺服器上。牌組都存在這個瀏覽器裡。</p>
     </section>
   </main>`;
 }
@@ -977,14 +1111,17 @@ function lobbyScreen(): string {
 function render(): void {
   const handScroll = root.querySelector('.hand')?.scrollLeft ?? 0;
   const custom = app.decks[app.builder.heroId];
-  // 開著頁面跨過午夜：換成今天的任務。
+  // 開著頁面跨過午夜：換成今天的任務（Google 帳號由伺服器在下一次存取時換）。
   const fresh = refreshDay(app.profile, today());
   if (fresh !== app.profile) {
     app.profile = fresh;
-    saveProfile(fresh);
+    if (app.session?.kind === 'test') saveTestProfile(fresh);
   }
+  // 還沒登入（或正在確認上次的登入）就顯示登入畫面；畫面本身不動，登入後回到原本的地方。
   root.innerHTML =
-    app.screen === 'setup'
+    app.screen === 'login' || !app.session
+      ? loginScreen()
+      : app.screen === 'setup'
       ? setupScreen()
       : app.screen === 'deck'
         ? deckScreen(db, app.builder, custom ?? [], custom !== undefined, owned())
@@ -993,6 +1130,10 @@ function render(): void {
           : app.screen === 'lobby'
             ? lobbyScreen()
             : playScreen();
+  const googleSlot = document.getElementById('google-button');
+  if (googleSlot) mountGoogleButton(googleSlot, onGoogleCredential).catch((error: unknown) => {
+    googleSlot.textContent = error instanceof Error ? error.message : '載入不了 Google 登入';
+  });
   const handEl = root.querySelector('.hand');
   if (handEl) handEl.scrollLeft = handScroll;
   const log = root.querySelector('.log');
@@ -1040,7 +1181,7 @@ function builderClick(el: HTMLElement, command: string | undefined): boolean {
   const deck = app.decks[heroId] ?? [];
   const edit = (next: string[]) => {
     app.decks = { ...app.decks, [heroId]: next };
-    saveDecks(app.decks);
+    saveDecks(app.decks, app.session!.account.id);
   };
   if (add) {
     if (addProblem(db, deck, add, owned()) === null) edit([...deck, add]);
@@ -1061,7 +1202,7 @@ function builderClick(el: HTMLElement, command: string | undefined): boolean {
   } else if (command === 'deck-forget') {
     const { [heroId]: _, ...rest } = app.decks;
     app.decks = rest;
-    saveDecks(app.decks);
+    saveDecks(app.decks, app.session!.account.id);
   } else if (command === 'deck-done') {
     app.screen = 'setup';
     window.scrollTo(0, 0);
@@ -1085,7 +1226,7 @@ root.addEventListener('click', (event) => {
   }
   const { do: command, key, hand: handUid, skill, hero: heroId, mull, pick } = el.dataset;
   if (app.screen === 'deck' && builderClick(el, command)) return;
-  if (app.screen === 'shop' && shopClick(db, app, el, command)) {
+  if (app.screen === 'shop' && app.backend && shopClick(db, app, app.backend, el, command, render)) {
     render();
     return;
   }
@@ -1127,6 +1268,14 @@ root.addEventListener('click', (event) => {
     app.toast = null;
     render();
     window.scrollTo(0, 0);
+  } else if (command === 'login-test') {
+    signIn({ kind: 'test', account: { id: 'test', name: '測試帳號', email: null, picture: null } }, testProfile(db));
+  } else if (command === 'logout') {
+    void signOut();
+  } else if (command === 'reset-test' && app.session?.kind === 'test') {
+    app.profile = resetTestProfile(db);
+    app.toast = '測試帳號已重設：10000 金幣、全部的卡';
+    render();
   } else if (command === 'shop') {
     Object.assign(app, { screen: 'shop', toast: null });
     app.shop = { ...app.shop, opened: null, dealing: false, notice: null };
@@ -1258,7 +1407,9 @@ function start(data: Partial<Saved>): void {
     data = { ...data, screen: 'setup', state: null, log: [], redraw: [] };
   }
   data = { ...data, format: SAVE_FORMAT };
-  Object.assign(app, data);
+  // 牌組跟著帳號存，不從快照還原；沒登入就停在登入畫面。
+  const { decks: _decks, ...rest } = data;
+  Object.assign(app, rest);
   if (!db.heroes.has(app.heroId)) app.heroId = SAMPLE_HEROES[1]!.id;
   if (app.state && app.screen === 'play') {
     YOU = 0;
@@ -1272,6 +1423,8 @@ function start(data: Partial<Saved>): void {
     app.screen = 'lobby';
     online.connect();
   }
+  restoreSession();
+  if (!app.session && !app.loggingIn) app.screen = 'login';
   render();
   void advance();
 }
