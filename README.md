@@ -67,6 +67,20 @@ npm run server                 # 預設埠 8787；要換埠：PORT=9000 npm run 
 - 房間與對局只存在伺服器的記憶體裡：伺服器重開，進行中的對局就沒了。沒有人連著的房間 30 分鐘後收掉。
 - 發布在 claude.ai 的試玩版只能跟電腦打；連線對戰要從這個伺服器打開網頁。
 
+## 部署在這台機器（給朋友玩）
+
+```bash
+scripts/deploy.sh          # 打包網頁，在 tmux 裡開伺服器與 Cloudflare 通道，印出 https 網址
+tmux attach -t card-game   # 看伺服器與通道的狀況（Ctrl-b d 離開，程式繼續跑）
+tmux kill-session -t card-game   # 停掉
+```
+
+- 用的是 Cloudflare 的免費通道（quick tunnel）：不用帳號、自動有 https，但**每次重開網址會變**。
+  只重開伺服器、不動通道的話網址不變：`tmux respawn-window -k -t card-game:server`。
+- 帳號資料在 `data/accounts.json`，重開也還在。伺服器與通道的紀錄在 `logs/`，網址在 `logs/url.txt`。
+- 這台機器重開機之後要再跑一次 `scripts/deploy.sh`。
+- 要固定網址（Google 登入需要），得用自己的網域或 Cloudflare 帳號建「具名通道」，網址固定後把它加進 Google 的「已授權的 JavaScript 來源」。
+
 ## Google 登入
 
 測試帳號哪裡都能用；Google 登入要從遊戲伺服器打開網頁，而且要先申請一個 OAuth client id：

@@ -78,7 +78,7 @@ import {
 import { ONLINE_AVAILABLE, OnlineClient } from './online';
 import { scriptedTurn, startTutorial, STEPS, TUTORIAL_KEY } from './tutorial';
 import { newShop, ownedOf, shopClick, shopScreen, walletBar, type Shop } from './shop';
-import { cardFace, esc, pips } from './ui';
+import { artUrl, cardFace, esc, pips } from './ui';
 import './style.css';
 
 const db = sampleDb();
@@ -1006,7 +1006,7 @@ function zone(cv: CreatureView | null, player: PlayerId, index: number, picks: M
   const invested = def.kind === 'creature' && def.token ? '衍' : cv.evolutionChain.map((id) => card(id).cost).join('+');
   // 背景是這隻生物目前那張卡的插圖，上下加深，字才看得清楚。
   classes.push('has-art');
-  return `<button class="${classes.join(' ')} r-${def.rarity}" data-key="${key}" style="--art:url('art/${def.id}.webp')" aria-label="${esc(def.name)}，費用 ${invested}，攻擊 ${cv.attack}，血量 ${cv.hp}">
+  return `<button class="${classes.join(' ')} r-${def.rarity}" data-key="${key}" style="--art:url('${artUrl(def.id)}')" aria-label="${esc(def.name)}，費用 ${invested}，攻擊 ${cv.attack}，血量 ${cv.hp}">
     <span class="z-top"><span class="z-cost">${invested}</span><span class="rarity">${def.rarity}</span>${pips(def.colors)}</span>
     <span class="z-name">${esc(def.name)}</span>
     <span class="z-stats"><span class="z-atk${buffed}" title="攻擊">⚔<b>${cv.attack}</b></span><span class="z-hp${hurt}" title="血量"><i aria-hidden="true">♥</i><b>${cv.hp}</b><small>/${cv.maxHp}</small></span></span>
@@ -1037,7 +1037,7 @@ function heroPlate(side: SideView, player: PlayerId, picks: Map<string, Action>)
   if (side.heroEvolution) classes.push('evolved');
   // 背景是英雄（進化後是英雄進化卡）的插圖。
   const art = side.heroEvolution ?? side.heroId;
-  return `<button class="${classes.join(' ')}" data-key="${key}" style="--art:url('art/${art}.webp')" aria-label="${esc(name)}，血量 ${hp}">
+  return `<button class="${classes.join(' ')}" data-key="${key}" style="--art:url('${artUrl(art)}')" aria-label="${esc(name)}，血量 ${hp}">
     <span class="h-name">${esc(name)}</span>${pips(h.colors)}
     <span class="h-hp"><i aria-hidden="true">♥</i><b>${hp}</b><small>/${side.heroMaxHp}</small></span>
     <span class="h-bar"><i style="width:${pct}%"></i></span>${extra}</button>`;

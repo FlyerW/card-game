@@ -28,6 +28,12 @@ export function kindLabel(def: DeckCardDef): string {
   }
 }
 
+/**
+ * 插圖的完整網址。CSS 變數裡的相對網址會照「用到它的樣式表」去解析（打包後樣式表在 assets/ 底下），
+ * 所以在這裡先換成完整網址。
+ */
+export const artUrl = (id: string): string => new URL(`art/${id}.webp`, document.baseURI).href;
+
 export interface FaceOptions {
   /** 放在 <button> 上的屬性，例如 data-hand="3"。 */
   attrs?: string;
@@ -57,7 +63,7 @@ export function cardFace(def: DeckCardDef | HeroDef, options: FaceOptions = {}):
   const tint = def.colors[0] ?? 'none';
   return `<button class="${classes}" ${options.attrs ?? ''}>
       ${cost}<span class="c-name">${esc(def.name)}</span>${pips(def.colors)}
-      <span class="c-art art-${tint}" style="--art:url('art/${def.id}.webp')" aria-hidden="true"></span>
+      <span class="c-art art-${tint}" style="--art:url('${artUrl(def.id)}')" aria-hidden="true"></span>
       <span class="c-foot"><span class="c-kind"><span class="rarity">${rarity}</span>${kind}</span>${stats}</span>
       ${options.mark ? `<span class="c-mark">${esc(options.mark)}</span>` : ''}
     </button>`;
