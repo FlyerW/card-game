@@ -12,7 +12,10 @@ const dataDir = process.env.DATA_DIR ?? fileURLToPath(new URL('../../../data/', 
 const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim() || null;
 const ecpay = ecpayFromEnv(process.env);
 const publicUrl = process.env.PUBLIC_URL?.trim() || null;
-const { port: bound } = await startServer({ port, dataDir, googleClientId, ecpay, publicUrl });
+// CARD_PREVIEW=1：預覽還沒發布的卡包系列（開得到、組得到）。
+const preview = process.env.CARD_PREVIEW === '1';
+const { port: bound } = await startServer({ port, dataDir, googleClientId, ecpay, publicUrl, preview });
+if (preview) console.log('預覽模式：還沒發布的卡包系列也開放。');
 
 const lan = Object.values(networkInterfaces())
   .flat()

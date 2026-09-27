@@ -281,3 +281,21 @@ describe('牌組驗證', () => {
     ]);
   });
 });
+
+describe('第二彈（還沒發布）', () => {
+  const preview = sampleDb(true);
+  const expansion = [...preview.cards.values()].filter((card) => card.set === 'awakening');
+
+  it('預覽的資料庫建得起來；平常的資料庫看不到第二彈', () => {
+    expect(expansion.length).toBeGreaterThanOrEqual(25);
+    expect([...sampleDb().cards.values()].some((card) => card.set === 'awakening')).toBe(false);
+  });
+
+  it('技能數照稀有度（持續效果、同族加成算一個技能）', () => {
+    const expected = { N: 0, R: 1, SR: 1, UR: 2 } as const;
+    for (const card of expansion) {
+      if (card.kind !== 'creature') continue;
+      expect(card.skills.length + (card.triggers?.length ?? 0) + (card.kin ? 1 : 0), card.name).toBe(expected[card.rarity]);
+    }
+  });
+});

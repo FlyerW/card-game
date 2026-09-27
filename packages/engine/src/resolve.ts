@@ -10,6 +10,7 @@ import {
   fieldDef,
   hasLifesteal,
   heroHp,
+  heroPassives,
   isSilenced,
   isToken,
   isWeakened,
@@ -205,9 +206,12 @@ function liveCreature(state: GameState, target: Target | null, uid: number | nul
 /** 造成傷害，回傳實際造成多少（扣掉減傷）。 */
 function dealDamage(ctx: Ctx, target: Target, creature: Creature | null, amount: number): number {
   if (target.kind === 'hero') {
-    ctx.state.players[target.player].heroDamage += amount;
-    ctx.events.push({ type: 'damaged', target, amount });
-    return amount;
+    // BOSS 的英雄減傷。
+    const armor = heroPassives(ctx.db, ctx.state, target.player).reduce((sum, passive) => sum + (passive.heroArmor ?? 0), 0);
+    const dealt = Math.max(0, amount - armor);
+    ctx.state.players[target.player].heroDamage += dealt;
+    ctx.events.push({ type: 'damaged', target, amount: dealt });
+    return dealt;
   }
   if (creature !== null) {
     const dealt = Math.max(0, amount - damageReduction(ctx.db, ctx.state, creature));

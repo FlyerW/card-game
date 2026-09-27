@@ -57,6 +57,7 @@ import type {
   Rules,
   Target,
 } from './types';
+import { AWAKEN_AT } from './types';
 
 export type ApplyResult =
   | { ok: true; state: GameState; events: GameEvent[] }
@@ -134,10 +135,14 @@ function ownCreature(state: GameState, player: PlayerId, zone: number) {
   return state.players[player].zones[zone] ?? fail('NO_CREATURE', `格子 ${zone + 1} 沒有生物`);
 }
 
-function spellAbility(db: CardDb, cardId: string): Ability | null {
+/** 覺醒了沒：能量上限 8 以上。 */
+const awakened = (state: GameState, player: PlayerId) => state.players[player].maxEnergy >= AWAKEN_AT;
+
+function spellAbility(db: CardDb, state: GameState, player: PlayerId, cardId: string): Ability | null {
   const def = cardDef(db, cardId);
   if (def.kind !== 'spell') return null;
-  return { name: def.name, cost: def.cost, target: def.target, effects: def.effects };
+  const effects = def.awaken && awakened(state, player) ? [...def.effects, ...def.awaken] : def.effects;
+  return { name: def.name, cost: def.cost, target: def.target, effects };
 }
 
 /** 驗證玩家選的目標；只有一個合法目標時可以不選。 */
@@ -168,7 +173,8 @@ function triggerEntry(ctx: Ctx, def: CreatureDef, player: PlayerId, zone: number
     if (chosen !== undefined) fail('TARGET_NOT_ALLOWED', `${def.name} 沒有進場效果，不需要指定目標`);
     return;
   }
-  const ability: Ability = { ...def.entry, cost: 0 };
+  const { awaken, ...entry } = def.entry;
+  const ability: Ability = { ...entry, cost: 0, effects: awaken && awakened(ctx.state, player) ? [...entry.effects, ...awaken] : entry.effects };
   const source: AbilitySource = { kind: 'creature', player, zone };
   // 進場效果不能選自己（例如「目標增益 2」不能加在自己身上）。
   const self: Target = { kind: 'creature', player, zone };
@@ -218,6 +224,12 @@ function startTurn(ctx: Ctx, player: PlayerId): void {
   p.energy = p.maxEnergy + (isFirstTurn && !isFirstPlayer ? rules.secondPlayerBonusEnergy : 0);
   tickRegenerate(ctx, player);
   tickField(ctx, player);
+  // BOSS 的被動：回合開始時發動的效果。
+  for (const passive of heroPassives(db, state, player)) {
+    if (!passive.turnStart || state.phase !== 'main') continue;
+    ctx.events.push({ type: 'abilityUsed', player, source: 'hero', cardId: heroDef(db, state, player).id, ability: passive.name });
+    resolveAbility(ctx, { name: passive.name, effects: passive.turnStart }, { kind: 'hero', player }, null);
+  }
   if (state.phase === 'main') fireTriggers(ctx, player, 'turnStart');
 }
 
@@ -425,7 +437,7 @@ function castSpell(ctx: Ctx, a: ActionOf<'castSpell'>): void {
   const { db, state } = ctx;
   const p = state.players[a.player];
   const card = handCard(p, a.card);
-  const spell = spellAbility(db, card.cardId) ?? fail('WRONG_CARD_KIND', `${cardDef(db, card.cardId).name} 不是法術卡`);
+  const spell = spellAbility(db, state, a.player, card.cardId) ?? fail('WRONG_CARD_KIND', `${cardDef(db, card.cardId).name} 不是法術卡`);
 
   const source: AbilitySource = { kind: 'spell', player: a.player };
   const target = chooseTarget(ctx, spell, source, a.target);
@@ -645,7 +657,7 @@ export function createEngine(db: CardDb) {
       source = { kind: 'hero', player };
     } else {
       const card = state.players[player].hand.find((c) => c.uid === ref.card);
-      ability = card === undefined ? null : spellAbility(db, card.cardId);
+      ability = card === undefined ? null : spellAbility(db, state, player, card.cardId);
       source = { kind: 'spell', player };
     }
     return ability == null ? [] : legalTargets(state, ability, source);
@@ -692,7 +704,7 @@ export function createEngine(db: CardDb) {
           for (const target of targets) candidates.push({ type, player, card: card.uid, zone, target });
         }
       } else if (def.kind === 'spell') {
-        const spell = spellAbility(db, card.cardId)!;
+        const spell = spellAbility(db, state, player, card.cardId)!;
         withTargets({ type: 'castSpell', player, card: card.uid }, spell, targetsFor(state, player, { kind: 'spell', card: card.uid }));
       } else if (def.kind === 'item') {
         for (const zone of zones) candidates.push({ type: 'attachItem', player, card: card.uid, zone });

@@ -1,5 +1,6 @@
 import { DEFAULT_RULES, type CardDb } from '@card-game/engine';
 import {
+  clearStage,
   craft,
   fullProfile,
   openPacks,
@@ -10,6 +11,7 @@ import {
   type GameReward,
   type GameSummary,
   type PackCard,
+  type AdventureDifficulty,
   type Profile,
   type SavedDeck,
   type RankState,
@@ -211,8 +213,8 @@ export const topupStatus = (session: ServerSession, tradeNo: string) =>
   api<{ status: 'pending' | 'paid'; gold: number; profile: Profile }>('/api/topup/status', session.token, { tradeNo });
 
 export interface Backend {
-  /** 開 count 包（1 或 10）。 */
-  openPack(profile: Profile, count: number): Promise<EconomyResult<{ profile: Profile; cards: PackCard[] }>>;
+  /** 開 count 包（1 或 10）；set 是哪一彈的卡包。 */
+  openPack(profile: Profile, count: number, set: string): Promise<EconomyResult<{ profile: Profile; cards: PackCard[] }>>;
   craft(profile: Profile, cardId: string): Promise<EconomyResult<{ profile: Profile }>>;
   /** record：跟電腦打的才有，伺服器帳號會記進對局紀錄。 */
   recordGame(profile: Profile, summary: GameSummary, record?: BotGameRecord): Promise<GameReward>;
@@ -220,6 +222,8 @@ export interface Backend {
   saveDeck(deck: SavedDeck): Promise<void>;
   deleteDeck(id: string): Promise<void>;
   selectDeck(heroId: string, id: string | null): Promise<void>;
+  /** 冒險模式打過一關：第一次打過給 100 金幣。 */
+  clearStage(profile: Profile, stage: string, difficulty: AdventureDifficulty): Promise<{ profile: Profile; gold: number }>;
   /** 儲值：伺服器帳號而且伺服器開放儲值才有。 */
   topup: ((topupId: string) => Promise<TopupCheckout>) | null;
 }
@@ -236,12 +240,18 @@ export function backendFor(session: Session, db: CardDb): Backend {
       return result;
     };
     return {
-      openPack: async (profile, count) => saved(openPacks(refreshDay(profile, today()), db, DEFAULT_RULES, Math.random, count)),
+      openPack: async (profile, count, set) => saved(openPacks(refreshDay(profile, today()), db, DEFAULT_RULES, Math.random, count, set)),
       craft: async (profile, cardId) => saved(craft(profile, db, DEFAULT_RULES, cardId)),
       recordGame: async (profile, summary) => {
         const reward = recordGame(profile, summary, today());
         saveTestProfile(reward.profile);
         return reward;
+      },
+      clearStage: async (profile, stage, difficulty) => {
+        const cleared = clearStage(profile, stage, difficulty);
+        if (!cleared) throw new Error('沒有這一關，或還沒解鎖');
+        saveTestProfile(cleared.profile);
+        return cleared;
       },
       saveDeck: async () => undefined,
       deleteDeck: async () => undefined,
@@ -251,9 +261,9 @@ export function backendFor(session: Session, db: CardDb): Backend {
   }
   const { token } = session;
   return {
-    openPack: async (_profile, count) => {
+    openPack: async (_profile, count, set) => {
       try {
-        return { ok: true, ...(await api<{ profile: Profile; cards: PackCard[] }>('/api/pack', token, { count })) };
+        return { ok: true, ...(await api<{ profile: Profile; cards: PackCard[] }>('/api/pack', token, { count, set })) };
       } catch (error) {
         return failed(error);
       }
@@ -266,6 +276,7 @@ export function backendFor(session: Session, db: CardDb): Backend {
       }
     },
     recordGame: (_profile, summary, record) => api<GameReward>('/api/game', token, { summary, record }),
+    clearStage: (_profile, stage, difficulty) => api<{ profile: Profile; gold: number }>('/api/adventure/clear', token, { stage, difficulty }),
     saveDeck: async (deck) => {
       await api('/api/decks/save', token, { deck });
     },

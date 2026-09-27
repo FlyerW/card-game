@@ -607,6 +607,17 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 
 /* 卡牌說明下面的關鍵字解釋 */
 .detail:empty { display: none; }
+/* 冒險模式 */
+.stages { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-top: 12px; }
+.stage { background: var(--mat); border: 1px solid var(--mat-edge); border-radius: var(--radius); padding: 14px 16px; display: grid; gap: 6px; }
+.stage.locked { opacity: .5; }
+.stage-title { margin: 0; font: 700 17px/1.3 var(--display); color: var(--hero-ink); }
+.stage-mark { font-size: 12px; color: var(--ink-faint); margin-left: 6px; }
+.stage-mark.done { color: var(--heal); }
+.stage-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.stage-buttons .nightmare:not(:disabled) { border-color: #c38bff; color: #d9c8ff; }
+.story { margin: 0; line-height: 1.8; color: var(--ink); font-size: 14.5px; }
+.mode-adventure { border-color: #c38bff66; }
 /* 開局畫面的牌組清單：點一副選來開局用，旁邊「編輯」進組牌畫面 */
 .deck-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; }
 .deck-actions { display: flex; gap: 8px; }

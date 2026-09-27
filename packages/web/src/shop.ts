@@ -12,7 +12,7 @@ import {
   type HeroDef,
   type Rarity,
 } from '@card-game/engine';
-import { ECONOMY, PACK_BATCH, packItems, questDef, TOPUPS, type PackCard, type PackItem, type Profile } from '@card-game/economy';
+import { ECONOMY, PACK_BATCH, packItems, packSets, questDef, TOPUPS, type PackCard, type PackItem, type Profile } from '@card-game/economy';
 import type { Backend } from './account';
 import { cardFace, detailLines, esc, pips } from './ui';
 
@@ -34,6 +34,10 @@ export interface Shop {
   cost: number | 'all';
   /** 種類：生物、法術、道具・場地・英雄進化、英雄。 */
   kind: 'all' | 'creature' | 'spell' | 'other' | 'hero';
+  /** 要開哪一彈的卡包。 */
+  pack: string;
+  /** 收藏只看哪一彈；all 是全部。 */
+  series: string;
   /** 只看還沒收齊的卡。 */
   missing: boolean;
   /** 正在前往綠界付款頁（跟開卡包的 busy 分開）。 */
@@ -54,6 +58,8 @@ export const newShop = (): Shop => ({
   color: 'all',
   cost: 'all',
   kind: 'all',
+  pack: 'core',
+  series: 'all',
   missing: false,
   paying: false,
   focus: null,
@@ -147,6 +153,7 @@ export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: stri
   const shown = all
     .filter((card) => shop.rarity === 'all' || card.rarity === shop.rarity)
     .filter((card) => (shop.color === 'all' ? true : shop.color === 'none' ? card.colors.length === 0 : card.colors.includes(shop.color)))
+    .filter((card) => shop.series === 'all' || card.set === shop.series)
     .filter((card) => {
       const kind = card.def.kind;
       if (shop.kind === 'all') return true;
@@ -162,6 +169,15 @@ export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: stri
   const rarityChips = [chip('data-rarity', 'all', '全部稀有度', shop.rarity === 'all'), ...RARITIES.map((r) => chip('data-rarity', r, r, shop.rarity === r))].join('');
   const kindOptions: [Shop['kind'], string][] = [['all', '全部種類'], ['creature', '生物'], ['spell', '法術'], ['other', '道具・場地・英雄進化'], ['hero', '英雄']];
   const kindChips = kindOptions.map(([k, label]) => chip('data-kind', k, label, shop.kind === k)).join('');
+  // 有兩彈以上：上面選要開哪一種卡包，收藏也能只看某一彈。
+  const sets = packSets(db);
+  const pack = sets.find((set) => set.id === shop.pack) ?? sets[0]!;
+  const packTabs = sets.length > 1
+    ? `<div class="chips pack-tabs">${sets.map((set) => chip('data-pack', set.id, `${set.name}${set.released ? '' : '（預覽）'}`, set.id === pack.id)).join('')}</div>`
+    : '';
+  const seriesChips = sets.length > 1
+    ? `<div class="chips">${[chip('data-series', 'all', '全部系列', shop.series === 'all'), ...sets.map((set) => chip('data-series', set.id, set.name, shop.series === set.id))].join('')}</div>`
+    : '';
   const colors: [ColorFilter, string][] = [['all', '全部顏色'], ...(Object.entries(COLOR_NAMES) as [Color, string][]), ['none', '無色']];
   const colorChips = colors.map(([c, label]) => chip('data-color', c, label, shop.color === c)).join('');
   const costs: (number | 'all')[] = ['all', 1, 2, 3, 4, 5, 6, 7];
@@ -212,9 +228,10 @@ export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: stri
         <p>收藏 ${kinds}/${all.length} 種，共 ${copies} 張。贏一場 ${ECONOMY.winGold} 金幣（每天最多 ${ECONOMY.dailyWinGoldCap}），完成每日任務 ${ECONOMY.questReward} 金幣。</p></div>
       <div class="w-gold"><span class="coin" aria-hidden="true"></span><b>${profile.gold}</b><span>金幣</span></div>
     </header>
+    ${packTabs}
     <section class="pack-bar">
       <div class="pack-info">
-        <p class="d-head">卡包・${ECONOMY.packPrice} 金幣</p>
+        <p class="d-head">${sets.length > 1 ? `${pack.name}・` : '卡包・'}${ECONOMY.packPrice} 金幣</p>
         <p class="d-line">一包 ${ECONOMY.packSize} 張，每張 R ${pct(R)}、SR ${pct(SR)}、UR ${pct(UR)}，其餘 N；每包至少一張 R 以上。
           UR 也可能開到多色的 UR 英雄。已經有 ${DEFAULT_RULES.maxCopies} 張（UR ${DEFAULT_RULES.maxUrCopies} 張、英雄 1 個）的再開到，換成粉塵
           （N ${ECONOMY.dustValue.N}、R ${ECONOMY.dustValue.R}、SR ${ECONOMY.dustValue.SR}、UR ${ECONOMY.dustValue.UR}），粉塵可以合成任意一張卡。</p>
@@ -231,6 +248,7 @@ export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: stri
     ${shop.opened ? packRow(db, profile, shop.opened, shop.dealing) : ''}
     <div class="b-body">
       <section class="b-pool" aria-label="收藏">
+        ${seriesChips}
         <div class="chips">${kindChips}</div>
         <div class="chips">${rarityChips}</div>
         <div class="chips">${colorChips}</div>
@@ -262,7 +280,7 @@ export function shopClick(
   command: string | undefined,
   rerender: () => void,
 ): boolean {
-  const { focus, rarity, color, cost, kind, missing, craft: craftId, topup } = el.dataset;
+  const { focus, rarity, color, cost, kind, missing, craft: craftId, topup, pack, series } = el.dataset;
   host.toast = null;
   host.shop.dealing = false;
   host.shop.notice = null;
@@ -302,6 +320,10 @@ export function shopClick(
     host.shop.cost = cost === 'all' ? 'all' : Number(cost);
   } else if (kind) {
     host.shop.kind = kind as Shop['kind'];
+  } else if (pack) {
+    host.shop.pack = pack;
+  } else if (series) {
+    host.shop.series = series;
   } else if (missing) {
     host.shop.missing = missing === 'true';
   } else if ((command === 'open-pack' || command === 'open-packs' || craftId) && !host.shop.busy) {
@@ -311,7 +333,7 @@ export function shopClick(
       rerender();
     };
     if (command === 'open-pack' || command === 'open-packs') {
-      void backend.openPack(host.profile, command === 'open-packs' ? PACK_BATCH : 1).then((opened) => {
+      void backend.openPack(host.profile, command === 'open-packs' ? PACK_BATCH : 1, host.shop.pack).then((opened) => {
         if (opened.ok) {
           host.profile = opened.profile;
           host.shop.opened = opened.cards;

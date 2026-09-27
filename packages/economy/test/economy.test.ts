@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { copyLimit, DEFAULT_RULES, SAMPLE_HEROES, sampleDb, validateDeck, type GameEvent } from '@card-game/engine';
 import {
+  ADVENTURE,
+  ADVENTURE_REWARD,
+  clearedOn,
+  clearStage,
+  stageUnlocked,
   ECONOMY,
   emptyTally,
   cleanBook,
@@ -21,6 +26,8 @@ import {
   ownedDeck,
   ownershipProblems,
   packableCards,
+  packItems,
+  packSets,
   parseProfile,
   parseSummary,
   QUESTS,
@@ -356,5 +363,73 @@ describe('牌組清單', () => {
     for (let i = 0; i < DECK_LIMIT; i++) book = putDeck(book, { id: `deck${i}x`, name: `#${i}`, heroId: 'flame-lord', cards: [] })!;
     expect(putDeck(book, { id: 'onemore', name: 'x', heroId: 'flame-lord', cards: [] })).toBeNull();
     expect(cleanDeck(db, { id: 'abcd1', name: '很'.repeat(50), heroId: 'flame-lord', cards: [] })!.name).toHaveLength(DECK_NAME_LIMIT);
+  });
+});
+
+describe('卡包系列', () => {
+  const preview = sampleDb(true);
+  const setOfId = (id: string) => preview.cards.get(id)?.set ?? 'core';
+
+  it('平常只有基本卡包；預覽時多一種第二彈卡包', () => {
+    expect(packSets(db).map((set) => set.id)).toEqual(['core']);
+    expect(packSets(preview).map((set) => set.id)).toEqual(['core', 'awakening']);
+  });
+
+  it('開哪一彈的卡包，就只開到那一彈的卡', () => {
+    const rich = { ...fresh(), gold: ECONOMY.packPrice * 20 };
+    const core = openPacks(rich, preview, DEFAULT_RULES, seededRandom(5), 10, 'core');
+    const awakening = openPacks(rich, preview, DEFAULT_RULES, seededRandom(5), 10, 'awakening');
+    if (!core.ok || !awakening.ok) throw new Error('開不了');
+    expect(core.cards.every((got) => got.hero || setOfId(got.cardId) === 'core')).toBe(true);
+    expect(awakening.cards.every((got) => setOfId(got.cardId) === 'awakening')).toBe(true);
+    expect(openPack(rich, preview, DEFAULT_RULES, seededRandom(1), 'nope')).toMatchObject({ ok: false });
+  });
+});
+
+describe('冒險模式', () => {
+  const [first, second] = [ADVENTURE[0]!, ADVENTURE[1]!];
+
+  it('共 5 關，每關的 BOSS（一般與惡夢）都在卡池裡，而且開卡包開不到', () => {
+    expect(ADVENTURE).toHaveLength(5);
+    const packable = new Set(packItems(db, DEFAULT_RULES).map((item) => item.id));
+    for (const stage of ADVENTURE) {
+      for (const id of [stage.boss.normal, stage.boss.nightmare]) {
+        expect(db.heroes.get(id)?.boss).toBe(true);
+        expect(packable.has(id)).toBe(false);
+      }
+    }
+  });
+
+  it('第一關一開始就能打；前一關打過（哪個難度都可以）才解鎖下一關', () => {
+    let profile = fresh();
+    expect(stageUnlocked(profile, 0)).toBe(true);
+    expect(stageUnlocked(profile, 1)).toBe(false);
+    expect(clearStage(profile, second.id, 'normal')).toBeNull();
+    profile = clearStage(profile, first.id, 'hard')!.profile;
+    expect(stageUnlocked(profile, 1)).toBe(true);
+    expect(stageUnlocked(profile, 2)).toBe(false);
+  });
+
+  it('每一關第一次打過給 100 金幣，換難度或再打一次都不會再給', () => {
+    const start = fresh();
+    const once = clearStage(start, first.id, 'normal')!;
+    expect(once.gold).toBe(ADVENTURE_REWARD);
+    expect(once.profile.gold).toBe(start.gold + ADVENTURE_REWARD);
+    const again = clearStage(once.profile, first.id, 'normal')!;
+    const nightmare = clearStage(again.profile, first.id, 'nightmare')!;
+    expect([again.gold, nightmare.gold]).toEqual([0, 0]);
+    expect(nightmare.profile.gold).toBe(once.profile.gold);
+    expect(clearedOn(nightmare.profile, first.id)).toEqual(['normal', 'nightmare']);
+  });
+
+  it('沒有這一關、不認得的難度都不算', () => {
+    const profile = fresh();
+    expect(clearStage(profile, 'nowhere', 'normal')).toBeNull();
+    expect(clearStage(profile, first.id, 'constructor' as never)).toBeNull();
+  });
+
+  it('通關紀錄跟著存檔一起讀回來', () => {
+    const cleared = clearStage(fresh(), first.id, 'normal')!.profile;
+    expect(clearedOn(parseProfile(JSON.parse(JSON.stringify(cleared)))!, first.id)).toEqual(['normal']);
   });
 });

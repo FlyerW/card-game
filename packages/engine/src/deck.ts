@@ -84,7 +84,8 @@ export function decodeDeckCode(db: CardDb, code: string): { heroId: string; card
     return null;
   }
   const [heroId = '', list = ''] = text.split('|');
-  if (!db.heroes.has(heroId)) return null;
+  const hero = db.heroes.get(heroId);
+  if (!hero || hero.boss) return null;
   const cards: string[] = [];
   for (const entry of list ? list.split(',') : []) {
     const [id = '', n = '1'] = entry.split('*');

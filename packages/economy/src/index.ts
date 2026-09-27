@@ -1,6 +1,9 @@
 import {
+  CARD_SETS,
   COLOR_NAMES,
   copyLimit,
+  setOf,
+  type CardSet,
   RARITIES,
   deckPool,
   type CardDb,
@@ -12,6 +15,7 @@ import {
   type Rules,
 } from '@card-game/engine';
 import { buildDeck } from '@card-game/sim/deck';
+import type { AdventureDifficulty } from './adventure';
 
 // 經濟系統：金幣、每日任務、卡包、粉塵合成。全部是純函式，輸入舊的玩家資料、輸出新的，
 // 不碰網路也不碰儲存，所以能直接寫測試；目前由網頁存在瀏覽器裡，之後搬到伺服器的帳號上。
@@ -50,6 +54,8 @@ export interface Profile {
   collection: Record<string, number>;
   /** 粉塵：開到多餘的卡換來的，用來合成任意一張卡。 */
   dust: number;
+  /** 冒險模式：每一關打過了哪些難度。 */
+  adventure?: Record<string, AdventureDifficulty[]>;
   /** 每日資料屬於哪一天（YYYY-MM-DD）。 */
   day: string;
   /** 今天從贏場拿到的金幣。 */
@@ -234,14 +240,23 @@ export interface PackItem {
   rarity: Rarity;
   limit: number;
   hero: boolean;
+  /** 屬於哪一彈（開哪一種卡包開得到）。 */
+  set: string;
 }
 
+/** 所有收藏得到的東西（每一彈都算）：合成、全卡帳號、收藏畫面用。 */
 export const packItems = (db: CardDb, rules: Rules): PackItem[] => [
-  ...packableCards(db).map((card) => ({ id: card.id, name: card.name, rarity: card.rarity, limit: copyLimit(rules, card), hero: false })),
+  ...packableCards(db).map((card) => ({ id: card.id, name: card.name, rarity: card.rarity, limit: copyLimit(rules, card), hero: false, set: setOf(card) })),
   ...[...db.heroes.values()]
-    .filter((hero) => hero.rarity === 'UR')
-    .map((hero) => ({ id: hero.id, name: hero.name, rarity: 'UR' as const, limit: 1, hero: true })),
+    .filter((hero) => hero.rarity === 'UR' && !hero.boss)
+    .map((hero) => ({ id: hero.id, name: hero.name, rarity: 'UR' as const, limit: 1, hero: true, set: setOf(hero) })),
 ];
+
+/** 這個資料庫裡有卡的系列（商店上一個系列一種卡包）。 */
+export const packSets = (db: CardDb): CardSet[] => {
+  const present = new Set([...db.cards.values()].map((card) => setOf(card)));
+  return CARD_SETS.filter((set) => present.has(set.id));
+};
 
 export interface PackCard {
   /** 卡或英雄的 id。 */
@@ -275,16 +290,26 @@ function rollGuaranteed(random: () => number): Rarity {
   return 'R';
 }
 
-/** 買一包並打開：扣 100 金幣，抽 5 張（UR 可能是英雄）；已經有滿的換成粉塵。 */
-export function openPack(profile: Profile, db: CardDb, rules: Rules, random: () => number): EconomyResult<{ profile: Profile; cards: PackCard[] }> {
+/** 買一包並打開：扣 100 金幣，抽 5 張（UR 可能是英雄）；已經有滿的換成粉塵。set 是哪一彈的卡包，只開得到那一彈的卡。 */
+export function openPack(
+  profile: Profile,
+  db: CardDb,
+  rules: Rules,
+  random: () => number,
+  set = 'core',
+): EconomyResult<{ profile: Profile; cards: PackCard[] }> {
   if (profile.gold < ECONOMY.packPrice) return { ok: false, reason: `金幣不夠：一包 ${ECONOMY.packPrice}，目前 ${profile.gold}` };
-  const pool = packItems(db, rules);
+  const pool = packItems(db, rules).filter((item) => item.set === set);
+  if (pool.length === 0) return { ok: false, reason: '沒有這種卡包' };
   const rarities = Array.from({ length: ECONOMY.packSize }, () => rollRarity(random));
   if (!rarities.some((rarity) => rarity !== 'N')) rarities[rarities.length - 1] = rollGuaranteed(random);
 
   const next = structuredClone(profile);
   next.gold -= ECONOMY.packPrice;
-  const cards = rarities.map((rarity): PackCard => {
+  const cards = rarities.map((wanted): PackCard => {
+    // 這一彈沒有這個稀有度的話，往下一級找。
+    const order: Rarity[] = ['UR', 'SR', 'R', 'N'];
+    const rarity = order.slice(order.indexOf(wanted)).find((r) => pool.some((item) => item.rarity === r)) ?? pool[0]!.rarity;
     const choices = pool.filter((item) => item.rarity === rarity);
     const item = choices[Math.floor(random() * choices.length)]!;
     const owned = next.collection[item.id] ?? 0;
@@ -306,13 +331,14 @@ export function openPacks(
   rules: Rules,
   random: () => number,
   count: number,
+  set = 'core',
 ): EconomyResult<{ profile: Profile; cards: PackCard[] }> {
   const price = ECONOMY.packPrice * count;
   if (profile.gold < price) return { ok: false, reason: `金幣不夠：${count} 包 ${price}，目前 ${profile.gold}` };
   let current = profile;
   const cards: PackCard[] = [];
   for (let i = 0; i < count; i++) {
-    const opened = openPack(current, db, rules, random);
+    const opened = openPack(current, db, rules, random, set);
     if (!opened.ok) return opened;
     current = opened.profile;
     cards.push(...opened.cards);
@@ -405,3 +431,4 @@ export function seededRandom(seed: number): () => number {
 }
 export * from './rank';
 export * from './decks';
+export * from './adventure';

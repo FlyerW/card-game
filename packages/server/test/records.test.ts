@@ -40,6 +40,22 @@ describe('伺服器上的牌組、卡包與對局紀錄', () => {
   };
   const signUp = async (name: string) => (await call('/api/login/password', { body: { name, password: 'secret-123', create: true } })).json.token as string;
 
+  it('冒險模式：打過一關第一次給 100 金幣，之後不再給；還沒解鎖的關卡不收', async () => {
+    const token = await signUp('冒險的人');
+    const gold = async () => (await call('/api/me', { token })).json.profile.gold as number;
+    const before = await gold();
+    const clear = (stage: string, difficulty: string) => call('/api/adventure/clear', { token, body: { stage, difficulty } });
+    expect((await clear('tide-cave', 'normal')).status).toBe(400); // 第二關還沒解鎖
+    const first = await clear('mist-forest', 'normal');
+    expect(first.status).toBe(200);
+    expect(first.json.gold).toBe(100);
+    expect((await clear('mist-forest', 'nightmare')).json.gold).toBe(0);
+    expect((await clear('mist-forest', 'bogus')).status).toBe(400);
+    expect(await gold()).toBe(before + 100);
+    expect((await call('/api/me', { token })).json.profile.adventure).toEqual({ 'mist-forest': ['normal', 'nightmare'] });
+    expect((await clear('tide-cave', 'hard')).status).toBe(200);
+  });
+
   it('牌組清單存在帳號上：同一個英雄存很多副、選開局用哪一副、刪掉；/api/me 帶回來', async () => {
     const token = await signUp('組牌的人');
     const cards = deckFor(white);

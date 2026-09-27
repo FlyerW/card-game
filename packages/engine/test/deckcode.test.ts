@@ -23,6 +23,7 @@ describe('牌組代碼', () => {
     expect(decodeDeckCode(db, encodeDeckCode('nobody', ['squire']))).toBeNull();
     expect(decodeDeckCode(db, encodeDeckCode('nameless-swordsman', ['no-such-card']))).toBeNull();
     expect(decodeDeckCode(db, encodeDeckCode('nameless-swordsman', ['soldier-token']))).toBeNull();
+    expect(decodeDeckCode(db, encodeDeckCode('boss-lich-lord', ['squire']))).toBeNull(); // 冒險模式的 BOSS 不能拿來組牌
     // 前後有空白（複製時常多帶）照樣讀得到
     expect(decodeDeckCode(db, `  ${encodeDeckCode('deep-seer', ['ice-shard'])}\n`)?.cards).toEqual(['ice-shard']);
   });

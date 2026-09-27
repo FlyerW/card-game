@@ -35,7 +35,7 @@ export function cleanDeck(db: CardDb, raw: unknown): SavedDeck | null {
   const d = raw as Partial<SavedDeck>;
   if (typeof d.id !== 'string' || !/^[a-z0-9]{4,24}$/.test(d.id) || typeof d.heroId !== 'string') return null;
   const hero = db.heroes.get(d.heroId);
-  if (!hero || !Array.isArray(d.cards)) return null;
+  if (!hero || hero.boss || !Array.isArray(d.cards)) return null;
   const cards = d.cards
     .filter((id): id is string => {
       const card = typeof id === 'string' ? db.cards.get(id) : undefined;

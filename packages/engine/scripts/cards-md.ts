@@ -4,10 +4,13 @@
 import { writeFileSync } from 'node:fs';
 import { cardNames, describeCard, describeColors, describeHero, KEYWORDS } from '../src/describe';
 import { RARITIES, type CreatureDef, type DeckCardDef } from '../src/types';
-import { SAMPLE_CARDS, SAMPLE_HEROES, sampleDb } from '../src/cards/sample';
+import { ALL_CARDS, SAMPLE_CARDS, SAMPLE_HEROES, sampleDb } from '../src/cards/sample';
+import { CARD_SETS, setOf } from '../src/cards/sets';
 
-const byId = new Map(SAMPLE_CARDS.map((card) => [card.id, card]));
-const nameOf = cardNames(sampleDb());
+const byId = new Map(ALL_CARDS.map((card) => [card.id, card]));
+const nameOf = cardNames(sampleDb(true));
+/** 還沒發布的系列：另外列在最後面。 */
+const unreleased = CARD_SETS.filter((set) => !set.released);
 const rank = (card: DeckCardDef) => RARITIES.indexOf(card.rarity);
 
 function section(title: string, cards: DeckCardDef[]): string[] {
@@ -70,7 +73,20 @@ const lines = [
   ...section('法術', SAMPLE_CARDS.filter((card) => card.kind === 'spell')),
   ...section('道具', SAMPLE_CARDS.filter((card) => card.kind === 'item')),
   ...section('場地', SAMPLE_CARDS.filter((card) => card.kind === 'field')),
+  ...unreleased.flatMap((set) => {
+    const cards = ALL_CARDS.filter((card) => setOf(card) === set.id);
+    return [
+      `# 第二彈以後：${set.name}（還沒發布）`,
+      '',
+      '> 這些卡還沒發布：遊戲、商店、組牌都看不到。網址加 `?preview`（或伺服器用 `CARD_PREVIEW=1`）可以先預覽；',
+      '> 發布時把 `packages/engine/src/cards/sets.ts` 裡這個系列的 `released` 改成 `true`。',
+      '',
+      ...section(`${set.name}・生物`, cards.filter((card) => card.kind === 'creature' && !card.token)),
+      ...section(`${set.name}・衍生物`, cards.filter((card) => card.kind === 'creature' && card.token)),
+      ...section(`${set.name}・法術與道具`, cards.filter((card) => card.kind !== 'creature')),
+    ];
+  }),
 ];
 
 writeFileSync(new URL('../../../docs/cards.md', import.meta.url), lines.join('\n'));
-console.log(`docs/cards.md：${SAMPLE_HEROES.length} 名英雄、${SAMPLE_CARDS.length} 張卡`);
+console.log(`docs/cards.md：${SAMPLE_HEROES.length} 名英雄、${SAMPLE_CARDS.length} 張卡；還沒發布的 ${ALL_CARDS.length - SAMPLE_CARDS.length} 張`);

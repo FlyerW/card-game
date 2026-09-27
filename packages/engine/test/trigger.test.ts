@@ -84,3 +84,33 @@ describe('種族相關', () => {
     expect(describeCard(db.cards.get('keeper')!)).toContain('**每當召喚**亡靈 toll：抽 1 張牌');
   });
 });
+
+describe('覺醒', () => {
+  it('能量上限 8 以上，進場效果多發動覺醒那一段；不到 8 只發動前面', () => {
+    let { state, a } = start();
+    state.players[a].maxEnergy = 7;
+    state.players[a].energy = 7;
+    let hand = state.players[a].hand.length;
+    state = act(state, { type: 'summon', player: a, card: give(state, a, 'awakener'), zone: 0 });
+    expect(state.players[a].hand.length).toBe(hand + 1);
+    state.players[a].maxEnergy = 8;
+    hand = state.players[a].hand.length;
+    state = act(state, { type: 'summon', player: a, card: give(state, a, 'awakener'), zone: 1 });
+    expect(state.players[a].hand.length).toBe(hand + 3);
+  });
+
+  it('法術的覺醒打同一個目標', () => {
+    let { state, a, b } = start();
+    place(state, b, 0, 'wall');
+    state = act(state, { type: 'castSpell', player: a, card: give(state, a, 'awake-bolt'), target: { kind: 'creature', player: b, zone: 0 } });
+    expect(at(state, b, 0)!.damage).toBe(2);
+    state.players[a].maxEnergy = 8;
+    state.players[a].energy = 8;
+    state = act(state, { type: 'castSpell', player: a, card: give(state, a, 'awake-bolt'), target: { kind: 'creature', player: b, zone: 0 } });
+    expect(at(state, b, 0)!.damage).toBe(2 + 5);
+  });
+
+  it('卡面寫出覺醒', () => {
+    expect(describeCard(db.cards.get('awake-bolt')!)).toContain('〔任意目標〕造成 2 傷害；**覺醒**：造成 3 傷害');
+  });
+});

@@ -17,8 +17,8 @@ import type { ClientMessage } from './protocol';
 
 const DIST = fileURLToPath(new URL('../../web/dist/', import.meta.url));
 /** 網頁看到這個就知道可以連線對戰、能不能用 Google 登入。 */
-const pageFlags = (googleClientId: string | null, topup: boolean) =>
-  `<script>window.CARD_GAME_ONLINE = true; window.CARD_GAME_TOPUP = ${topup}; window.CARD_GAME_GOOGLE_CLIENT_ID = ${JSON.stringify(googleClientId).replace(/</g, '\\u003c')}</script>`;
+const pageFlags = (googleClientId: string | null, topup: boolean, preview: boolean) =>
+  `<script>window.CARD_GAME_ONLINE = true; window.CARD_GAME_TOPUP = ${topup}; window.CARD_GAME_PREVIEW = ${preview}; window.CARD_GAME_GOOGLE_CLIENT_ID = ${JSON.stringify(googleClientId).replace(/</g, '\\u003c')}</script>`;
 const MAX_MESSAGE_BYTES = 64 * 1024;
 
 const TYPES: Record<string, string> = {
@@ -54,11 +54,13 @@ export interface ServerOptions {
   ecpay?: EcpayConfig | null;
   /** 對外的網址（綠界通知用）；沒有就用瀏覽器頁面的來源。 */
   publicUrl?: string | null;
+  /** 預覽還沒發布的卡包系列（測試用）。 */
+  preview?: boolean;
 }
 
 export async function startServer(options: ServerOptions): Promise<Running> {
   const dist = options.dist ?? DIST;
-  const db = sampleDb();
+  const db = sampleDb(options.preview ?? false);
   const googleClientId = options.googleClientId ?? null;
   const store = await AccountStore.open(options.dataDir ?? null, db);
   const log = new GameLog(options.dataDir ? join(options.dataDir, 'games.jsonl') : null);
@@ -100,7 +102,7 @@ export async function startServer(options: ServerOptions): Promise<Running> {
     }
     try {
       let body: Buffer | string = await readFile(file);
-      if (file.endsWith('index.html')) body = body.toString('utf8').replace('</head>', `${pageFlags(googleClientId, Boolean(options.ecpay))}</head>`);
+      if (file.endsWith('index.html')) body = body.toString('utf8').replace('</head>', `${pageFlags(googleClientId, Boolean(options.ecpay), options.preview ?? false)}</head>`);
       response.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' }).end(body);
     } catch {
       const hint = path === '/' ? '找不到網頁。先執行 npm run build:web，或直接用 npm run server。' : 'Not found';

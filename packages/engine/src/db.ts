@@ -110,7 +110,11 @@ function checkCard(
         problems.push(`${where}：再生必須是正整數`);
       }
       for (const skill of card.skills) problems.push(...checkAbility(skill, where, true));
-      if (card.entry) problems.push(...checkAbility({ ...card.entry, cost: 0 }, `${where}的進場效果`, true));
+      if (card.entry) {
+        const { awaken = [], ...entry } = card.entry;
+        problems.push(...checkAbility({ ...entry, effects: [...entry.effects, ...awaken], cost: 0 }, `${where}的進場效果`, true));
+        if (card.entry.awaken?.length === 0) problems.push(`${where}：覺醒沒有效果`);
+      }
       if (card.death) problems.push(...checkAbility({ ...card.death, cost: 0, target: { kind: 'none' } }, `${where}的遺言`, false));
       for (const trigger of card.triggers ?? []) {
         problems.push(...checkAbility({ ...trigger, cost: 0, target: { kind: 'none' } }, `${where}的持續效果`, true));
@@ -133,7 +137,9 @@ function checkCard(
       break;
     }
     case 'spell':
-      problems.push(...checkAbility({ ...card, name: card.name }, where, false));
+      // 覺醒的效果跟本來的效果用同一個目標，合起來一起檢查。
+      problems.push(...checkAbility({ ...card, name: card.name, effects: [...card.effects, ...(card.awaken ?? [])] }, where, false));
+      if (card.awaken?.length === 0) problems.push(`${where}：覺醒沒有效果`);
       break;
     case 'item':
       for (const key of ['attack', 'damageReduction', 'hp'] as const) {
@@ -186,6 +192,7 @@ function checkHero(hero: HeroDef): string[] {
   if (hero.power) problems.push(...checkAbility(hero.power, where, false));
   if (hero.alternatePower) problems.push(...(hero.power ? checkAbility(hero.alternatePower, where, false) : [`${where}：有輪流的天生技，就要有原本的天生技`]));
   for (const part of [hero.passive?.creatures, hero.passive?.ownTurn, hero.passive?.opponentTurn]) problems.push(...checkModifier(part, where));
+  if (hero.passive?.turnStart) problems.push(...checkAbility({ name: hero.passive.name, cost: 0, target: { kind: 'none' }, effects: hero.passive.turnStart }, `${where}的被動`, false));
   return problems;
 }
 

@@ -420,7 +420,7 @@ export class Lobby {
   /** 檢查名字、英雄與牌組；有問題就回報給這位玩家並回傳 null。 */
   private newSeat(client: Client, name: unknown, heroId: unknown, deck: unknown): Seat | null {
     const cleanName = typeof name === 'string' ? name.trim().slice(0, NAME_LIMIT) : '';
-    if (typeof heroId !== 'string' || !this.engine.db.heroes.has(heroId)) {
+    if (typeof heroId !== 'string' || !this.engine.db.heroes.has(heroId) || this.engine.db.heroes.get(heroId)!.boss) {
       client.send({ t: 'error', message: '找不到這個英雄' });
       return null;
     }

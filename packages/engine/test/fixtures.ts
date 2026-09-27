@@ -209,6 +209,10 @@ export const TEST_CARDS: DeckCardDef[] = [
   creature('bone-token', [], { rarity: 'N', race: 'undead', cost: 0, attack: 1, hp: 1, token: true }),
   { kind: 'spell', id: 'raise', name: 'raise', rarity: 'R', colors: [], cost: 1, target: NONE, effects: [{ type: 'summonToken', token: 'bone-token', count: 2 }] },
 
+  // 覺醒：能量上限 8 以上時多發動一段
+  creature('awakener', [], { rarity: 'N', attack: 1, hp: 3, entry: { name: 'stir', target: NONE, effects: [{ type: 'draw', count: 1 }], awaken: [{ type: 'draw', count: 2 }] } }),
+  { kind: 'spell', id: 'awake-bolt', name: 'awake-bolt', rarity: 'R', colors: [], cost: 1, target: ANY, effects: [{ type: 'damage', amount: 2 }], awaken: [{ type: 'damage', amount: 3 }] },
+
   // 顏色測試
   creature('red-imp', [hit('x', ANY, 1), hit('y', ANY, 1)], { colors: ['red'] }),
   creature('gold-griffin', [hit('x', ANY, 1), hit('y', ANY, 1)], { colors: ['red', 'green'] }),
@@ -227,6 +231,10 @@ export const TEST_HEROES: HeroDef[] = [
   { kind: 'hero', id: 'mender', name: 'mender', colors: ['green'], hp: 47, passive: { name: 'growth', creatures: { regenerate: 1 } } },
   { kind: 'hero', id: 'duelist', name: 'duelist', colors: ['white'], hp: 47, passive: { name: 'edge', ownTurn: { attack: 1 } } },
   { kind: 'hero', id: 'warder', name: 'warder', colors: ['green'], hp: 47, passive: { name: 'bark', opponentTurn: { hp: 2 } } },
+  {
+    kind: 'hero', id: 'overlord', name: 'overlord', colors: ['black'], hp: 60, boss: true,
+    passive: { name: 'dread', heroArmor: 2, turnStart: [{ type: 'summonToken', token: 'imp-token', count: 1 }] },
+  },
   {
     kind: 'hero', id: 'twins', name: 'twins', colors: ['blue', 'black'], hp: 40,
     power: { name: 'tide', cost: 1, target: NONE, effects: [{ type: 'draw', count: 1 }] },

@@ -134,7 +134,12 @@ interface CardBase {
   name: string;
   colors: Color[];
   rarity: Rarity;
+  /** 屬於哪一彈（卡包系列）；沒寫是基本卡包 core。 */
+  set?: string;
 }
+
+/** 覺醒：能量上限到這麼多（含）時，進場效果與法術多發動一段。 */
+export const AWAKEN_AT = 8;
 
 /**
  * 種族：每個種族有一個天生的特色（沉默時跟卡上其他效果一樣失效）。
@@ -205,14 +210,16 @@ export interface DeathEffect {
   effects: Effect[];
 }
 
-/** 進場效果跟技能一樣是「目標類型 + 效果」，只是沒有費用。 */
-export type EntryEffect = Omit<Ability, 'cost'>;
+/** 進場效果跟技能一樣是「目標類型 + 效果」，只是沒有費用。awaken：覺醒時（能量上限 8 以上）接著發動的效果，目標相同。 */
+export type EntryEffect = Omit<Ability, 'cost'> & { awaken?: Effect[] };
 
 export interface SpellDef extends CardBase {
   kind: 'spell';
   cost: number;
   target: TargetSpec;
   effects: Effect[];
+  /** 覺醒時（能量上限 8 以上）接著發動的效果，目標相同。 */
+  awaken?: Effect[];
 }
 
 export interface ItemDef extends CardBase {
@@ -261,6 +268,10 @@ export interface HeroPassive {
   ceilingBonus?: number;
   /** 我方生物攻擊時，正前方與斜對角都被擋住也打得到英雄。 */
   pierce?: boolean;
+  /** 英雄受到的傷害 −N（BOSS 專用）。 */
+  heroArmor?: number;
+  /** 你的回合開始時（抽牌、再生之後）發動的效果，不選目標（BOSS 專用）。 */
+  turnStart?: Effect[];
 }
 
 /**
@@ -290,10 +301,14 @@ export interface HeroDef {
   kind: 'hero';
   id: string;
   name: string;
+  /** 屬於哪一彈；沒寫是基本卡包。UR 英雄從那一彈的卡包開得到。 */
+  set?: string;
   /**
    * 單色的是基礎英雄，每個人都有；雙色以上的英雄是 UR，要從卡包抽到（或用粉塵合成）才能用。
    */
   rarity?: 'UR';
+  /** 冒險模式的 BOSS：玩家不能選、開不到、牌組與房間都不能用。 */
+  boss?: boolean;
   colors: Color[];
   hp: number;
   power?: Ability;

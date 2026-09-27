@@ -7,6 +7,7 @@ import type {
   CreatureModifier,
   DeathEffect,
   DeckCardDef,
+  EntryEffect,
   Effect,
   HeroDef,
   HeroPassive,
@@ -65,6 +66,7 @@ export const KEYWORDS: Record<string, string> = {
   再生: '你的回合開始時回復 N♥',
   進場: '召喚時（或進化成這張時）發動',
   遺言: '死掉時發動（被打倒或被消滅）；沉默中死掉就不發動',
+  覺醒: '你的能量上限 8 以上時，多發動這一段（目標跟前面一樣）',
   回合開始: '在場上時，你的每個回合開始時發動（抽牌之後）',
   回合結束: '在場上時，你的每個回合結束時發動',
   每當回復: '在場上時，每當你的英雄回復 ♥ 就發動',
@@ -220,8 +222,12 @@ export function describeAbility(ability: Ability, names: Names = ids): string {
 }
 
 /** 進場效果：「**進場** 火星：〔任意目標〕造成 2 傷害」。 */
-export const describeEntry = (entry: Omit<Ability, 'cost'>, names: Names = ids): string =>
-  `${keyword('進場')} ${entry.name}：${describeEffects(entry, names)}`;
+export const describeEntry = (entry: EntryEffect, names: Names = ids): string =>
+  `${keyword('進場')} ${entry.name}：${describeEffects(entry, names)}${describeAwaken(entry.awaken, names)}`;
+
+/** 覺醒的那一段：「；**覺醒**：再造成 3 傷害」。 */
+const describeAwaken = (awaken: readonly Effect[] | undefined, names: Names) =>
+  awaken?.length ? `；${keyword('覺醒')}：${awaken.map((effect) => describeEffect(effect, names)).join('，')}` : '';
 
 /** 遺言：「**遺言** 傳承：召喚 1 隻士兵（2/2）」。 */
 export const describeDeath = (death: DeathEffect, names: Names = ids): string =>
@@ -309,7 +315,7 @@ export function describeCard(card: DeckCardDef, names: Names = ids): string[] {
       ];
     }
     case 'spell':
-      return [`${card.name}　${tag}・法術｜${cost}`, describeEffects(card, names)];
+      return [`${card.name}　${tag}・法術｜${cost}`, `${describeEffects(card, names)}${describeAwaken(card.awaken, names)}`];
     case 'item':
       const stats = describeModifier(card);
       return [
@@ -327,7 +333,7 @@ export function describeCard(card: DeckCardDef, names: Names = ids): string[] {
       lines.push(`英雄 ♥ 上限 +${card.hpBonus}`);
       if (card.power) lines.push(`天生技換成 ${describeAbility(card.power, names)}`);
       if (card.alternatePower) lines.push(`每發動一次就跟 ${describeAbility(card.alternatePower, names)} 輪流`);
-      if (card.passive) lines.push(`多一個被動 ${describePassive(card.passive)}`);
+      if (card.passive) lines.push(`多一個被動 ${describePassive(card.passive, names)}`);
       lines.push('每局只能進化一次');
       return lines;
     }
@@ -335,8 +341,10 @@ export function describeCard(card: DeckCardDef, names: Names = ids): string[] {
 }
 
 /** 英雄被動：「劍士之道：**突破**；我方生物 ⚔ +1；……」。不寫「被動」兩個字；突破寫在最前面。 */
-export function describePassive(passive: HeroPassive): string {
+export function describePassive(passive: HeroPassive, names: Names = ids): string {
   const parts = [passive.pierce ? keyword('突破') : '', describeOwnEffects(passive.creatures, passive.ceilingBonus)];
+  if (passive.heroArmor) parts.push(`英雄受到的傷害 −${passive.heroArmor}`);
+  if (passive.turnStart) parts.push(`${keyword('回合開始')}：${passive.turnStart.map((effect) => describeEffect(effect, names)).join('，')}`);
   const own = describeModifier(passive.ownTurn);
   if (own.length > 0) parts.push(`我方回合，${ourCreatures(own)}`);
   const theirs = describeModifier(passive.opponentTurn);
@@ -345,8 +353,9 @@ export function describePassive(passive: HeroPassive): string {
 }
 
 export function describeHero(hero: HeroDef, names: Names = ids): string[] {
-  const lines = [`${hero.name}　${hero.rarity ? `${hero.rarity} 英雄・` : ''}${describeColors(hero.colors)}｜♥ ${hero.hp}`];
-  if (hero.passive) lines.push(describePassive(hero.passive));
+  const kind = hero.boss ? 'BOSS・' : hero.rarity ? `${hero.rarity} 英雄・` : '';
+  const lines = [`${hero.name}　${kind}${describeColors(hero.colors)}｜♥ ${hero.hp}`];
+  if (hero.passive) lines.push(describePassive(hero.passive, names));
   if (hero.power) lines.push(`天生技 ${describeAbility(hero.power, names)}`);
   if (hero.alternatePower) lines.push(`每發動一次就跟 ${describeAbility(hero.alternatePower, names)} 輪流`);
   if (!hero.passive && !hero.power) lines.push('沒有效果');

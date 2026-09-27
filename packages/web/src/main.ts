@@ -26,12 +26,19 @@ import {
   type PlayerView,
   type SideView,
   type Target,
+  CARD_SETS,
   decodeDeckCode,
   encodeDeckCode,
 } from '@card-game/engine';
 import {
+  ADVENTURE,
+  ADVENTURE_REWARD,
   cleanBook,
+  clearedOn,
   DECK_LIMIT,
+  DIFFICULTY_NAMES,
+  stageUnlocked,
+  type AdventureDifficulty,
   DECK_NAME_LIMIT,
   ECONOMY,
   emptyBook,
@@ -101,7 +108,12 @@ import { newShop, ownedOf, shopClick, shopScreen, walletBar, type Shop } from '.
 import { artUrl, cardFace, detailLines, esc, pips, rich } from './ui';
 import './style.css';
 
-const db = sampleDb();
+/**
+ * 預覽還沒發布的卡包系列：網址加 ?preview，或伺服器用 CARD_PREVIEW=1 開。
+ * 伺服器沒開預覽時，伺服器帳號的牌組存不進還沒發布的卡，所以預覽建議用測試帳號。
+ */
+const PREVIEW = new URLSearchParams(location.search).has('preview') || (window as { CARD_GAME_PREVIEW?: boolean }).CARD_GAME_PREVIEW === true;
+const db = sampleDb(PREVIEW);
 const engine = createEngine(db);
 /** 你的座位。跟電腦打時是 0；連線對戰時由伺服器決定。 */
 let YOU: PlayerId = 0;
@@ -140,8 +152,10 @@ interface Reward {
 
 interface Saved {
   format: number;
-  screen: 'login' | 'setup' | 'deck' | 'lobby' | 'play' | 'shop' | 'queue';
+  screen: 'login' | 'setup' | 'deck' | 'lobby' | 'play' | 'shop' | 'queue' | 'adventure';
   heroId: string;
+  /** 這一局是冒險模式的哪一關、什麼難度；一般的電腦對戰是 null。 */
+  adventure: { stage: string; difficulty: AdventureDifficulty } | null;
   state: GameState | null;
   log: LogLine[];
   redraw: number[];
@@ -164,6 +178,10 @@ interface App extends Saved {
   rank: RankState | null;
   /** 牌組清單：同一個英雄可以有很多副，記住每個英雄開局用哪一副。 */
   book: DeckBook;
+  /** 冒險模式：開打前的劇情（哪一關、什麼難度）。 */
+  story: { stage: string; difficulty: AdventureDifficulty } | null;
+  /** 冒險模式打贏後：拿到多少金幣、有沒有出錯。 */
+  stageReward: { gold: number; error?: string } | null;
   /** 正在貼上牌組代碼。 */
   importing: boolean;
   importText: string;
@@ -213,6 +231,9 @@ const app: App = {
   screen: 'login',
   heroId: SAMPLE_HEROES[1]!.id,
   book: emptyBook(),
+  adventure: null,
+  story: null,
+  stageReward: null,
   importing: false,
   importText: '',
   builder: {
@@ -411,13 +432,29 @@ function botRecord(view: PlayerView): BotGameRecord | undefined {
     opponentHero: app.botGame.rival,
     opponentHeroEvolution: view.opponent.heroEvolution,
     opponentDeck: app.botGame.rivalDeck,
-    difficulty: app.difficulty,
+    difficulty: app.adventure ? (app.adventure.difficulty === 'normal' ? 'normal' : 'hard') : app.difficulty,
     first: state.firstPlayer === YOU,
     winner: winner === 'draw' ? 'draw' : winner === YOU ? 'you' : 'bot',
     reason,
     turns: state.turn,
     seconds: Math.round((Date.now() - app.botGame.startedAt) / 1000),
   };
+}
+
+/** 冒險模式打贏一關：記下難度，第一次打過給金幣。 */
+function reportStageClear(adventure: NonNullable<App['adventure']>): void {
+  if (!app.backend) return;
+  app.backend.clearStage(app.profile, adventure.stage, adventure.difficulty).then(
+    (cleared) => {
+      app.profile = cleared.profile;
+      app.stageReward = { gold: cleared.gold };
+      render();
+    },
+    (error: unknown) => {
+      app.stageReward = { gold: 0, error: error instanceof Error ? error.message : '出錯了' };
+      render();
+    },
+  );
 }
 
 /** 這局已經送去結算了，避免重複。 */
@@ -442,6 +479,7 @@ function settle(view: PlayerView): void {
         quest: quest ? `${quest.text} ${app.profile.quest.progress}/${quest.goal}` : '',
         conceded,
       };
+      if (app.adventure && winner === YOU) reportStageClear(app.adventure);
       render();
     },
     (error: unknown) => {
@@ -828,7 +866,9 @@ async function advance(): Promise<void> {
     if (engine.actor(before) === BOT) {
       await sleep(BOT_STEP_MS);
       if (app.state !== before) break;
-      const think = app.difficulty === 'hard' ? chooseActionSmart : chooseAction;
+      // 冒險模式：普通用普通的電腦；困難、惡夢用困難的電腦。
+      const smart = app.adventure ? app.adventure.difficulty !== 'normal' : app.difficulty === 'hard';
+      const think = smart ? chooseActionSmart : chooseAction;
       const pick = think(engine, before, BOT, STYLES.balanced);
       localStep(pick.state, pick.events);
     } else {
@@ -839,10 +879,12 @@ async function advance(): Promise<void> {
   render();
 }
 
-function startGame(): void {
+/** 開一局跟電腦打；冒險模式的話，對手是那一關的 BOSS（惡夢用惡夢版）。 */
+function startGame(adventure: App['adventure'] = null): void {
   const seed = (Math.random() * 2 ** 32) >>> 0;
   const rivals = SAMPLE_HEROES.filter((h) => h.id !== app.heroId);
-  const rival = rivals[seed % rivals.length]!.id;
+  const stage = adventure ? ADVENTURE.find((each) => each.id === adventure.stage) : undefined;
+  const rival = stage ? (adventure!.difficulty === 'nightmare' ? stage.boss.nightmare : stage.boss.normal) : rivals[seed % rivals.length]!.id;
   YOU = 0;
   // 雙方都照正式規則組牌；你有自訂牌組就用你的，沒有就用收藏自動組一副。電腦每局從全部的卡自動組一副。
   const deck = myDeck();
@@ -861,7 +903,7 @@ function startGame(): void {
   }
   const kept = engine.apply(created.state, { type: 'mulligan', player: BOT, cards: [] });
   if (!kept.ok) return;
-  Object.assign(app, { mode: 'bot', screen: 'play', log: [], redraw: [], selection: null, toast: null, view: null });
+  Object.assign(app, { mode: 'bot', screen: 'play', log: [], redraw: [], selection: null, toast: null, view: null, adventure, story: null, stageReward: null });
   resetGameRecord(deck);
   app.botGame = { rival, rivalDeck, startedAt: Date.now() };
   localStep(kept.state, []);
@@ -882,8 +924,8 @@ function heroInfo(side: SideView): string {
   const h = hero(side.heroId);
   const evolution = side.heroEvolution ? card(side.heroEvolution) : null;
   const lines: string[] = [];
-  if (h.passive) lines.push(describePassive(h.passive));
-  if (evolution?.kind === 'heroEvolution' && evolution.passive) lines.push(describePassive(evolution.passive));
+  if (h.passive) lines.push(describePassive(h.passive, describeName));
+  if (evolution?.kind === 'heroEvolution' && evolution.passive) lines.push(describePassive(evolution.passive, describeName));
   return `<div class="hero-side">${powerPill(side, false)}<div class="hero-info"><span class="hi-hand">手牌 ${side.handCount}</span>${lines
     .map((line) => `<p>${rich(line)}</p>`)
     .join('')}</div></div>`;
@@ -1306,12 +1348,31 @@ function overlay(view: PlayerView): string {
           ? `<p class="d-line">等${esc(themName())}也按「再來一局」……</p><button class="ghost" data-do="leave-room">離開房間</button>`
           : `${asked?.[THEM()] ? `<p class="d-line">${esc(themName())}想再來一局</p>` : ''}
              <div class="end-actions"><button class="primary" data-do="rematch">再來一局</button><button class="ghost" data-do="leave-room">離開房間</button></div>`
-        : '<div class="end-actions"><button class="primary" data-do="again">再來一局</button><button class="ghost" data-do="setup">換英雄</button><button class="ghost" data-do="shop">卡包與收藏</button></div>';
+        : app.adventure
+          ? `<div class="end-actions"><button class="primary" data-do="adventure">回到冒險</button><button class="ghost" data-do="again">${winner === YOU ? '再打一次' : '再挑戰一次'}</button></div>`
+          : '<div class="end-actions"><button class="primary" data-do="again">再來一局</button><button class="ghost" data-do="setup">換英雄</button><button class="ghost" data-do="shop">卡包與收藏</button></div>';
     return `<div class="overlay"><div class="dialog end ${winner === YOU ? 'won' : 'lost'}" role="dialog" aria-label="${title}">
-      <h2>${title}</h2><p class="d-line">${app.rankedRoom ? '排位賽・' : ''}${why}・共 ${view.turn} 回合</p>${app.rankedRoom ? rankedLines() : rewardLines()}${actions}
+      <h2>${title}</h2><p class="d-line">${app.rankedRoom ? '排位賽・' : ''}${why}・共 ${view.turn} 回合</p>${adventureLines(winner === YOU)}${app.rankedRoom ? rankedLines() : rewardLines()}${actions}
     </div></div>`;
   }
   return '';
+}
+
+/** 冒險模式的結算：打贏時的劇情與通關獎勵。 */
+function adventureLines(won: boolean): string {
+  const stage = app.adventure ? ADVENTURE.find((each) => each.id === app.adventure!.stage) : undefined;
+  if (!stage) return '';
+  const head = `<p class="d-line"><b>${esc(stage.title)}</b>・${DIFFICULTY_NAMES[app.adventure!.difficulty]}</p>`;
+  if (!won) return `${head}<p class="d-line">再調整一下牌組，回來挑戰吧。</p>`;
+  const reward = app.stageReward;
+  const gain = !reward
+    ? ''
+    : reward.error
+      ? `<p class="d-line reward">通關沒有記到：${esc(reward.error)}</p>`
+      : reward.gold > 0
+        ? `<p class="d-line reward"><span class="gain">首次通關 +${reward.gold} 金幣</span></p>`
+        : '<p class="d-line reward">這一關的通關獎勵已經領過了。</p>';
+  return `${head}<p class="story">${esc(stage.outro)}</p>${gain}`;
 }
 
 /** 結算畫面上的金幣與任務進度。 */
@@ -1489,6 +1550,7 @@ function setupScreen(): string {
         ${musicButton()}<button class="ghost small" data-do="logout">登出</button></div>` : ''}
     </header>
     ${walletBar(app.profile)}
+    ${PREVIEW ? `<p class="notice" role="status">預覽模式：看得到還沒發布的卡包（${esc(CARD_SETS.filter((set) => !set.released).map((set) => set.name).join('、'))}）。預覽建議用測試帳號。</p>` : ''}
     <div class="heroes">${heroes}</div>
     <section class="deck-bar">
       <div class="deck-head"><div><p class="d-head">牌組・${esc(hero(app.heroId).name)}</p><p class="d-line${problems.length ? ' warn' : ''}">${esc(deckText)}</p></div>
@@ -1498,6 +1560,7 @@ function setupScreen(): string {
     ${importDialog()}
     <div class="modes">
       ${tutorialMode()}
+      ${adventureMode()}
       ${botMode(problems.length > 0)}
       ${rankedPanel(problems.length > 0)}
       ${friendlyMode(problems.length > 0)}
@@ -1590,6 +1653,63 @@ function tutorialMode(): string {
   </section>`;
 }
 
+/** 開局畫面上的冒險模式入口。 */
+function adventureMode(): string {
+  const cleared = ADVENTURE.filter((stage) => clearedOn(app.profile, stage.id).length > 0).length;
+  return `<section class="mode mode-adventure">
+    <p class="mode-title">冒險模式<small>黑霧之謎・${cleared}/${ADVENTURE.length} 關</small></p>
+    <p class="d-line">一段小劇情，一關一個 BOSS。每一關第一次打過 +${ADVENTURE_REWARD} 金幣；惡夢難度的 BOSS 有專屬的強大能力。</p>
+    <button class="primary" data-do="adventure">進入冒險</button>
+  </section>`;
+}
+
+/** 冒險模式：關卡清單。用開局畫面選的英雄與牌組出戰。 */
+function adventureScreen(): string {
+  const chosen = chosenDeck(app.heroId);
+  const problems = chosen ? deckIssues(db, app.heroId, chosen.cards, owned()).problems : [];
+  const deckName = chosen ? `「${chosen.name}」` : '自動組牌';
+  const stages = ADVENTURE.map((stage, index) => {
+    const unlocked = stageUnlocked(app.profile, index);
+    const cleared = clearedOn(app.profile, stage.id);
+    const normal = hero(stage.boss.normal);
+    const marks = (['normal', 'hard', 'nightmare'] as const)
+      .map((d) => `<span class="stage-mark${cleared.includes(d) ? ' done' : ''}">${DIFFICULTY_NAMES[d]}${cleared.includes(d) ? ' ✓' : ''}</span>`)
+      .join('');
+    const buttons = (['normal', 'hard', 'nightmare'] as const)
+      .map((d) => `<button class="${d === 'nightmare' ? 'ghost nightmare' : 'ghost'}" data-stage="${stage.id}" data-stage-level="${d}" ${unlocked && problems.length === 0 ? '' : 'disabled'}>${DIFFICULTY_NAMES[d]}</button>`)
+      .join('');
+    return `<section class="stage${unlocked ? '' : ' locked'}">
+      <p class="stage-title">第 ${index + 1} 關・${esc(stage.title)}</p>
+      <p class="d-line">BOSS：${esc(normal.name)}　${marks}</p>
+      <p class="d-line">${unlocked ? (cleared.length > 0 ? '✓ 通關獎勵已經領過了' : `首次通關 +${ADVENTURE_REWARD} 金幣`) : '打過前一關才會解鎖'}</p>
+      <div class="stage-buttons">${buttons}</div>
+    </section>`;
+  }).join('');
+  return `<main class="setup adventure">
+    <header class="setup-head"><div><h1>冒險模式・黑霧之謎</h1>
+      <p>黑色的霧從大陸各地湧出，你一路追查源頭。普通、困難的 BOSS 用一般的能力；惡夢難度的 BOSS 有專屬的被動與天生技，一般玩家拿不到。</p></div>
+      <button class="ghost" data-do="setup">回到開局</button></header>
+    ${walletBar(app.profile)}
+    <p class="d-line${problems.length ? ' warn' : ''}">出戰：${esc(hero(app.heroId).name)}・${esc(deckName)}${problems.length ? `——這副牌組還不能用：${esc(problems[0]!)}` : ''}（到開局畫面換英雄或牌組）</p>
+    <div class="stages">${stages}</div>
+    ${storyDialog()}
+  </main>`;
+}
+
+/** 開打前的劇情，加上這次 BOSS 的能力。 */
+function storyDialog(): string {
+  const story = app.story;
+  const stage = story ? ADVENTURE.find((each) => each.id === story.stage) : undefined;
+  if (!story || !stage) return '';
+  const boss = hero(story.difficulty === 'nightmare' ? stage.boss.nightmare : stage.boss.normal);
+  return `<div class="overlay"><div class="dialog" role="dialog" aria-label="${esc(stage.title)}">
+    <h2>${esc(stage.title)}・${DIFFICULTY_NAMES[story.difficulty]}</h2>
+    <p class="story">${esc(stage.intro)}</p>
+    <div class="vs-hero"><span class="vs-label">對手</span>${lines(describeHero(boss, describeName).map((line) => line.replace(/^天生技 /, '')))}</div>
+    <div class="respond"><button class="primary" data-do="stage-fight">開始戰鬥</button><button class="ghost" data-do="stage-cancel">再想想</button></div>
+  </div></div>`;
+}
+
 /** 跟電腦打：選難度。 */
 function botMode(blocked: boolean): string {
   const chips = (['normal', 'hard'] as const)
@@ -1671,6 +1791,8 @@ function render(): void {
           ? shopScreen(db, app.profile, app.shop, app.toast, Boolean(app.backend?.topup))
           : app.screen === 'queue'
             ? queueScreen()
+          : app.screen === 'adventure'
+            ? adventureScreen()
           : app.screen === 'lobby'
             ? lobbyScreen()
             : playScreen();
@@ -1901,7 +2023,7 @@ function builderClick(el: HTMLElement, command: string | undefined): boolean {
 
 root.addEventListener('click', (event) => {
   const el = (event.target as HTMLElement).closest<HTMLElement>(
-    '[data-do],[data-key],[data-hand],[data-skill],[data-hero],[data-mull],[data-pick],[data-add],[data-remove],[data-focus],[data-filter],[data-rarity],[data-color],[data-cost],[data-kind],[data-deck-pick],[data-deck-edit],[data-missing],[data-craft],[data-topup],[data-difficulty]',
+    '[data-do],[data-key],[data-hand],[data-skill],[data-hero],[data-mull],[data-pick],[data-add],[data-remove],[data-focus],[data-filter],[data-rarity],[data-color],[data-cost],[data-kind],[data-pack],[data-stage],[data-series],[data-deck-pick],[data-deck-edit],[data-missing],[data-craft],[data-topup],[data-difficulty]',
   );
   if (!el) {
     // 點在說明欄裡（正在看卡片資訊、點關鍵字看意思）不取消選取；點其他地方才回到對戰紀錄。
@@ -1912,7 +2034,7 @@ root.addEventListener('click', (event) => {
     }
     return;
   }
-  const { do: command, key, hand: handUid, skill, hero: heroId, mull, pick, difficulty, deckPick, deckEdit } = el.dataset;
+  const { do: command, key, hand: handUid, skill, hero: heroId, mull, pick, difficulty, deckPick, deckEdit, stage, stageLevel } = el.dataset;
   if (app.screen === 'deck' && builderClick(el, command)) return;
   if (app.screen === 'shop' && app.backend && shopClick(db, app, app.backend, el, command, render)) {
     render();
@@ -2029,8 +2151,22 @@ root.addEventListener('click', (event) => {
         getSelection()?.addRange(range);
       },
     );
-  } else if (command === 'start' || command === 'again') {
+  } else if (command === 'start') {
     startGame();
+  } else if (command === 'again') {
+    startGame(app.adventure);
+  } else if (command === 'adventure') {
+    Object.assign(app, { screen: 'adventure', state: null, view: null, selection: null, toast: null, adventure: null, story: null });
+    render();
+    window.scrollTo(0, 0);
+  } else if (command === 'stage-cancel') {
+    app.story = null;
+    render();
+  } else if (command === 'stage-fight' && app.story) {
+    startGame(app.story);
+  } else if (stage && stageLevel) {
+    app.story = { stage, difficulty: stageLevel as AdventureDifficulty };
+    render();
   } else if (command === 'setup') {
     Object.assign(app, { screen: 'setup', state: null, view: null, selection: null, toast: null });
     render();
@@ -2167,6 +2303,7 @@ hot?.snapshot?.(() => ({
   redraw: app.redraw,
   gameDeck: app.gameDeck,
   botGame: app.mode === 'bot' ? app.botGame : null,
+  adventure: app.mode === 'bot' ? app.adventure : null,
   tally: app.tally,
   reward: app.reward,
 }));

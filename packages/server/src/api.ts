@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { DEFAULT_RULES, type CardDb } from '@card-game/engine';
-import { cleanDeck, craft, DECK_LIMIT, emptyBook, openPacks, PACK_BATCH, parseSummary, putDeck, recordGame, removeDeck, selectDeck, TOPUPS } from '@card-game/economy';
+import { clearStage, cleanDeck, craft, DECK_LIMIT, emptyBook, openPacks, PACK_BATCH, packSets, parseSummary, putDeck, recordGame, removeDeck, selectDeck, TOPUPS } from '@card-game/economy';
 import { AccountError, accountInfo, serverDay, type Account, type AccountStore } from './accounts';
 import { checkoutFields, checkoutUrl, newTradeNo, readNotice, type EcpayConfig } from './ecpay';
 import { parseBotRecord, type GameLog } from './gamelog';
@@ -179,9 +179,10 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
 
       case 'POST /api/pack': {
         const { account } = authed();
-        const { count = 1 } = await readJson(request);
+        const { count = 1, set = 'core' } = await readJson(request);
         if (count !== 1 && count !== PACK_BATCH) throw new HttpError(400, `一次只能開 1 包或 ${PACK_BATCH} 包`);
-        const opened = openPacks(account.profile, db, DEFAULT_RULES, () => randomInt(2 ** 32) / 2 ** 32, count);
+        if (typeof set !== 'string' || !packSets(db).some((each) => each.id === set)) throw new HttpError(400, '沒有這種卡包');
+        const opened = openPacks(account.profile, db, DEFAULT_RULES, () => randomInt(2 ** 32) / 2 ** 32, count, set);
         if (!opened.ok) throw new HttpError(400, opened.reason);
         await store.update(account, opened.profile);
         return send(response, 200, { profile: opened.profile, cards: opened.cards }), true;
@@ -195,6 +196,18 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
         if (!crafted.ok) throw new HttpError(400, crafted.reason);
         await store.update(account, crafted.profile);
         return send(response, 200, { profile: crafted.profile }), true;
+      }
+
+      case 'POST /api/adventure/clear': {
+        // 冒險模式打過一關：第一次打過給 100 金幣。跟電腦打的對局一樣是瀏覽器回報的。
+        const { account } = authed();
+        const { stage, difficulty } = await readJson(request);
+        const cleared = typeof stage === 'string' && typeof difficulty === 'string'
+          ? clearStage(account.profile, stage, difficulty as 'normal' | 'hard' | 'nightmare')
+          : null;
+        if (!cleared) throw new HttpError(400, '沒有這一關，或還沒解鎖');
+        await store.update(account, cleared.profile);
+        return send(response, 200, cleared), true;
       }
 
       case 'POST /api/decks/save': {
