@@ -121,6 +121,8 @@ const PAGE_PREVIEW = new URLSearchParams(location.search).has('preview') || (win
 const ACCOUNT_PREVIEW = !PAGE_PREVIEW && loadSession()?.account.preview === true;
 const PREVIEW = PAGE_PREVIEW || ACCOUNT_PREVIEW;
 const db = sampleDb(PREVIEW);
+/** 選得到的英雄（預覽時包括還沒發布的系列）；BOSS 不算。 */
+const HEROES = [...db.heroes.values()].filter((hero) => !hero.boss);
 const engine = createEngine(db);
 /** 你的座位。跟電腦打時是 0；連線對戰時由伺服器決定。 */
 let YOU: PlayerId = 0;
@@ -900,7 +902,7 @@ async function advance(): Promise<void> {
 /** 開一局跟電腦打；冒險模式的話，對手是那一關的 BOSS（惡夢用惡夢版）。 */
 function startGame(adventure: App['adventure'] = null): void {
   const seed = (Math.random() * 2 ** 32) >>> 0;
-  const rivals = SAMPLE_HEROES.filter((h) => h.id !== app.heroId);
+  const rivals = HEROES.filter((h) => h.id !== app.heroId);
   const stage = adventure ? ADVENTURE.find((each) => each.id === adventure.stage) : undefined;
   const rival = stage ? (adventure!.difficulty === 'nightmare' ? stage.boss.nightmare : stage.boss.normal) : rivals[seed % rivals.length]!.id;
   YOU = 0;
@@ -1542,7 +1544,7 @@ function loginScreen(): string {
 
 function setupScreen(): string {
   // 基礎英雄每個人都有；多色的 UR 英雄沒抽到就鎖著，看得到但不能選。
-  const heroes = SAMPLE_HEROES.map((h) => {
+  const heroes = HEROES.map((h) => {
     // 被動、天生技、可進化各一行；天生技不寫「天生技」三個字，直接寫名字。
     const [head, ...body] = describeHero(h, describeName).map((line) => line.replace(/^天生技 /, ''));
     const evolution = SAMPLE_CARDS.find((c) => c.kind === 'heroEvolution' && c.evolvesFrom === h.id);

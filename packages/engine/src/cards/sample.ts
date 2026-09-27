@@ -1,5 +1,6 @@
 import { buildCardDb } from '../db';
 import type { Ability, DeckCardDef, HeroDef, TargetSpec } from '../types';
+import { AWAKENING_CARDS, AWAKENING_HEROES } from './awakening';
 import { BOSS_HEROES } from './bosses';
 import { isReleased, setOf } from './sets';
 
@@ -32,7 +33,7 @@ const hit = (name: string, cost: number, target: TargetSpec, amount: number): Ab
   effects: [{ type: 'damage', amount }],
 });
 
-export const SAMPLE_HEROES: HeroDef[] = [
+const CORE_HEROES: HeroDef[] = [
   // 英雄 HP 在 35–45 之間（快攻比較打得死），再用困難電腦的英雄對戰模擬調技能與 HP。
   // 單色的五個是基礎英雄，每個人都有；雙色以上的是 UR，要從卡包抽到。
   {
@@ -742,129 +743,6 @@ const CORE_CARDS: DeckCardDef[] = [
   },
 ];
 
-// ─── 第二彈「龍脈覺醒」（還沒發布） ────────────────────────────────────────────
-// 主題是龍：每個顏色都有龍，加上「召喚龍時」「每有另一隻龍」的卡。
-// 新關鍵字 **覺醒**：能量上限 8 以上時，進場效果與法術多發動一段——前期是普通的卡，後期變強，
-// 所以覺醒的卡大多在 7 費以下（8 費以上打得出來時通常已經覺醒了，沒有差別）。
-const AWAKENING: DeckCardDef[] = [
-  // 白：回復、增益
-  { kind: 'creature', id: 'white-wyrmling', name: '白龍幼崽', rarity: 'N', colors: ['white'], race: 'dragon', stage: 0, cost: 2, attack: 2, hp: 3, skills: [] },
-  {
-    kind: 'creature', id: 'dragon-knight', name: '聖光龍騎士', rarity: 'R', colors: ['white'], race: 'human',
-    stage: 0, cost: 4, attack: 3, hp: 4, skills: [],
-    triggers: [{ when: 'allySummoned', race: 'dragon', name: '龍誓', effects: [{ type: 'healHero', amount: 3 }] }],
-  },
-  {
-    kind: 'creature', id: 'dawn-dragon', name: '晨曦巨龍', rarity: 'SR', colors: ['white'], race: 'dragon',
-    stage: 0, cost: 7, attack: 5, hp: 7,
-    entry: { name: '聖息', target: NONE, effects: [{ type: 'healHero', amount: 3 }], awaken: [{ type: 'buff', attack: 1, hp: 1, on: 'all' }] },
-    skills: [{ name: '光鱗', cost: 3, target: ALLY_CREATURE, effects: [{ type: 'buff', attack: 1, hp: 1, on: 'target' }] }],
-  },
-  {
-    kind: 'spell', id: 'dragon-blessing', name: '龍之祝福', rarity: 'R', colors: ['white'], cost: 2,
-    target: ALLY_CREATURE, effects: [{ type: 'buff', attack: 1, hp: 2, on: 'target' }], awaken: [{ type: 'draw', count: 1 }],
-  },
-  { kind: 'item', id: 'dragonscale-shield', name: '龍鱗盾', rarity: 'N', colors: ['white'], cost: 2, hp: 2, damageReduction: 1 },
-  // 藍：抽牌、麻痺
-  {
-    kind: 'creature', id: 'mist-wyrmling', name: '霧海幼龍', rarity: 'N', colors: ['blue'], race: 'dragon',
-    stage: 0, cost: 3, attack: 3, hp: 4, skills: [], entry: { name: '霧息', target: NONE, effects: [{ type: 'draw', count: 1 }] },
-  },
-  {
-    kind: 'creature', id: 'dragon-speaker', name: '龍語者', rarity: 'R', colors: ['blue'], race: 'human',
-    stage: 0, cost: 3, attack: 2, hp: 4, skills: [],
-    triggers: [{ when: 'allySummoned', race: 'dragon', name: '龍語', effects: [{ type: 'draw', count: 1 }] }],
-  },
-  {
-    kind: 'creature', id: 'abyssal-elder-dragon', name: '深淵古龍', rarity: 'SR', colors: ['blue'], race: 'dragon',
-    stage: 0, cost: 6, attack: 5, hp: 7,
-    entry: { name: '冰息', target: NONE, effects: [{ type: 'draw', count: 1 }], awaken: [{ type: 'paralyze', all: true }] },
-    skills: [hit('冰槍', 2, CREATURE, 4)],
-  },
-  {
-    kind: 'spell', id: 'dragon-lore', name: '龍脈學識', rarity: 'R', colors: ['blue'], cost: 2,
-    target: NONE, effects: [{ type: 'draw', count: 2 }], awaken: [{ type: 'draw', count: 1 }],
-  },
-  // 黑：消滅、遺言
-  {
-    kind: 'creature', id: 'bone-dragon', name: '骸骨龍', rarity: 'R', colors: ['black'], race: 'dragon',
-    stage: 0, cost: 5, attack: 4, hp: 5,
-    skills: [{ name: '腐息', cost: 2, target: CREATURE, effects: [{ type: 'poison', amount: 2 }] }],
-    death: { name: '骸骨重生', effects: [{ type: 'summonToken', token: 'skeleton-token', count: 1 }] },
-  },
-  {
-    kind: 'creature', id: 'dragon-cultist', name: '冥龍信徒', rarity: 'R', colors: ['black'], race: 'human',
-    stage: 0, cost: 3, attack: 2, hp: 4, skills: [],
-    triggers: [{ when: 'allySummoned', race: 'dragon', name: '獻身', effects: [{ type: 'buff', attack: 2, hp: 2, on: 'self' }] }],
-  },
-  {
-    kind: 'creature', id: 'shadow-dragon-queen', name: '暗影龍后', rarity: 'UR', colors: ['black'], race: 'dragon',
-    stage: 0, cost: 9, attack: 9, hp: 10,
-    entry: { name: '吞噬', target: CREATURE, effects: [{ type: 'destroyCreature' }] },
-    skills: [
-      { name: '龍威', cost: 5, target: NONE, effects: [{ type: 'halveHp', all: true }] },
-      hit('暗焰', 3, ANY, 4),
-    ],
-  },
-  {
-    kind: 'spell', id: 'blood-pact', name: '龍血契約', rarity: 'R', colors: ['black'], cost: 5,
-    target: CREATURE, effects: [{ type: 'destroyCreature' }], awaken: [{ type: 'draw', count: 1 }],
-  },
-  { kind: 'item', id: 'fallen-dragon-fang', name: '墮龍之牙', rarity: 'N', colors: ['black'], cost: 2, attack: 3 },
-  // 紅：速攻、傷害
-  { kind: 'creature', id: 'fire-wyrmling', name: '火龍幼崽', rarity: 'N', colors: ['red'], race: 'dragon', stage: 0, cost: 1, attack: 2, hp: 1, skills: [] },
-  {
-    kind: 'creature', id: 'flame-wyvern', name: '烈焰飛龍', rarity: 'R', colors: ['red'], race: 'dragon',
-    stage: 0, cost: 4, attack: 4, hp: 3, keywords: ['haste'], skills: [hit('火息', 2, DIAGONAL, 4)],
-  },
-  {
-    kind: 'creature', id: 'dragon-rider', name: '龍騎士長', rarity: 'SR', colors: ['red'], race: 'human',
-    stage: 0, cost: 5, attack: 4, hp: 5, skills: [], kin: { race: 'dragon', attack: 2 },
-  },
-  {
-    kind: 'creature', id: 'magma-dragon', name: '熔岩巨龍', rarity: 'UR', colors: ['red'], race: 'dragon',
-    stage: 0, cost: 10, attack: 11, hp: 12,
-    entry: { name: '熔岩吐息', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] },
-    skills: [hit('龍怒', 4, ANY, 5), { name: '焚天', cost: 4, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }],
-  },
-  {
-    kind: 'spell', id: 'dragonfire-burst', name: '龍焰爆發', rarity: 'R', colors: ['red'], cost: 3,
-    target: ANY, effects: [{ type: 'damage', amount: 4 }], awaken: [{ type: 'damage', amount: 2 }],
-  },
-  { kind: 'item', id: 'dragon-claw', name: '龍鱗爪', rarity: 'N', colors: ['red'], cost: 1, attack: 2 },
-  // 綠：加能量上限、大體型
-  { kind: 'creature', id: 'grove-wyrmling', name: '翠林幼龍', rarity: 'N', colors: ['green'], race: 'dragon', stage: 0, cost: 3, attack: 3, hp: 4, skills: [] },
-  {
-    kind: 'creature', id: 'ancient-wood-dragon', name: '古木龍', rarity: 'SR', colors: ['green'], race: 'dragon',
-    stage: 0, cost: 6, attack: 5, hp: 8, skills: [{ name: '森息', cost: 3, target: NONE, effects: [{ type: 'healAll', amount: 3 }] }],
-  },
-  {
-    kind: 'creature', id: 'nest-warden', name: '龍巢守護者', rarity: 'R', colors: ['green'], race: 'plant',
-    stage: 0, cost: 5, attack: 3, hp: 6, skills: [],
-    triggers: [{ when: 'allySummoned', race: 'dragon', name: '育龍', effects: [{ type: 'gainMaxEnergy', amount: 1 }] }],
-  },
-  {
-    kind: 'spell', id: 'awakening-seed', name: '覺醒之種', rarity: 'R', colors: ['green'], cost: 2,
-    target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }], awaken: [{ type: 'draw', count: 1 }],
-  },
-  {
-    kind: 'creature', id: 'dragon-egg', name: '巨龍之卵', rarity: 'N', colors: ['green'], race: 'dragon',
-    stage: 0, cost: 2, attack: 0, hp: 4, skills: [], death: { name: '破殼', effects: [{ type: 'summonToken', token: 'wyrm-token', count: 1 }] },
-  },
-  // 無色
-  {
-    kind: 'creature', id: 'dragon-hunter', name: '流浪龍獵人', rarity: 'R', colors: [], race: 'human',
-    stage: 0, cost: 3, attack: 2, hp: 3, skills: [hit('屠龍', 2, CREATURE, 4)],
-  },
-  {
-    kind: 'spell', id: 'dragon-scroll', name: '龍語卷軸', rarity: 'N', colors: [], cost: 2,
-    target: NONE, effects: [{ type: 'draw', count: 1 }], awaken: [{ type: 'draw', count: 1 }],
-  },
-  { kind: 'creature', id: 'dragon-guardian', name: '龍蛋守衛', rarity: 'N', colors: [], race: 'dragon', stage: 0, cost: 5, attack: 4, hp: 5, skills: [] },
-  // 巨龍之卵的遺言召喚的
-  { kind: 'creature', id: 'wyrm-token', name: '幼龍', rarity: 'N', colors: ['green'], race: 'dragon', stage: 0, cost: 0, attack: 3, hp: 3, skills: [], token: true },
-];
-const AWAKENING_CARDS: DeckCardDef[] = AWAKENING.map((card) => ({ ...card, set: 'awakening' }));
 
 /** 全部的卡，包括還沒發布的系列（預覽、模擬、測試用）。 */
 export const ALL_CARDS: DeckCardDef[] = [...CORE_CARDS, ...AWAKENING_CARDS];
@@ -872,5 +750,12 @@ export const ALL_CARDS: DeckCardDef[] = [...CORE_CARDS, ...AWAKENING_CARDS];
 /** 已經發布的卡：遊戲、商店、組牌都只用這些。 */
 export const SAMPLE_CARDS: DeckCardDef[] = ALL_CARDS.filter((card) => isReleased(setOf(card)));
 
-/** 範例卡的資料庫；preview 為 true 時連還沒發布的系列一起放進來。 */
-export const sampleDb = (preview = false) => buildCardDb(preview ? ALL_CARDS : SAMPLE_CARDS, [...SAMPLE_HEROES, ...BOSS_HEROES]);
+/** 全部的英雄，包括還沒發布的系列；BOSS 另外放。 */
+export const ALL_HEROES: HeroDef[] = [...CORE_HEROES, ...AWAKENING_HEROES];
+
+/** 已經發布的英雄：選角、電腦對手、模擬都只用這些。 */
+export const SAMPLE_HEROES: HeroDef[] = ALL_HEROES.filter((hero) => isReleased(hero.set ?? 'core'));
+
+/** 範例卡的資料庫；preview 為 true 時連還沒發布的系列（卡與英雄）一起放進來。 */
+export const sampleDb = (preview = false) =>
+  buildCardDb(preview ? ALL_CARDS : SAMPLE_CARDS, [...(preview ? ALL_HEROES : SAMPLE_HEROES), ...BOSS_HEROES]);

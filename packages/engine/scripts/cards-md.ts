@@ -3,8 +3,8 @@
 
 import { writeFileSync } from 'node:fs';
 import { cardNames, describeCard, describeColors, describeHero, KEYWORDS } from '../src/describe';
-import { RARITIES, type CreatureDef, type DeckCardDef } from '../src/types';
-import { ALL_CARDS, SAMPLE_CARDS, SAMPLE_HEROES, sampleDb } from '../src/cards/sample';
+import { RARITIES, type CreatureDef, type DeckCardDef, type HeroDef } from '../src/types';
+import { ALL_CARDS, ALL_HEROES, SAMPLE_CARDS, SAMPLE_HEROES, sampleDb } from '../src/cards/sample';
 import { CARD_SETS, setOf } from '../src/cards/sets';
 
 const byId = new Map(ALL_CARDS.map((card) => [card.id, card]));
@@ -38,6 +38,19 @@ function evolutionLines(): string[] {
     });
 }
 
+/** 英雄表的一列。 */
+function heroRow(hero: HeroDef): string {
+  const effects = describeHero(hero, nameOf).slice(1).join('<br>');
+  return `| **${hero.name}** | ${hero.rarity ?? '基礎'} | ${describeColors(hero.colors)} | ${hero.hp} | ${effects} |`;
+}
+
+/** 還沒發布的系列裡的新英雄。 */
+function heroTable(set: string): string[] {
+  const heroes = ALL_HEROES.filter((hero) => hero.set === set);
+  if (heroes.length === 0) return [];
+  return ['## 新英雄', '', '| 英雄 | 稀有度 | 顏色 | HP | 效果 |', '|---|---|---|---|---|', ...heroes.map(heroRow), ''];
+}
+
 const lines = [
   '# 範例卡牌',
   '',
@@ -58,10 +71,7 @@ const lines = [
   '',
   '| 英雄 | 稀有度 | 顏色 | HP | 效果 |',
   '|---|---|---|---|---|',
-  ...SAMPLE_HEROES.map((hero) => {
-    const effects = describeHero(hero, nameOf).slice(1).join('<br>');
-    return `| **${hero.name}** | ${hero.rarity ?? '基礎'} | ${describeColors(hero.colors)} | ${hero.hp} | ${effects} |`;
-  }),
+  ...SAMPLE_HEROES.map(heroRow),
   '',
   ...section('英雄進化', SAMPLE_CARDS.filter((card) => card.kind === 'heroEvolution')),
   '## 進化線',
@@ -81,9 +91,11 @@ const lines = [
       '> 這些卡還沒發布：遊戲、商店、組牌都看不到。網址加 `?preview`（或伺服器用 `CARD_PREVIEW=1`）可以先預覽；',
       '> 發布時把 `packages/engine/src/cards/sets.ts` 裡這個系列的 `released` 改成 `true`。',
       '',
+      ...heroTable(set.id),
+      ...section(`${set.name}・英雄進化`, cards.filter((card) => card.kind === 'heroEvolution')),
       ...section(`${set.name}・生物`, cards.filter((card) => card.kind === 'creature' && !card.token)),
       ...section(`${set.name}・衍生物`, cards.filter((card) => card.kind === 'creature' && card.token)),
-      ...section(`${set.name}・法術與道具`, cards.filter((card) => card.kind !== 'creature')),
+      ...section(`${set.name}・法術、道具與場地`, cards.filter((card) => card.kind !== 'creature' && card.kind !== 'heroEvolution')),
     ];
   }),
 ];

@@ -1,5 +1,6 @@
 import {
   ALL_CARDS,
+  ALL_HEROES,
   buildCardDb,
   createEngine,
   deckPool,
@@ -30,8 +31,9 @@ export const HERO_HPS = [30, 35, 40, 45, 50] as const;
 const simHero = (hp: number): HeroDef => ({ kind: 'hero', id: `sim-${hp}`, name: `模擬英雄 ${hp}`, colors: ALL_COLORS, hp });
 
 /** CARD_PREVIEW=1：連還沒發布的卡包系列一起模擬（發布前測強度用）。 */
-const CARDS = process.env.CARD_PREVIEW === '1' ? ALL_CARDS : SAMPLE_CARDS;
-export const db = buildCardDb(CARDS, [...SAMPLE_HEROES, ...HERO_HPS.map(simHero)]);
+const PREVIEW = process.env.CARD_PREVIEW === '1';
+const CARDS = PREVIEW ? ALL_CARDS : SAMPLE_CARDS;
+export const db = buildCardDb(CARDS, [...(PREVIEW ? ALL_HEROES : SAMPLE_HEROES), ...HERO_HPS.map(simHero)]);
 export const engine = createEngine(db);
 
 export interface Experiment {

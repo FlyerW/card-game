@@ -291,11 +291,34 @@ describe('第二彈（還沒發布）', () => {
     expect([...sampleDb().cards.values()].some((card) => card.set === 'awakening')).toBe(false);
   });
 
-  it('技能數照稀有度（持續效果、同族加成算一個技能）', () => {
-    const expected = { N: 0, R: 1, SR: 1, UR: 2 } as const;
+  it('100 張卡（不算衍生物）：每個顏色 16 張、無色 10 張', () => {
+    const collectible = expansion.filter((card) => !(card.kind === 'creature' && card.token));
+    expect(collectible).toHaveLength(100);
+    for (const color of ['white', 'blue', 'black', 'red', 'green']) expect(collectible.filter((card) => card.colors.length === 1 && card.colors[0] === color), color).toHaveLength(16);
+    expect(collectible.filter((card) => card.colors.length === 0)).toHaveLength(10);
+  });
+
+  it('新的雙色英雄只在預覽出現；每個都有英雄進化與一張雙色卡', () => {
+    const heroes = [...preview.heroes.values()].filter((hero) => hero.set === 'awakening');
+    expect(heroes).toHaveLength(5);
+    expect([...sampleDb().heroes.values()].some((hero) => hero.set === 'awakening')).toBe(false);
+    for (const hero of heroes) {
+      expect(hero.rarity).toBe('UR');
+      expect(expansion.some((card) => card.kind === 'heroEvolution' && card.evolvesFrom === hero.id), hero.name).toBe(true);
+      const sameColors = (card: DeckCardDef) => card.kind === 'creature' && card.colors.join() === hero.colors.join();
+      expect(expansion.some(sameColors), hero.name).toBe(true);
+    }
+    // 雙色組合不跟已經有的英雄重複
+    const pairs = [...preview.heroes.values()].filter((hero) => !hero.boss && hero.colors.length === 2).map((hero) => hero.colors.join('+'));
+    expect(new Set(pairs).size).toBe(pairs.length);
+  });
+
+  it('技能數照稀有度：N／R／SR／UR 各 1／2／3／4 個（進場、遺言、持續效果、同族加成都算一個）', () => {
+    const expected = { N: 1, R: 2, SR: 3, UR: 4 } as const;
     for (const card of expansion) {
-      if (card.kind !== 'creature') continue;
-      expect(card.skills.length + (card.triggers?.length ?? 0) + (card.kin ? 1 : 0), card.name).toBe(expected[card.rarity]);
+      if (card.kind !== 'creature' || card.token) continue;
+      const count = card.skills.length + (card.triggers?.length ?? 0) + (card.kin ? 1 : 0) + (card.entry ? 1 : 0) + (card.death ? 1 : 0);
+      expect(count, card.name).toBe(expected[card.rarity]);
     }
   });
 });

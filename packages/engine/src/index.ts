@@ -30,7 +30,7 @@ export { eventsFor } from './view';
 /** 教學與工具用：做一隻剛進場的生物（直接放進格子，不經過召喚）。 */
 export { newCreature } from './resolve';
 export type { CreatureView, PlayerView, SideView } from './view';
-export { ALL_CARDS, SAMPLE_CARDS, SAMPLE_HEROES, sampleDb } from './cards/sample';
+export { ALL_CARDS, ALL_HEROES, SAMPLE_CARDS, SAMPLE_HEROES, sampleDb } from './cards/sample';
 export { CARD_SETS, isReleased, setOf, type CardSet } from './cards/sets';
 export { BOSS_HEROES } from './cards/bosses';
 export * from './types';
