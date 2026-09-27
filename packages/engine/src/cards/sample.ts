@@ -9,11 +9,11 @@ import { isReleased, setOf } from './sets';
 // 生物的基準照總費用 C（進化生物是基礎加進化的費用）：攻擊 C、HP C + 1，跟爐石的白板一樣。
 //
 // 稀有度：N 沒有技能，數值照基準；R 照基準、一個技能；SR 多 2 點 HP、一個技能；UR 多 3 點數值、兩個技能。
-// 原本是二階進化、後來改成基礎生物的卡（熾天使、深海水母皇、死亡騎士、九尾天狐），技能是照二階的預算做的，
-// 所以數值照 R（不拿 SR/UR 的額外數值），技能貴 1 費、效果略減。
+// 原本是二階進化、後來改成基礎生物的卡（熾天使、深海水母皇、死亡騎士、九尾天狐、古樹熊神），技能是照二階的預算做的，
+// 所以數值照 R（不拿 SR/UR 的額外數值）。技能原本也多貴 1 費，後來改回一般的費用（太貴一場用不到一次）。
 // 無色卡比有顏色的卡少 1 點數值。進場效果、速攻、吸血、再生扣 1 點左右；9 費以上的進場效果不扣。
 // 單體傷害（技能與法術共用）：任意目標 = 費用 + 1，剛好解掉同費用的生物；只打英雄、只打生物、位置 = 費用 + 2。
-// 附帶其他效果的扣 1–2。範圍傷害：法術約費用的一半；技能 3 費全體 2、4 費全體 3（元素之力另外加）。天生技約是同費用技能的一半。
+// 附帶其他效果的扣 1–2。範圍傷害（技能與法術一樣）= 費用 −1：3 費全體 2、6 費全體 5（元素之力另外加）。天生技約是同費用技能的一半。
 // 回復約是 v0.8 的 1/2，增益、道具、中毒灼燒約是縮模時的 2 倍。
 
 const ANY: TargetSpec = { kind: 'enemy', allow: 'any' };
@@ -131,7 +131,7 @@ const CORE_CARDS: DeckCardDef[] = [
     // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物（見開頭：數值照 R、技能貴 1 費）。
     kind: 'creature', id: 'seraph', name: '熾天使', rarity: 'SR', colors: ['white'], race: 'angel',
     stage: 0, cost: 6, attack: 6, hp: 7,
-    skills: [{ name: '神聖庇護', cost: 3, target: ALLY, effects: [{ type: 'heal', amount: 5 }] }],
+    skills: [{ name: '神聖庇護', cost: 2, target: ALLY, effects: [{ type: 'heal', amount: 5 }] }],
   },
   {
     kind: 'creature', id: 'shield-knight', name: '盾衛騎士', rarity: 'R', colors: ['white'], race: 'human',
@@ -213,7 +213,7 @@ const CORE_CARDS: DeckCardDef[] = [
     // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物（見開頭：數值照 R、技能貴 1 費）。
     kind: 'creature', id: 'jelly-empress', name: '深海水母皇', rarity: 'SR', colors: ['blue'], race: 'beast',
     stage: 0, cost: 5, attack: 5, hp: 6,
-    skills: [{ name: '麻痺電網', cost: 4, target: CREATURE, effects: [{ type: 'damage', amount: 3 }, { type: 'paralyze' }] }],
+    skills: [{ name: '麻痺電網', cost: 3, target: CREATURE, effects: [{ type: 'damage', amount: 3 }, { type: 'paralyze' }] }],
   },
   {
     kind: 'creature', id: 'tide-mage', name: '潮汐術士', rarity: 'R', colors: ['blue'], race: 'human',
@@ -278,12 +278,12 @@ const CORE_CARDS: DeckCardDef[] = [
   },
   {
     kind: 'spell', id: 'thunderstorm', name: '雷暴', rarity: 'SR', colors: ['blue'], cost: 5,
-    target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }, { type: 'paralyze', all: true }],
+    target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }, { type: 'paralyze', all: true }],
   },
   {
     kind: 'spell', id: 'tsunami', name: '大海嘯', rarity: 'SR', colors: ['blue'], cost: 10,
     target: NONE,
-    effects: [{ type: 'damageEnemyCreatures', amount: 4 }, { type: 'paralyze', all: true }, { type: 'draw', count: 2 }],
+    effects: [{ type: 'damageEnemyCreatures', amount: 6 }, { type: 'paralyze', all: true }, { type: 'draw', count: 2 }],
   },
   {
     kind: 'item', id: 'frost-staff', name: '冰霜法杖', rarity: 'R', colors: ['blue'], cost: 2,
@@ -302,7 +302,7 @@ const CORE_CARDS: DeckCardDef[] = [
     // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物（見開頭：數值照 R、技能貴 1 費）。
     kind: 'creature', id: 'death-knight', name: '死亡騎士', rarity: 'SR', colors: ['black'], race: 'undead', trait: 2,
     stage: 0, cost: 6, attack: 6, hp: 7,
-    skills: [{ name: '凋零', cost: 4, target: CREATURE, effects: [{ type: 'halveHp' }] }],
+    skills: [{ name: '凋零', cost: 3, target: CREATURE, effects: [{ type: 'halveHp' }] }],
   },
   {
     kind: 'creature', id: 'rust-mite', name: '腐蝕蟲', rarity: 'R', colors: ['black'], race: 'beast',
@@ -372,7 +372,7 @@ const CORE_CARDS: DeckCardDef[] = [
   {
     kind: 'spell', id: 'withering', name: '萬物凋零', rarity: 'SR', colors: ['black'], cost: 10,
     target: NONE,
-    effects: [{ type: 'halveHp', all: true }, { type: 'damageEnemyCreatures', amount: 2 }, { type: 'opponentDiscardRandom', count: 1 }],
+    effects: [{ type: 'halveHp', all: true }, { type: 'damageEnemyCreatures', amount: 3 }, { type: 'opponentDiscardRandom', count: 1 }],
   },
   { kind: 'item', id: 'bone-armor', name: '骨甲', rarity: 'N', colors: ['black'], cost: 1, attack: 2, hp: 2 },
   { kind: 'field', id: 'rot-marsh', name: '腐沼', rarity: 'R', colors: ['black'], cost: 5, enemyDecay: 1, lifesteal: true },
@@ -390,7 +390,7 @@ const CORE_CARDS: DeckCardDef[] = [
     kind: 'creature', id: 'nine-tailed-fox', name: '九尾天狐', rarity: 'SR', colors: ['red'], race: 'beast',
     stage: 0, cost: 7, attack: 7, hp: 7,
     entry: { name: '九焰', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 1 }] },
-    skills: [{ name: '燎天', cost: 4, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }, { type: 'buff', attack: 1, hp: 1, on: 'self' }] }],
+    skills: [{ name: '燎天', cost: 3, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }, { type: 'buff', attack: 1, hp: 1, on: 'self' }] }],
   },
   {
     kind: 'creature', id: 'flame-imp', name: '炎之小鬼', rarity: 'R', colors: ['red'], race: 'elemental',
@@ -424,7 +424,7 @@ const CORE_CARDS: DeckCardDef[] = [
   { kind: 'spell', id: 'fireball', name: '火球術', rarity: 'N', colors: ['red'], cost: 3, target: ANY, effects: [{ type: 'damage', amount: 4 }] },
   { kind: 'spell', id: 'devouring-flame', name: '烈焰吞噬', rarity: 'R', colors: ['red'], cost: 3, target: CREATURE, effects: [{ type: 'damage', amount: 5 }] },
   { kind: 'spell', id: 'wildfire', name: '焚野', rarity: 'R', colors: ['red'], cost: 3, target: NONE, effects: [{ type: 'burn', amount: 2, all: true }] },
-  { kind: 'spell', id: 'firestorm', name: '烈焰風暴', rarity: 'SR', colors: ['red'], cost: 6, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] },
+  { kind: 'spell', id: 'firestorm', name: '烈焰風暴', rarity: 'SR', colors: ['red'], cost: 6, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 5 }] },
   {
     kind: 'spell', id: 'meteor', name: '隕石術', rarity: 'SR', colors: ['red'], cost: 9,
     target: ANY, effects: [{ type: 'damage', amount: 9 }, { type: 'damageEnemyCreatures', amount: 2 }],
