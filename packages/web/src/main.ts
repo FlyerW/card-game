@@ -767,19 +767,32 @@ const owned = () => ownedOf(app.profile);
 /** 你這局要用的牌組：有自訂牌組就用，沒有就用收藏自動組一副。 */
 const myDeck = (): string[] => app.decks[app.heroId] ?? autoDeck(db, app.heroId, (Math.random() * 2 ** 32) >>> 0, owned());
 
-/** 目前的天生技：英雄進化卡有新的就用新的。 */
-/** 對手英雄右邊的說明：手牌張數、被動、目前的天生技（輪流的話下一個是什麼）。 */
+/** 對手英雄右邊：天生技（跟我方一樣的按鈕樣式，點了看說明）、手牌張數、被動。 */
 function heroInfo(side: SideView): string {
   const h = hero(side.heroId);
   const evolution = side.heroEvolution ? card(side.heroEvolution) : null;
   const lines: string[] = [];
   if (h.passive) lines.push(describePassive(h.passive));
   if (evolution?.kind === 'heroEvolution' && evolution.passive) lines.push(describePassive(evolution.passive));
+  return `<div class="hero-side">${powerPill(side, false)}<div class="hero-info"><span class="hi-hand">手牌 ${side.handCount}</span>${lines
+    .map((line) => `<p>${rich(line)}</p>`)
+    .join('')}</div></div>`;
+}
+
+/**
+ * 天生技的按鈕：左邊費用、右邊名字。我方的按了就發動；對手的按了看說明。
+ * 有次數限制的標出這局還剩幾次；輪流的標出下一次換成哪個。
+ */
+function powerPill(side: SideView, mine: boolean): string {
   const current = powerOf(side);
-  if (current) {
-    lines.push(`${describeAbility(current.power, describeName)}${current.next ? `；用完換成「${current.next.name}」` : ''}`);
-  }
-  return `<div class="hero-info"><span class="hi-hand">手牌 ${side.handCount}</span>${lines.map((line) => `<p>${rich(line)}</p>`).join('')}</div>`;
+  if (!current) return '';
+  const { power, next } = current;
+  const left = power.uses === undefined ? '' : `（剩 ${Math.max(0, power.uses - side.heroPowerUses)} 次）`;
+  const then = next ? `<small>・用完換成「${esc(next.name)}」</small>` : '';
+  const body = `${costBadge(power)}${esc(power.name)}${left}${then}`;
+  if (!mine) return `<button class="power" data-do="their-power" aria-label="對手的天生技 ${esc(power.name)}，點了看說明">${body}</button>`;
+  const usable = actsForPower().length > 0;
+  return `<button class="power${app.selection?.kind === 'heroPower' ? ' selected' : ''}" data-do="power" ${usable ? '' : 'disabled'}>${body}</button>`;
 }
 
 /** 目前的天生技，以及輪流的話下一次換成哪一個（跟引擎的 heroPower 同一套規則）。 */
@@ -1088,19 +1101,7 @@ function sideRows(side: SideView, player: PlayerId, picks: Map<string, Action>, 
   const energy = `<div class="row energy-row">${mine ? `<span></span>${energyRow(side)}${deck}` : `${deck}${energyRow(side)}<span></span>`}</div>`;
 
   let heroRow = `<div class="row hero-row">${heroPlate(side, player, picks)}`;
-  if (player !== YOU) heroRow += heroInfo(side);
-  if (player === YOU) {
-    const current = powerOf(side);
-    if (current) {
-      const { power, next } = current;
-      const usable = actsForPower().length > 0;
-      // 有次數限制的天生技，標出這局還剩幾次；輪流的天生技，標出下一次換成哪個。
-      const left = power.uses === undefined ? '' : `（剩 ${Math.max(0, power.uses - side.heroPowerUses)} 次）`;
-      const then = next ? `<small>・用完換成「${esc(next.name)}」</small>` : '';
-      heroRow += `<button class="power${app.selection?.kind === 'heroPower' ? ' selected' : ''}" data-do="power" ${usable ? '' : 'disabled'}>
-        ${costBadge(power)}${esc(power.name)}${left}${then}</button>`;
-    }
-  }
+  heroRow += player === YOU ? powerPill(side, true) : heroInfo(side);
   heroRow += '</div>';
   return player === YOU ? creatures + energy + heroRow : heroRow + energy + creatures;
 }
@@ -1774,6 +1775,9 @@ root.addEventListener('click', (event) => {
     else perform({ type: 'concede', player: YOU });
   } else if (command === 'power') {
     chooseAbility(actsForPower(), { kind: 'heroPower' });
+  } else if (command === 'their-power') {
+    app.selection = { kind: 'hero', player: THEM() };
+    render();
   } else if (command === 'direct' && app.selection?.kind === 'hand') {
     const act = actsForCard(app.selection.uid).find(
       (a) => a.type === 'playField' || a.type === 'evolveHero' || (a.type === 'castSpell' && !a.target),
