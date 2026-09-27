@@ -1946,6 +1946,23 @@ root.addEventListener('input', (event) => {
   }
 });
 
+// 從綠界付款頁按「上一頁」回來：瀏覽器會把離開前的頁面原封不動還原（bfcache），
+// 那時的「前往付款頁」「開卡包中」狀態要重設；伺服器帳號再拿一次最新的金幣（說不定已經付款入帳）。
+window.addEventListener('pageshow', (event) => {
+  if (!event.persisted) return;
+  app.shop.busy = false;
+  app.shop.paying = false;
+  const session = app.session;
+  if (session && session.kind !== 'test') {
+    fetchMe(session)
+      .then((me) => {
+        if (me) app.profile = me.profile;
+        render();
+      })
+      .catch(() => render());
+  } else render();
+});
+
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && app.selection) {
     app.selection = null;

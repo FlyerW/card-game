@@ -34,6 +34,8 @@ export interface Shop {
   cost: number | 'all';
   /** 只看還沒收齊的卡。 */
   missing: boolean;
+  /** 正在前往綠界付款頁（跟開卡包的 busy 分開）。 */
+  paying: boolean;
   focus: string | null;
   /** 剛開的那一包。 */
   opened: PackCard[] | null;
@@ -50,6 +52,7 @@ export const newShop = (): Shop => ({
   color: 'all',
   cost: 'all',
   missing: false,
+  paying: false,
   focus: null,
   opened: null,
   dealing: false,
@@ -119,13 +122,15 @@ function packRow(db: CardDb, profile: Profile, unsorted: PackCard[], dealing: bo
 }
 
 /** 儲值：跳到綠界付款頁，付完按「返回商店」回來。 */
-function topupBar(canTopup: boolean, busy: boolean): string {
+function topupBar(canTopup: boolean, paying: boolean): string {
   if (!canTopup) return '';
   const buttons = TOPUPS.map(
-    (topup) => `<button class="ghost topup" data-topup="${topup.id}" ${busy ? 'disabled' : ''}><b>${topup.gold}</b> 金幣<small>NT$${topup.price}</small></button>`,
+    (topup) => `<button class="ghost topup" data-topup="${topup.id}" ${paying ? 'disabled' : ''}><b>${topup.gold}</b> 金幣<small>NT$${topup.price}</small></button>`,
   ).join('');
   return `<section class="topup-bar">
-      <div><p class="d-head">儲值金幣</p><p class="d-line">NT$30 = 100 金幣。付款由綠界科技處理，可以用信用卡、ATM 或超商代碼；付款完成後金幣會自動入帳。</p></div>
+      <div><p class="d-head">儲值金幣</p><p class="d-line">${
+        paying ? '正在前往綠界付款頁……' : 'NT$30 = 100 金幣。付款由綠界科技處理，可以用信用卡、ATM 或超商代碼；付款完成後金幣會自動入帳。'
+      }</p></div>
       <div class="topups">${buttons}</div>
     </section>`;
 }
@@ -209,7 +214,7 @@ export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: stri
         <button class="ghost big" data-do="open-packs" ${canBuyBatch && !shop.busy ? '' : 'disabled'}>開 ${PACK_BATCH} 包（${ECONOMY.packPrice * PACK_BATCH} 金幣）</button>
       </div>
     </section>
-    ${topupBar(canTopup, shop.busy)}
+    ${topupBar(canTopup, shop.paying)}
     ${toast ? `<p class="toast" role="alert">${esc(toast)}</p>` : ''}
     ${shop.notice ? `<p class="notice" role="status">${esc(shop.notice)}</p>` : ''}
     ${shop.opened ? packRow(db, profile, shop.opened, shop.dealing) : ''}
@@ -253,9 +258,9 @@ export function shopClick(
     host.shop.focus = host.shop.focus === focus ? null : focus;
   } else if (command === 'focus-close') {
     host.shop.focus = null;
-  } else if (topup && backend.topup && !host.shop.busy) {
-    // 建立訂單後，用表單把頁面送去綠界付款。
-    host.shop.busy = true;
+  } else if (topup && backend.topup && !host.shop.paying) {
+    // 建立訂單後，用表單把頁面送去綠界付款。從付款頁按「上一頁」回來時，main 的 pageshow 會把 paying 重設。
+    host.shop.paying = true;
     backend.topup(topup).then(
       (checkout) => {
         const form = document.createElement('form');
@@ -272,7 +277,7 @@ export function shopClick(
         form.submit();
       },
       (error: unknown) => {
-        host.shop.busy = false;
+        host.shop.paying = false;
         host.toast = error instanceof Error ? error.message : '儲值失敗';
         rerender();
       },
