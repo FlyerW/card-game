@@ -31,7 +31,7 @@ const hit = (name: string, cost: number, target: TargetSpec, amount: number): Ab
  */
 const HEROES: HeroDef[] = [
   {
-    kind: 'hero', id: 'sky-envoy', name: '天穹龍使', rarity: 'UR', colors: ['white', 'blue'], hp: 40,
+    kind: 'hero', id: 'sky-envoy', name: '天穹龍使', rarity: 'UR', colors: ['white', 'blue'], hp: 37,
     passive: { name: '天穹庇護', opponentTurn: { hp: 1 } },
     power: { name: '聖諭', cost: 3, target: NONE, effects: [{ type: 'draw', count: 1 }, { type: 'healHero', amount: 2 }] },
   },
@@ -65,7 +65,7 @@ const CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'dawn-dragon', name: '晨曦巨龍', rarity: 'SR', colors: ['white'], race: 'dragon',
-    stage: 0, cost: 7, attack: 5, hp: 7,
+    stage: 0, cost: 7, attack: 5, hp: 6,
     entry: { name: '聖息', target: NONE, effects: [{ type: 'healHero', amount: 3 }], awaken: [{ type: 'buff', attack: 1, hp: 1, on: 'all' }] },
     skills: [{ name: '光鱗', cost: 3, target: ALLY_CREATURE, effects: [{ type: 'buff', attack: 1, hp: 1, on: 'target' }] }],
   },
@@ -81,7 +81,7 @@ const CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'dragon-speaker', name: '龍語者', rarity: 'R', colors: ['blue'], race: 'human',
-    stage: 0, cost: 3, attack: 2, hp: 4, skills: [],
+    stage: 0, cost: 3, attack: 2, hp: 5, skills: [],
     triggers: [{ when: 'allySummoned', race: 'dragon', name: '龍語', effects: [{ type: 'draw', count: 1 }] }],
   },
   {
@@ -108,10 +108,10 @@ const CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'shadow-dragon-queen', name: '暗影龍后', rarity: 'UR', colors: ['black'], race: 'dragon',
-    stage: 0, cost: 9, attack: 9, hp: 10,
+    stage: 0, cost: 9, attack: 8, hp: 10,
     entry: { name: '吞噬', target: CREATURE, effects: [{ type: 'destroyCreature' }] },
     skills: [
-      { name: '龍威', cost: 5, target: NONE, effects: [{ type: 'halveHp', all: true }] },
+      { name: '龍威', cost: 6, target: NONE, effects: [{ type: 'halveHp', all: true }] },
       hit('暗焰', 3, ANY, 4),
     ],
   },
@@ -134,8 +134,8 @@ const CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'magma-dragon', name: '熔岩巨龍', rarity: 'UR', colors: ['red'], race: 'dragon',
-    stage: 0, cost: 10, attack: 11, hp: 12,
-    entry: { name: '熔岩吐息', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] },
+    stage: 0, cost: 10, attack: 10, hp: 11,
+    entry: { name: '熔岩吐息', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] },
     skills: [hit('龍怒', 4, ANY, 5), { name: '焚天', cost: 4, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }],
   },
   {
@@ -221,8 +221,8 @@ const CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'sky-sacred-dragon', name: '天穹聖龍', rarity: 'UR', colors: ['white'], race: 'dragon',
-    stage: 0, cost: 8, attack: 8, hp: 10,
-    skills: [hit('聖炎', 3, ANY, 4), { name: '天穹守護', cost: 3, target: NONE, effects: [{ type: 'buff', attack: 0, hp: 2, on: 'all' }] }],
+    stage: 0, cost: 8, attack: 8, hp: 9,
+    skills: [hit('聖炎', 3, ANY, 4), { name: '天穹守護', cost: 4, target: NONE, effects: [{ type: 'buff', attack: 0, hp: 2, on: 'all' }] }],
     entry: { name: '聖光降臨', target: NONE, effects: [{ type: 'healAll', amount: 3 }] },
   },
   // 藍：抽牌、麻痺
@@ -284,7 +284,7 @@ const CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'obsidian-egg', name: '黑曜之卵', rarity: 'N', colors: ['black'], race: 'dragon', trait: 0,
-    stage: 0, cost: 2, attack: 0, hp: 3, skills: [], death: { name: '孵化', effects: [{ type: 'summonToken', token: 'whelp-token', count: 1 }] },
+    stage: 0, cost: 2, attack: 0, hp: 4, skills: [], death: { name: '孵化', effects: [{ type: 'summonToken', token: 'whelp-token', count: 1 }] },
   },
   {
     kind: 'spell', id: 'netherflame-breath', name: '冥火吐息', rarity: 'N', colors: ['black'], cost: 3,
@@ -292,7 +292,7 @@ const CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'venomfang-drake', name: '毒牙龍', rarity: 'R', colors: ['black'], race: 'dragon',
-    stage: 0, cost: 3, attack: 3, hp: 3, skills: [{ name: '毒牙', cost: 1, target: CREATURE, effects: [{ type: 'poison', amount: 2 }] }],
+    stage: 0, cost: 3, attack: 3, hp: 4, skills: [{ name: '毒牙', cost: 1, target: CREATURE, effects: [{ type: 'poison', amount: 2 }] }],
   },
   {
     kind: 'creature', id: 'shadow-priest', name: '暗影祭司', rarity: 'R', colors: ['black'], race: 'human',
@@ -353,7 +353,7 @@ const CARDS: DeckCardDef[] = [
   {
     kind: 'creature', id: 'volcano-dragon', name: '火山龍', rarity: 'SR', colors: ['red'], race: 'dragon',
     stage: 0, cost: 7, attack: 7, hp: 8, entry: { name: '火山彈', target: ANY, effects: [{ type: 'damage', amount: 3 }] },
-    skills: [{ name: '火山爆發', cost: 4, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }],
+    skills: [{ name: '火山爆發', cost: 3, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] }],
   },
   {
     kind: 'creature', id: 'inferno-dragon-king', name: '炎獄龍王', rarity: 'UR', colors: ['red'], race: 'dragon',
@@ -450,7 +450,7 @@ const CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'blaze-grove-dragon', name: '焰林龍', rarity: 'SR', colors: ['red', 'green'], race: 'dragon',
-    stage: 0, cost: 6, attack: 6, hp: 7, keywords: ['haste'], skills: [hit('焦土', 3, ANY, 4)],
+    stage: 0, cost: 6, attack: 5, hp: 7, keywords: ['haste'], skills: [hit('焦土', 3, ANY, 4)],
   },
   // 新英雄的英雄進化
   {

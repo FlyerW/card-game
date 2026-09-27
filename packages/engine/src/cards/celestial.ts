@@ -29,16 +29,16 @@ const HEROES: HeroDef[] = [
     power: { name: '血刃', cost: 2, target: ANY, effects: [damage(1)], combo: [damage(1)] },
   },
   {
-    kind: 'hero', id: 'tidegrove-druid', name: '潮林德魯伊', rarity: 'UR', colors: ['blue', 'green'], hp: 40,
-    power: { name: '潮生', cost: 4, uses: 3, target: NONE, effects: [draw(1), gain] },
+    kind: 'hero', id: 'tidegrove-druid', name: '潮林德魯伊', rarity: 'UR', colors: ['blue', 'green'], hp: 42,
+    power: { name: '潮生', cost: 3, uses: 3, target: NONE, effects: [draw(1), gain] },
   },
   {
-    kind: 'hero', id: 'libra-oracle', name: '天秤神官', rarity: 'UR', colors: ['white', 'blue', 'black'], hp: 37,
-    power: { name: '天秤', cost: 3, target: ALLY_CREATURE, effects: [shieldTarget] },
+    kind: 'hero', id: 'libra-oracle', name: '天秤神官', rarity: 'UR', colors: ['white', 'blue', 'black'], hp: 39,
+    power: { name: '天秤', cost: 2, target: ALLY_CREATURE, effects: [shieldTarget] },
   },
   {
-    kind: 'hero', id: 'dawn-war-god', name: '曙光軍神', rarity: 'UR', colors: ['white', 'red', 'green'], hp: 36,
-    passive: { name: '曙光', creatures: { attack: 1, hp: 1 } },
+    kind: 'hero', id: 'dawn-war-god', name: '曙光軍神', rarity: 'UR', colors: ['white', 'red', 'green'], hp: 38,
+    passive: { name: '曙光', creatures: { attack: 1 } },
   },
   {
     kind: 'hero', id: 'gear-tyrant', name: '齒輪暴君', rarity: 'UR', colors: ['black', 'red', 'green'], hp: 38,
@@ -57,38 +57,38 @@ const CARDS: DeckCardDef[] = [
   { kind: 'creature', id: 'silver-guard', name: '銀甲衛兵', rarity: 'N', colors: ['white'], race: 'human', stage: 0, cost: 3, attack: 3, hp: 4, skills: [] },
   {
     kind: 'creature', id: 'temple-gatekeeper', name: '聖殿守門人', rarity: 'N', colors: ['white'], race: 'human', trait: 0,
-    stage: 0, cost: 4, attack: 3, hp: 5, skills: [], entry: { name: '守門', target: NONE, effects: [{ type: 'taunt' }] },
+    stage: 0, cost: 4, attack: 3, hp: 4, skills: [], entry: { name: '守門', target: NONE, effects: [{ type: 'taunt' }] },
   },
   { kind: 'creature', id: 'holy-cavalry', name: '聖光騎兵', rarity: 'N', colors: ['white'], race: 'human', stage: 0, cost: 5, attack: 5, hp: 6, skills: [] },
   {
     kind: 'creature', id: 'ward-priest', name: '護盾祭司', rarity: 'R', colors: ['white'], race: 'human',
     stage: 0, cost: 3, attack: 2, hp: 4, skills: [{ name: '賜盾', cost: 2, target: ALLY_CREATURE, effects: [shieldTarget] }],
   },
-  { kind: 'creature', id: 'angel-lancer', name: '天使槍兵', rarity: 'R', colors: ['white'], race: 'angel', trait: 2, stage: 0, cost: 4, attack: 4, hp: 4, keywords: ['shield'], skills: [] },
+  { kind: 'creature', id: 'angel-lancer', name: '天使槍兵', rarity: 'R', colors: ['white'], race: 'angel', trait: 2, stage: 0, cost: 4, attack: 3, hp: 4, keywords: ['shield'], skills: [] },
   {
     kind: 'creature', id: 'choir-captain', name: '聖歌隊長', rarity: 'R', colors: ['white'], race: 'human',
     stage: 0, cost: 3, attack: 3, hp: 3, skills: [], death: { name: '聖歌', effects: [heal(3)] },
   },
   {
     kind: 'spell', id: 'temple-blessing', name: '神殿的祝福', rarity: 'R', colors: ['white'], cost: 2,
-    target: ALLY_CREATURE, effects: [shieldTarget, { type: 'buff', attack: 1, hp: 1, on: 'target' }], combo: [draw(1)],
+    target: ALLY_CREATURE, effects: [shieldTarget], combo: [draw(1)],
   },
-  { kind: 'spell', id: 'purifying-light', name: '淨化之光', rarity: 'R', colors: ['white'], cost: 3, target: CREATURE, effects: [{ type: 'silence' }, draw(1)] },
+  { kind: 'spell', id: 'purifying-light', name: '淨化之光', rarity: 'R', colors: ['white'], cost: 4, target: CREATURE, effects: [{ type: 'silence' }, draw(1)] },
   { kind: 'field', id: 'light-bulwark', name: '聖光壁壘', rarity: 'R', colors: ['white'], cost: 3, creatures: { hp: 1 }, heroRegenerate: 1 },
   {
     kind: 'creature', id: 'seraph-guardian', name: '熾翼守護天使', rarity: 'SR', colors: ['white'], race: 'angel', trait: 3,
-    stage: 0, cost: 5, attack: 4, hp: 8, keywords: ['shield'], skills: [{ name: '神聖連結', cost: 2, target: ALLY_CREATURE, effects: [shieldTarget] }],
+    stage: 0, cost: 5, attack: 4, hp: 7, keywords: ['shield'], skills: [{ name: '神聖連結', cost: 2, target: ALLY_CREATURE, effects: [shieldTarget] }],
   },
   {
     kind: 'creature', id: 'knight-commander', name: '聖堂騎士團長', rarity: 'SR', colors: ['white'], race: 'human', trait: 2,
-    stage: 0, cost: 6, attack: 5, hp: 9, entry: { name: '聖誓', target: NONE, effects: [shieldAll] },
+    stage: 0, cost: 6, attack: 5, hp: 8, entry: { name: '聖誓', target: NONE, effects: [shieldAll] },
     skills: [{ name: '號令', cost: 3, target: NONE, effects: [summon('soldier-token')] }],
   },
   { kind: 'spell', id: 'divine-punishment', name: '天罰', rarity: 'SR', colors: ['white'], cost: 6, target: NONE, effects: [aoe(4), heal(4)] },
   {
     kind: 'creature', id: 'celestial-archangel', name: '天界大天使', rarity: 'UR', colors: ['white'], race: 'angel', trait: 4,
     stage: 0, cost: 9, attack: 9, hp: 12, keywords: ['shield'],
-    entry: { name: '天界降臨', target: NONE, effects: [shieldAll, { type: 'buff', attack: 2, hp: 2, on: 'all' }] },
+    entry: { name: '天界降臨', target: NONE, effects: [shieldAll, { type: 'buff', attack: 1, hp: 1, on: 'all' }] },
     skills: [hit('天界審判', 4, ANY, 6)],
   },
 
@@ -105,7 +105,7 @@ const CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'frost-colossus', name: '寒霜巨像', rarity: 'N', colors: ['blue'], race: 'machine', trait: 0,
-    stage: 0, cost: 5, attack: 4, hp: 6, skills: [], entry: { name: '寒霜', target: CREATURE, effects: [{ type: 'paralyze' }] },
+    stage: 0, cost: 5, attack: 5, hp: 6, skills: [], entry: { name: '寒霜', target: CREATURE, effects: [{ type: 'paralyze' }] },
   },
   { kind: 'spell', id: 'arcane-missile', name: '秘法飛彈', rarity: 'N', colors: ['blue'], cost: 1, target: ANY, effects: [damage(1)], combo: [draw(1)] },
   {
@@ -114,11 +114,11 @@ const CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'mirror-golem', name: '鏡像魔像', rarity: 'R', colors: ['blue'], race: 'machine',
-    stage: 0, cost: 4, attack: 3, hp: 5, skills: [{ name: '反射', cost: 2, target: NONE, effects: [shieldSelf] }],
+    stage: 0, cost: 4, attack: 3, hp: 5, skills: [{ name: '反射', cost: 1, target: NONE, effects: [shieldSelf] }],
   },
   {
     kind: 'creature', id: 'tide-puppeteer', name: '潮汐傀儡師', rarity: 'R', colors: ['blue'], race: 'human',
-    stage: 0, cost: 4, attack: 3, hp: 4, skills: [], triggers: [{ when: 'allySummoned', race: 'machine', name: '操偶', effects: [draw(1)] }],
+    stage: 0, cost: 4, attack: 3, hp: 5, skills: [], triggers: [{ when: 'allySummoned', race: 'machine', name: '操偶', effects: [draw(1)] }],
   },
   { kind: 'spell', id: 'time-warp', name: '時間扭曲', rarity: 'R', colors: ['blue'], cost: 3, target: CREATURE, effects: [{ type: 'paralyze' }], combo: [draw(2)] },
   { kind: 'spell', id: 'arcane-resonance', name: '秘法共鳴', rarity: 'R', colors: ['blue'], cost: 2, target: NONE, effects: [draw(1)], combo: [draw(1)] },
@@ -145,7 +145,7 @@ const CARDS: DeckCardDef[] = [
     kind: 'creature', id: 'shadow-thief', name: '陰影盜賊', rarity: 'N', colors: ['black'], race: 'human', trait: 0,
     stage: 0, cost: 1, attack: 2, hp: 1, skills: [], entry: { name: '偷襲', target: ANY, effects: [], combo: [damage(1)] },
   },
-  { kind: 'creature', id: 'rotting-soldier', name: '腐屍兵', rarity: 'N', colors: ['black'], race: 'undead', stage: 0, cost: 2, attack: 2, hp: 2, skills: [] },
+  { kind: 'creature', id: 'rotting-soldier', name: '腐屍兵', rarity: 'N', colors: ['black'], race: 'undead', stage: 0, cost: 2, attack: 2, hp: 3, skills: [] },
   {
     kind: 'creature', id: 'venom-rat', name: '毒牙鼠', rarity: 'N', colors: ['black'], race: 'beast', trait: 0,
     stage: 0, cost: 2, attack: 2, hp: 2, skills: [], death: { name: '毒血', effects: [{ type: 'poison', amount: 1, all: true }] },
@@ -192,7 +192,7 @@ const CARDS: DeckCardDef[] = [
     kind: 'creature', id: 'netherworld-soul', name: '冥界機魂', rarity: 'UR', colors: ['black'], race: 'undead', trait: 3,
     stage: 0, cost: 9, attack: 9, hp: 10, entry: { name: '冥界', target: NONE, effects: [{ type: 'halveHp', all: true }] },
     death: { name: '亡者召集', effects: [summon('skeleton-token', 2)] },
-    skills: [{ name: '魂噬', cost: 4, target: CREATURE, effects: [{ type: 'destroyCreature' }] }],
+    skills: [{ name: '魂噬', cost: 5, target: CREATURE, effects: [{ type: 'destroyCreature' }] }],
   },
 
   // ── 紅：連擊、速攻、爆破機械 ──
@@ -227,7 +227,7 @@ const CARDS: DeckCardDef[] = [
   { kind: 'item', id: 'flamethrower', name: '火焰噴射器', rarity: 'R', colors: ['red'], cost: 3, attack: 2, skills: [{ name: '噴火', cost: 2, target: NONE, effects: [aoe(1)] }] },
   {
     kind: 'creature', id: 'lava-mech', name: '熔岩機甲', rarity: 'SR', colors: ['red'], race: 'machine',
-    stage: 0, cost: 6, attack: 6, hp: 7, keywords: ['haste'], skills: [hit('熔岩砲', 3, ANY, 4)],
+    stage: 0, cost: 6, attack: 5, hp: 6, keywords: ['haste'], skills: [hit('熔岩砲', 3, ANY, 4)],
   },
   {
     kind: 'creature', id: 'flame-dancer', name: '焰魔舞姬', rarity: 'SR', colors: ['red'], race: 'elemental',
@@ -237,7 +237,7 @@ const CARDS: DeckCardDef[] = [
   { kind: 'spell', id: 'demolition-plan', name: '爆破計畫', rarity: 'SR', colors: ['red'], cost: 5, target: ANY, effects: [damage(6)], combo: [aoe(2)] },
   {
     kind: 'creature', id: 'inferno-machine-god', name: '煉獄機神', rarity: 'UR', colors: ['red'], race: 'machine', trait: 2,
-    stage: 0, cost: 10, attack: 11, hp: 12, keywords: ['haste'], entry: { name: '煉獄降臨', target: NONE, effects: [aoe(3)] },
+    stage: 0, cost: 10, attack: 10, hp: 11, keywords: ['haste'], entry: { name: '煉獄降臨', target: NONE, effects: [aoe(2)] },
     skills: [hit('煉獄砲', 4, ANY, 6)],
   },
 
@@ -331,12 +331,12 @@ const CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'libra-apostle', name: '天秤使徒', rarity: 'UR', colors: ['white', 'blue', 'black'], race: 'angel', trait: 3,
-    stage: 0, cost: 7, attack: 6, hp: 9, keywords: ['shield'], entry: { name: '天秤', target: CREATURE, effects: [{ type: 'destroyCreature' }] },
+    stage: 0, cost: 7, attack: 5, hp: 8, keywords: ['shield'], entry: { name: '天秤', target: CREATURE, effects: [{ type: 'destroyCreature' }] },
     skills: [{ name: '審判', cost: 3, target: ALLY_CREATURE, effects: [shieldTarget, draw(1)] }],
   },
   {
     kind: 'creature', id: 'dawn-standard-bearer', name: '曙光戰旗手', rarity: 'SR', colors: ['white', 'red', 'green'], race: 'human', trait: 2,
-    stage: 0, cost: 5, attack: 5, hp: 6, entry: { name: '戰旗', target: NONE, effects: [{ type: 'buff', attack: 1, hp: 1, on: 'all' }] },
+    stage: 0, cost: 5, attack: 4, hp: 5, entry: { name: '戰旗', target: NONE, effects: [{ type: 'buff', attack: 1, hp: 0, on: 'all' }] },
     skills: [{ name: '衝鋒', cost: 2, target: NONE, effects: [shieldSelf] }],
   },
   {
