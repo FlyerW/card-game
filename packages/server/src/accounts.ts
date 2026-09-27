@@ -180,13 +180,13 @@ export class AccountStore {
     return { token, account };
   }
 
-  /** 認領舊的訪客帳號：設定密碼，同名的全部合併到收藏最多的那個（抽到的卡加在一起，不超過上限）。 */
+  /** 認領舊的訪客帳號：設定密碼，同名的全部合併到收藏最多的那個（抽到的卡加在一起，不超過上限；粉塵與金幣相加）。 */
   private claim(legacy: Account[], password: string): Account {
     const count = (account: Account) => Object.values(account.profile.collection).reduce((sum, n) => sum + n, 0);
     const [keep, ...rest] = [...legacy].sort((a, b) => count(b) - count(a));
     const base = newProfile(keep!.profile.day, starterDecks(this.db)).collection;
     const collection = { ...keep!.profile.collection };
-    const vouchers = { ...keep!.profile.vouchers };
+    let dust = keep!.profile.dust;
     let gold = keep!.profile.gold;
     for (const other of rest) {
       // 每個舊帳號都從同一份起始收藏開始，只把多抽到的加進來。
@@ -197,12 +197,12 @@ export class AccountStore {
         const limit = card ? copyLimit(DEFAULT_RULES, card) : this.db.heroes.has(id) ? 1 : 0;
         collection[id] = Math.min(limit, (collection[id] ?? 0) + extra);
       }
-      for (const rarity of Object.keys(vouchers) as (keyof typeof vouchers)[]) vouchers[rarity] += other.profile.vouchers[rarity];
+      dust += other.profile.dust;
       gold += other.profile.gold;
       delete this.data.accounts[other.id];
       for (const [key, session] of Object.entries(this.data.sessions)) if (session.accountId === other.id) delete this.data.sessions[key];
     }
-    keep!.profile = { ...keep!.profile, collection, vouchers, gold };
+    keep!.profile = { ...keep!.profile, collection, dust, gold };
     keep!.password = hashPassword(password);
     return keep!;
   }

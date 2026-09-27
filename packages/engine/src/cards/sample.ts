@@ -386,7 +386,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物（見開頭：數值照 R、技能貴 1 費）。
     kind: 'creature', id: 'nine-tailed-fox', name: '九尾天狐', rarity: 'SR', colors: ['red'], race: 'beast',
     stage: 0, cost: 7, attack: 7, hp: 7,
-    entry: { name: '九焰', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] },
+    entry: { name: '九焰', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 1 }] },
     skills: [{ name: '燎天', cost: 5, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }, { type: 'buff', attack: 1, hp: 1, on: 'self' }] }],
   },
   {
@@ -403,7 +403,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   {
     kind: 'creature', id: 'blast-mage', name: '炎爆術士', rarity: 'R', colors: ['red'], race: 'human',
     stage: 0, cost: 2, attack: 2, hp: 2,
-    entry: { name: '引燃', target: CREATURE, effects: [{ type: 'burn', amount: 2 }] },
+    entry: { name: '引燃', target: CREATURE, effects: [{ type: 'burn', amount: 1 }] },
     skills: [hit('爆燃', 2, CREATURE, 4)],
   },
   {
@@ -414,7 +414,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   {
     kind: 'creature', id: 'inferno-demon', name: '炎魔', rarity: 'UR', colors: ['red'], race: 'elemental',
     stage: 0, cost: 11, attack: 13, hp: 14,
-    entry: { name: '煉獄降臨', target: HERO, effects: [{ type: 'damage', amount: 4 }, { type: 'damageEnemyCreatures', amount: 3 }] },
+    entry: { name: '煉獄降臨', target: HERO, effects: [{ type: 'damage', amount: 4 }, { type: 'damageEnemyCreatures', amount: 2 }] },
     skills: [hit('爆炎', 4, DIAGONAL, 6), hit('末日烈焰', 6, HERO, 8)],
   },
   { kind: 'spell', id: 'scorching-ray', name: '灼熱射線', rarity: 'N', colors: ['red'], cost: 2, target: HERO, effects: [{ type: 'damage', amount: 4 }] },
@@ -599,7 +599,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   {
     // 元素之力讓餘燼風暴變成 2 傷害。
     kind: 'creature', id: 'ember-heart', name: '烈焰之心', rarity: 'SR', colors: ['red'], race: 'elemental',
-    stage: 0, cost: 6, attack: 5, hp: 6, skills: [],
+    stage: 0, cost: 6, attack: 4, hp: 6, skills: [],
     triggers: [{ when: 'turnEnd', name: '餘燼風暴', effects: [{ type: 'damageEnemyCreatures', amount: 1 }] }],
   },
   {

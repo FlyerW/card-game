@@ -8,10 +8,10 @@ export const esc = (text: string) =>
 /** 說明文字：跳脫之後把 **關鍵字** 換成粗體。 */
 export const rich = (text: string) => esc(text).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
 
-/** 卡牌說明：第一行是標題，其餘是效果，最後用小字解釋用到的關鍵字。 */
-export function detailLines(texts: readonly string[]): string {
+/** 卡牌說明：第一行是標題，其餘是效果，最後用小字解釋用到的關鍵字（also：別處寫出來的文字，例如技能按鈕，關鍵字也一起解釋）。 */
+export function detailLines(texts: readonly string[], also: readonly string[] = []): string {
   const [head, ...body] = texts;
-  const glossary = explainKeywords(body);
+  const glossary = explainKeywords([...body, ...also]);
   return (
     `<p class="d-head">${rich(head ?? '')}</p>${body.map((text) => `<p class="d-line">${rich(text)}</p>`).join('')}` +
     (glossary.length > 0 ? `<ul class="d-kw">${glossary.map((text) => `<li>${rich(text)}</li>`).join('')}</ul>` : '')

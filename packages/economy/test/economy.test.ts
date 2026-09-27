@@ -3,7 +3,7 @@ import { copyLimit, DEFAULT_RULES, SAMPLE_HEROES, sampleDb, validateDeck, type G
 import {
   ECONOMY,
   emptyTally,
-  exchange,
+  craft,
   fullProfile,
   newProfile,
   openPack,
@@ -49,10 +49,10 @@ describe('新玩家', () => {
     }
   });
 
-  it('一開始有 100 金幣，剛好開一包；沒有兌換卷', () => {
+  it('一開始有 100 金幣，剛好開一包；沒有粉塵', () => {
     const profile = fresh();
     expect(profile.gold).toBe(ECONOMY.packPrice);
-    expect(profile.vouchers).toEqual({ N: 0, R: 0, SR: 0, UR: 0 });
+    expect(profile.dust).toBe(0);
   });
 });
 
@@ -209,21 +209,21 @@ describe('卡包', () => {
     }
   });
 
-  it('已經有 2 張（UR 1 張）的卡再開到，換成一張同稀有度的兌換卷，收藏不會超過上限', () => {
+  it('已經有 2 張（UR 1 張）的卡再開到，換成粉塵（N 10、R 30、SR 100、UR 300），收藏不會超過上限', () => {
     const random = seededRandom(9);
     const full: Record<string, number> = {};
     for (const card of packableCards(db)) full[card.id] = copyLimit(DEFAULT_RULES, card);
     let profile: Profile = { ...fresh(), gold: 20 * ECONOMY.packPrice, collection: full };
-    let duplicates = 0;
+    let dust = 0;
     for (let i = 0; i < 20; i++) {
       const opened = openPack(profile, db, DEFAULT_RULES, random);
       if (!opened.ok) throw new Error(opened.reason);
-      expect(opened.cards.every((card) => card.duplicate)).toBe(true);
-      duplicates += opened.cards.length;
+      expect(opened.cards.every((card) => card.duplicate && card.dust === ECONOMY.dustValue[card.rarity])).toBe(true);
+      dust += opened.cards.reduce((sum, card) => sum + card.dust, 0);
       profile = opened.profile;
     }
     expect(profile.collection).toEqual(full);
-    expect(Object.values(profile.vouchers).reduce((a, b) => a + b, 0)).toBe(duplicates);
+    expect(profile.dust).toBe(dust);
   });
 });
 
@@ -243,33 +243,41 @@ describe('UR 英雄', () => {
     for (const hero of urHeroes) expect(profile.collection[hero.id]).toBe(1);
   });
 
-  it('3 張 UR 兌換卷換一個英雄；有了就不能再換', () => {
-    const profile: Profile = { ...fresh(), vouchers: { N: 0, R: 0, SR: 0, UR: 6 } };
-    const swapped = exchange(profile, db, DEFAULT_RULES, 'tide-shadow-twins');
-    if (!swapped.ok) throw new Error(swapped.reason);
-    expect(ownsHero(swapped.profile, db, 'tide-shadow-twins')).toBe(true);
-    expect(exchange(swapped.profile, db, DEFAULT_RULES, 'tide-shadow-twins')).toMatchObject({ ok: false });
-    expect(exchange(profile, db, DEFAULT_RULES, 'flame-lord')).toMatchObject({ ok: false }); // 基礎英雄不用換
+  it('1000 粉塵合成一個 UR 英雄；有了就不能再合成', () => {
+    const profile: Profile = { ...fresh(), dust: 2000 };
+    const crafted = craft(profile, db, DEFAULT_RULES, 'tide-shadow-twins');
+    if (!crafted.ok) throw new Error(crafted.reason);
+    expect(ownsHero(crafted.profile, db, 'tide-shadow-twins')).toBe(true);
+    expect(crafted.profile.dust).toBe(1000);
+    expect(craft(crafted.profile, db, DEFAULT_RULES, 'tide-shadow-twins')).toMatchObject({ ok: false });
+    expect(craft(profile, db, DEFAULT_RULES, 'flame-lord')).toMatchObject({ ok: false }); // 基礎英雄不用合成
   });
 });
 
-describe('兌換卷', () => {
+describe('粉塵合成', () => {
   const sr = packableCards(db).find((card) => card.rarity === 'SR')!;
   const ur = packableCards(db).find((card) => card.rarity === 'UR')!;
 
-  it('3 張同稀有度的兌換卷換一張那個稀有度的任意卡', () => {
-    const profile: Profile = { ...fresh(), collection: {}, vouchers: { N: 0, R: 0, SR: 4, UR: 0 } };
-    const swapped = exchange(profile, db, DEFAULT_RULES, sr.id);
-    if (!swapped.ok) throw new Error(swapped.reason);
-    expect(swapped.profile.collection[sr.id]).toBe(1);
-    expect(swapped.profile.vouchers.SR).toBe(1);
+  it('粉塵合成任意一張卡：N 30、R 100、SR 300、UR 1000；粉塵不分稀有度', () => {
+    const profile: Profile = { ...fresh(), collection: {}, dust: 350 };
+    const crafted = craft(profile, db, DEFAULT_RULES, sr.id);
+    if (!crafted.ok) throw new Error(crafted.reason);
+    expect(crafted.profile.collection[sr.id]).toBe(1);
+    expect(crafted.profile.dust).toBe(50);
   });
 
-  it('兌換卷不夠、稀有度不同、已經有滿的都不能換', () => {
-    const profile: Profile = { ...fresh(), collection: { [ur.id]: 1 }, vouchers: { N: 0, R: 0, SR: 2, UR: 9 } };
-    expect(exchange(profile, db, DEFAULT_RULES, sr.id)).toMatchObject({ ok: false });
-    expect(exchange(profile, db, DEFAULT_RULES, ur.id)).toMatchObject({ ok: false });
-    expect(exchange(profile, db, DEFAULT_RULES, 'soldier-token')).toMatchObject({ ok: false });
+  it('粉塵不夠、已經有滿、衍生物都不能合成', () => {
+    const profile: Profile = { ...fresh(), collection: { [ur.id]: 1 }, dust: 999 };
+    expect(craft(profile, db, DEFAULT_RULES, 'tide-shadow-twins')).toMatchObject({ ok: false });
+    expect(craft({ ...profile, dust: 5000 }, db, DEFAULT_RULES, ur.id)).toMatchObject({ ok: false });
+    expect(craft({ ...profile, dust: 5000 }, db, DEFAULT_RULES, 'soldier-token')).toMatchObject({ ok: false });
+  });
+
+  it('舊存檔的兌換卷換成粉塵', () => {
+    const { dust: _, ...rest } = fresh();
+    const old = { ...rest, vouchers: { N: 3, R: 1, SR: 1, UR: 1 } };
+    expect(parseProfile(old)?.dust).toBe(3 * 10 + 30 + 100 + 300);
+    expect(parseProfile(old)).not.toHaveProperty('vouchers');
   });
 });
 

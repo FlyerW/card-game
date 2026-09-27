@@ -16,7 +16,7 @@ import { ECONOMY, PACK_BATCH, packItems, questDef, type PackCard, type PackItem,
 import type { Backend } from './account';
 import { cardFace, detailLines, esc, pips } from './ui';
 
-// 卡包與收藏：金幣、開卡包、兌換卷。規則在 @card-game/economy，這裡只負責畫面；
+// 卡包與收藏：金幣、開卡包、粉塵合成。規則在 @card-game/economy，這裡只負責畫面；
 // 開卡包與兌換交給登入的帳號（測試帳號在瀏覽器裡算，Google 帳號交給伺服器）。
 
 /** 每張卡最多能放進牌組幾張：規則上限與擁有張數取小的。 */
@@ -102,7 +102,7 @@ function packRow(db: CardDb, profile: Profile, unsorted: PackCard[], dealing: bo
       const later = opened.filter((other, j) => j > i && other.cardId === got.cardId && !other.duplicate).length;
       const nth = (profile.collection[got.cardId] ?? 0) - later;
       const label = got.duplicate
-        ? `<span class="p-tag dup">${many ? `${got.rarity} 卷 +1` : `重複 → ${got.rarity} 兌換卷 +1`}</span>`
+        ? `<span class="p-tag dup">${many ? `粉塵 +${got.dust}` : `重複 → 粉塵 +${got.dust}`}</span>`
         : `<span class="p-tag new">${got.hero ? '新英雄' : nth === 1 ? '新卡' : `第 ${nth} 張`}</span>`;
       return `<div class="p-card" style="--i:${i}">${itemFace(card, `data-focus="${card.id}" aria-label="${esc(card.name)}，看說明"`)}${label}</div>`;
     })
@@ -110,7 +110,7 @@ function packRow(db: CardDb, profile: Profile, unsorted: PackCard[], dealing: bo
   const summary = many
     ? `<p class="pack-summary">${opened.length / ECONOMY.packSize} 包、${opened.length} 張：${order
         .map((rarity) => `${rarity} ${opened.filter((got) => got.rarity === rarity).length}`)
-        .join('、')}；新卡 ${opened.filter((got) => !got.duplicate).length} 張，兌換卷 +${opened.filter((got) => got.duplicate).length}</p>`
+        .join('、')}；新卡 ${opened.filter((got) => !got.duplicate).length} 張，粉塵 +${opened.reduce((sum, got) => sum + got.dust, 0)}</p>`
     : '';
   return `${summary}<div class="pack-row${dealing ? ' deal' : ''}${many ? ' many' : ''}" aria-label="剛開的卡包">${cards}</div>`;
 }
@@ -144,30 +144,31 @@ export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: stri
     .join('');
 
   const focus = shop.focus ? all.find((item) => item.id === shop.focus) : undefined;
-  let focusBox = '<p class="d-line">點卡片看說明。沒收齊的卡（或還沒有的 UR 英雄）可以用 3 張同稀有度的兌換卷換。</p>';
+  const { craftCost } = ECONOMY;
+  let focusBox = `<p class="d-line">點卡片看說明。沒收齊的卡（或還沒有的 UR 英雄）可以用粉塵合成：N ${craftCost.N}、R ${craftCost.R}、SR ${craftCost.SR}、UR ${craftCost.UR}。</p>`;
   if (focus) {
     const n = owned(focus);
-    const vouchers = profile.vouchers[focus.rarity];
+    const cost = craftCost[focus.rarity];
     const why = full(focus)
       ? focus.hero ? '已經有這個英雄了' : '已經收齊了'
-      : vouchers < ECONOMY.vouchersPerCard
-        ? `${focus.rarity} 兌換卷不夠（${vouchers}/${ECONOMY.vouchersPerCard}）`
+      : profile.dust < cost
+        ? `粉塵不夠（${profile.dust}/${cost}）`
         : null;
     const lines = focus.def.kind === 'hero'
       ? describeHero(focus.def, cardNames(db))
       : describeCard(focus.def, cardNames(db));
     const have = focus.hero
-      ? `${n > 0 ? '已經有了，開局時可以選' : '還沒有：從卡包抽到，或用兌換卷換'}。`
+      ? `${n > 0 ? '已經有了，開局時可以選' : '還沒有：從卡包抽到，或用粉塵合成'}。`
       : `擁有 <b>${n}</b> 張，牌組最多放 ${focus.limit} 張。`;
     focusBox = `<div class="focus">${detailLines(lines)}
       <p class="d-line">${have}</p>
-      <button class="primary" data-exchange="${focus.id}" ${why || shop.busy ? 'disabled' : ''}>用 ${ECONOMY.vouchersPerCard} 張 ${focus.rarity} 兌換卷換${focus.hero ? '這個英雄' : '一張'}</button>
-      ${why ? `<p class="d-line">${why}</p>` : ''}</div>`;
+      <button class="primary" data-craft="${focus.id}" ${why || shop.busy ? 'disabled' : ''}>用 ${cost} 粉塵合成${focus.hero ? '這個英雄' : '一張'}</button>
+      ${why ? `<p class="d-line">${why}</p>` : ''}
+      <button class="ghost focus-close" data-do="focus-close">關閉</button></div>`;
   }
 
   const canBuy = profile.gold >= ECONOMY.packPrice;
   const canBuyBatch = profile.gold >= ECONOMY.packPrice * PACK_BATCH;
-  const vouchers = RARITIES.map((r) => `<span class="voucher r-${r}"><span class="rarity">${r}</span> <b>${profile.vouchers[r]}</b></span>`).join('');
   const { UR, SR, R } = ECONOMY.odds;
   const pct = (p: number) => `${Math.round(p * 100)}%`;
 
@@ -181,8 +182,9 @@ export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: stri
       <div class="pack-info">
         <p class="d-head">卡包・${ECONOMY.packPrice} 金幣</p>
         <p class="d-line">一包 ${ECONOMY.packSize} 張，每張 R ${pct(R)}、SR ${pct(SR)}、UR ${pct(UR)}，其餘 N；每包至少一張 R 以上。
-          UR 也可能開到多色的 UR 英雄。已經有 ${DEFAULT_RULES.maxCopies} 張（UR ${DEFAULT_RULES.maxUrCopies} 張、英雄 1 個）的再開到，換成一張同稀有度的兌換卷。</p>
-        <p class="vouchers"><span class="w-label">兌換卷</span>${vouchers}</p>
+          UR 也可能開到多色的 UR 英雄。已經有 ${DEFAULT_RULES.maxCopies} 張（UR ${DEFAULT_RULES.maxUrCopies} 張、英雄 1 個）的再開到，換成粉塵
+          （N ${ECONOMY.dustValue.N}、R ${ECONOMY.dustValue.R}、SR ${ECONOMY.dustValue.SR}、UR ${ECONOMY.dustValue.UR}），粉塵可以合成任意一張卡。</p>
+        <p class="vouchers"><span class="w-label">粉塵</span><b class="dust">${profile.dust}</b></p>
       </div>
       <div class="pack-buttons">
         <button class="primary big" data-do="open-pack" ${canBuy && !shop.busy ? '' : 'disabled'}>${shop.busy ? '開卡包中……' : canBuy ? '開一包' : `金幣不夠（${profile.gold}/${ECONOMY.packPrice}）`}</button>
@@ -198,8 +200,9 @@ export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: stri
         <div class="chips">${colorChips}${chip('data-missing', String(!shop.missing), '只看沒收齊的', shop.missing)}</div>
         <div class="pool">${grid || '<p class="d-line">沒有符合的卡。</p>'}</div>
       </section>
+      ${focus ? '<div class="shop-backdrop" data-do="focus-close"></div>' : ''}
       <aside class="b-side">
-        <div class="detail">${focusBox}</div>
+        <div class="detail${focus ? ' has-focus' : ''}">${focusBox}</div>
         <button class="primary big" data-do="shop-done">回到開局</button>
       </aside>
     </div>
@@ -222,19 +225,21 @@ export function shopClick(
   command: string | undefined,
   rerender: () => void,
 ): boolean {
-  const { focus, rarity, color, missing, exchange: exchangeId } = el.dataset;
+  const { focus, rarity, color, missing, craft: craftId } = el.dataset;
   host.toast = null;
   host.shop.dealing = false;
   host.shop.notice = null;
   if (focus) {
     host.shop.focus = host.shop.focus === focus ? null : focus;
+  } else if (command === 'focus-close') {
+    host.shop.focus = null;
   } else if (rarity) {
     host.shop.rarity = rarity as Shop['rarity'];
   } else if (color) {
     host.shop.color = color as ColorFilter;
   } else if (missing) {
     host.shop.missing = missing === 'true';
-  } else if ((command === 'open-pack' || command === 'open-packs' || exchangeId) && !host.shop.busy) {
+  } else if ((command === 'open-pack' || command === 'open-packs' || craftId) && !host.shop.busy) {
     host.shop.busy = true;
     const done = () => {
       host.shop.busy = false;
@@ -251,13 +256,13 @@ export function shopClick(
         done();
       });
     } else {
-      const cardId = exchangeId!;
-      void backend.exchange(host.profile, cardId).then((swapped) => {
-        if (swapped.ok) {
-          host.profile = swapped.profile;
+      const cardId = craftId!;
+      void backend.craft(host.profile, cardId).then((crafted) => {
+        if (crafted.ok) {
+          host.profile = crafted.profile;
           const hero = db.heroes.get(cardId);
-          host.shop.notice = hero ? `換到了英雄 ${hero.name}，開局時可以選了` : `換到了 ${db.cards.get(cardId)!.name}（現在 ${host.profile.collection[cardId]} 張）`;
-        } else host.toast = swapped.reason;
+          host.shop.notice = hero ? `合成了英雄 ${hero.name}，開局時可以選了` : `合成了 ${db.cards.get(cardId)!.name}（現在 ${host.profile.collection[cardId]} 張）`;
+        } else host.toast = crafted.reason;
         done();
       });
     }

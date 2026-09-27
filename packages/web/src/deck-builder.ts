@@ -79,7 +79,7 @@ export function addProblem(db: CardDb, deck: readonly string[], id: string, owne
   const limit = copyLimit(DEFAULT_RULES, card);
   const have = owned(card);
   if (count(deck, id) >= limit) return limit < maxCopies ? `UR 最多 ${limit} 張` : `同名卡最多 ${limit} 張`;
-  if (count(deck, id) >= have) return have === 0 ? '還沒有這張卡：開卡包或用兌換卷換' : `你只有 ${have} 張`;
+  if (count(deck, id) >= have) return have === 0 ? '還沒有這張卡：開卡包或用粉塵合成' : `你只有 ${have} 張`;
   return null;
 }
 
@@ -209,7 +209,7 @@ export function deckScreen(db: CardDb, b: Builder, deck: readonly string[], cust
     ? `<div class="focus">${detailLines(describeCard(focus, cardNames(db)))}
         <div class="respond"><button class="ghost" data-remove="${focus.id}" ${count(deck, focus.id) === 0 ? 'disabled' : ''}>拿掉一張</button>
         <button class="primary" data-add="${focus.id}" ${addProblem(db, deck, focus.id, owned) ? 'disabled' : ''}>加一張（${count(deck, focus.id)}/${owned(focus)}）</button></div>
-        ${owned(focus) === 0 ? '<p class="d-line warn">還沒有這張卡：開卡包，或用 3 張同稀有度的兌換卷換。</p>' : ''}</div>`
+        ${owned(focus) === 0 ? '<p class="d-line warn">還沒有這張卡：開卡包，或到「卡包與收藏」用粉塵合成。</p>' : ''}</div>`
     : '<p class="d-line">點卡片看說明；卡片下面的 − ＋ 調整張數。</p>';
   const status =
     problems.length === 0

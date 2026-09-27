@@ -43,10 +43,11 @@ describe('名字＋密碼帳號', () => {
         email: null,
         picture: null,
         createdAt: '2026-09-26T00:00:00.000Z',
+        // 舊的存檔還是兌換卷，讀進來時換成粉塵（UR 一張 300）。
         profile: {
-          ...base,
+          ...Object.fromEntries(Object.entries(base).filter(([key]) => key !== 'dust')),
           gold,
-          vouchers: { ...base.vouchers, UR: ur },
+          vouchers: { N: 0, R: 0, SR: 0, UR: ur },
           collection: Object.fromEntries(
             Object.entries({ ...Object.fromEntries(Object.keys(extra).map((k) => [k, 0])), ...base.collection }).map(([k, n]) => [k, n + (extra[k] ?? 0)]),
           ),
@@ -62,7 +63,7 @@ describe('名字＋密碼帳號', () => {
       const { account } = await store.loginWithPassword('Flyer', 'newpass', false);
       expect(account.profile.collection['ancient-dragon']).toBe((base.collection['ancient-dragon'] ?? 0) + 1);
       expect(account.profile.collection.kraken).toBe(Math.min(2, (base.collection.kraken ?? 0) + 2));
-      expect(account.profile.vouchers.UR).toBe(3);
+      expect(account.profile.dust).toBe(3 * 300);
       expect(account.profile.gold).toBe(100);
       // 其他同名的舊帳號併掉了；之後要用密碼登入
       expect(['guest:a', 'guest:b', 'guest:c'].filter((id) => store.byId(id) !== null)).toHaveLength(1);

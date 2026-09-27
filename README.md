@@ -14,7 +14,7 @@
 - [x] 平衡模擬：[`packages/sim`](packages/sim)，讓機器人大量對打，比較不同規則、估算一局要打多久。結果見 [docs/balance-results.md](docs/balance-results.md)
 - [x] 網頁試玩版：[`packages/web`](packages/web)，跟電腦對戰，可以自己組牌。引擎和電腦對手都在瀏覽器裡跑，不需要伺服器
 - [x] 伺服器：兩人連線對戰（[`packages/server`](packages/server)），見下面「跟朋友連線對戰」
-- [x] 金幣、每日任務、卡包、兌換卷：規則在 [`packages/economy`](packages/economy)
+- [x] 金幣、每日任務、卡包、粉塵合成：規則在 [`packages/economy`](packages/economy)
 - [x] 英雄：基礎五色每個人都有，雙色以上的是 UR（卡包抽）
 - [x] 種族（8 種，特色有強度，例如同袍 2）、生物攻擊範圍（正前方與兩個斜對角）
 - [x] 卡面文字用粗體關鍵字，點卡片看說明時列出關鍵字的意思
@@ -146,7 +146,7 @@ packages/sim/             平衡模擬
 ├── src/pace.ts           用動作數估算真人一局要打多久
 └── src/run.ts            多程序平行跑大量對局，統計並寫出報告
 
-packages/economy/         金幣、每日任務、卡包、兌換卷：純函式，網頁與伺服器共用
+packages/economy/         金幣、每日任務、卡包、粉塵合成：純函式，網頁與伺服器共用
 └── src/index.ts
 
 packages/server/          連線對戰伺服器（Node + WebSocket），也負責提供網頁

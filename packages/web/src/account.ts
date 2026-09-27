@@ -1,6 +1,6 @@
 import { DEFAULT_RULES, type CardDb } from '@card-game/engine';
 import {
-  exchange,
+  craft,
   fullProfile,
   openPacks,
   parseProfile,
@@ -198,7 +198,7 @@ export async function logout(session: Session): Promise<void> {
 export interface Backend {
   /** 開 count 包（1 或 10）。 */
   openPack(profile: Profile, count: number): Promise<EconomyResult<{ profile: Profile; cards: PackCard[] }>>;
-  exchange(profile: Profile, cardId: string): Promise<EconomyResult<{ profile: Profile }>>;
+  craft(profile: Profile, cardId: string): Promise<EconomyResult<{ profile: Profile }>>;
   /** record：跟電腦打的才有，伺服器帳號會記進對局紀錄。 */
   recordGame(profile: Profile, summary: GameSummary, record?: BotGameRecord): Promise<GameReward>;
   /** 存一個英雄的自訂牌組（null 是刪掉）。測試帳號存在瀏覽器裡，這裡不用做事。 */
@@ -218,7 +218,7 @@ export function backendFor(session: Session, db: CardDb): Backend {
     };
     return {
       openPack: async (profile, count) => saved(openPacks(refreshDay(profile, today()), db, DEFAULT_RULES, Math.random, count)),
-      exchange: async (profile, cardId) => saved(exchange(profile, db, DEFAULT_RULES, cardId)),
+      craft: async (profile, cardId) => saved(craft(profile, db, DEFAULT_RULES, cardId)),
       recordGame: async (profile, summary) => {
         const reward = recordGame(profile, summary, today());
         saveTestProfile(reward.profile);
@@ -236,9 +236,9 @@ export function backendFor(session: Session, db: CardDb): Backend {
         return failed(error);
       }
     },
-    exchange: async (_profile, cardId) => {
+    craft: async (_profile, cardId) => {
       try {
-        return { ok: true, ...(await api<{ profile: Profile }>('/api/exchange', token, { cardId })) };
+        return { ok: true, ...(await api<{ profile: Profile }>('/api/craft', token, { cardId })) };
       } catch (error) {
         return failed(error);
       }

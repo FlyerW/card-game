@@ -273,7 +273,10 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 }
 
 /* ─── 右側：說明與紀錄 ─── */
-.panel { display: grid; grid-template-rows: auto minmax(160px, 1fr) auto; gap: 10px; min-width: 0; max-height: calc(100vh - 24px); position: sticky; top: 12px; }
+/* 由上往下：說明（沒選東西時不顯示）、對戰紀錄（撐滿剩下的高度）、工具列 */
+.panel { display: flex; flex-direction: column; gap: 10px; min-width: 0; max-height: calc(100vh - 24px); position: sticky; top: 12px; }
+.panel > .log-wrap { flex: 1 1 160px; min-height: 160px; }
+.panel > .detail, .panel > .panel-tools { flex: none; }
 .detail { background: var(--mat); border: 1px solid var(--mat-edge); border-radius: 12px; padding: 12px 14px; display: grid; gap: 6px; align-content: start; }
 .d-head { margin: 0; font: 700 16px/1.35 var(--display); }
 .d-line { margin: 0; color: var(--ink-soft); font-size: 13px; }
@@ -431,6 +434,9 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .pack-info { flex: 1 1 320px; display: grid; gap: 4px; min-width: 0; }
 .pack-bar .primary.big { justify-self: auto; }
 .vouchers { margin: 2px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 13px; }
+.vouchers .dust { font: 700 18px/1 var(--display); color: #d9c8ff; }
+.shop-backdrop { display: none; }
+.focus-close { justify-self: start; }
 .voucher { display: inline-flex; align-items: baseline; gap: 4px; padding: 2px 8px; border: 1px solid var(--mat-edge); border-radius: 4px; }
 .voucher b { font: 700 16px var(--num); color: var(--ink); }
 .pack-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 18px 14px; padding: 18px 8px 8px; }
@@ -548,10 +554,14 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
   .b-body { grid-template-columns: 1fr; }
   .b-side { position: static; }
   .table { grid-template-columns: 1fr; }
-  .panel { position: static; max-height: none; grid-template-rows: auto 220px auto; }
+  .panel { position: static; max-height: none; }
+  .panel > .log-wrap { flex: none; height: 220px; }
   /* 手機：選到東西時，說明與按鈕固定在畫面底部，不用捲到棋盤下面；頁面底下多留空間，棋盤照樣捲得到 */
   .detail.floating { position: fixed; left: 8px; right: 8px; bottom: 8px; z-index: 9; max-height: 36vh; overflow: auto; border-color: var(--pick); box-shadow: 0 -8px 30px #000c; }
   body:has(.detail.floating) { padding-bottom: 40vh; }
+  /* 手機的卡包與收藏：點卡片跳出視窗（說明與合成按鈕），不用捲到最下面 */
+  .shop-backdrop { display: block; position: fixed; inset: 0; background: #0a1015cc; z-index: 20; }
+  .shop .detail.has-focus { position: fixed; left: 12px; right: 12px; top: 50%; translate: 0 -50%; max-height: 80vh; overflow: auto; z-index: 21; box-shadow: 0 10px 40px #000c; }
 }
 @media (max-width: 560px) {
   body { padding-inline: 10px; }
@@ -582,6 +592,10 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 }
 
 /* 卡牌說明下面的關鍵字解釋 */
+.detail:empty { display: none; }
+.play-howto { margin-top: 12px; }
+.play-howto summary { cursor: pointer; font: 700 15px/1.4 var(--display); }
+.play-howto ul { margin: 10px 0 0; }
 .d-kw { margin: 6px 0 0; padding: 6px 0 0; list-style: none; border-top: 1px solid var(--mat-edge); font-size: 12px; line-height: 1.5; opacity: .8; }
 .d-kw li { margin: 2px 0; }
 .d-line b, .d-kw b, .tags b, .hero-info b, .hp-text b, .skill-text b { font-weight: 700; color: var(--ink); }

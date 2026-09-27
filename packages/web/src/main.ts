@@ -959,15 +959,8 @@ function detail(view: PlayerView): string {
     if (view.opponentChoosing) {
       return toast + `<p class="d-head">${esc(themName())}正在選牌</p><p class="d-line">對手翻開了牌庫頂的牌，選好就會繼續。</p>`;
     }
-    if (!myTurn) {
-      return toast + `<p class="d-head">${esc(themName())}的回合</p><p class="d-line">右邊的紀錄會一步一步列出對手做了什麼。</p>`;
-    }
-    return (
-      toast +
-      `<p class="d-head">你的回合</p>
-       <p class="d-line">點手牌出牌；點你的生物，再點發光的對手生物或英雄攻擊，或選技能發動；點任何卡可以看說明。</p>
-       <p class="d-line">能量 ${view.you.energy} / ${view.you.maxEnergy}。沒花完的能量不會留下來，你的下個回合開始時重置。</p>`
-    );
+    // 沒選東西時不寫「你的回合」：看結束回合按鈕就知道；規則說明在畫面最下面的「怎麼玩」。
+    return toast;
   }
 
   if (sel.kind === 'hand') {
@@ -994,33 +987,38 @@ function detail(view: PlayerView): string {
     const cv = side.zones[sel.zone];
     if (!cv) return toast;
     const def = card(cv.cardId);
-    let body = lines(describeCard(def, describeName)) + creatureStatus(cv);
-    if (sel.player === YOU && def.kind === 'creature') {
-      const attacks = actsForAttack(sel.zone);
-      const orSkill = skillsOf(cv).length > 0 ? '技能另外算，每回合也可以發動一次（花能量，不會被反擊）。' : '';
-      body +=
-        attacks.length > 0
-          ? `<p class="hint">點發光的對手生物或英雄攻擊：不花能量，打生物時對方會反擊。${orSkill}</p>`
-          : myTurn
-            ? `<p class="hint blocked">${esc(attackReason(cv))}</p>`
-            : '';
-      body += '<div class="skills">';
-      skillsOf(cv).forEach((skill, index) => {
-        const acts = actsForSkill(sel.zone, index);
-        const reason = myTurn && acts.length === 0 ? skillReason(cv, skill, view.you) : '';
-        body += `<button class="skill" data-skill="${sel.zone}:${index}" ${acts.length === 0 ? 'disabled' : ''}>
-          ${costBadge(skill)}<span class="skill-text">${rich(`${skill.name}：${describeEffects(skill, describeName)}`)}</span>
-          ${reason ? `<span class="skill-why">${esc(reason)}</span>` : ''}</button>`;
-      });
-      body += '</div>';
-      const dismiss = app.legalActions.find((a) => a.type === 'dismiss' && a.zone === sel.zone);
-      if (dismiss && sel.confirmDismiss) {
-        const extra = cv.item === null && cv.evolutionChain.length === 1 ? '' : '（進化前的牌和道具也一起）';
-        body += `<p class="hint blocked">${esc(def.name)}會送進棄牌區${extra}，不能收回。</p>
-          <div class="respond"><button class="primary" data-do="dismiss-confirm">確定退場</button><button class="ghost" data-do="dismiss-cancel">留著</button></div>`;
-      } else if (dismiss) {
-        body += '<button class="ghost" data-do="dismiss">退場（空出這一格）</button>';
-      }
+    if (sel.player !== YOU || def.kind !== 'creature') return toast + lines(describeCard(def, describeName)) + creatureStatus(cv) + cancel;
+    // 我方的生物：技能按鈕放最上面，卡片說明就不再寫一次同樣的技能。
+    const skills = skillsOf(cv);
+    const skillLines = skills.map((skill) => describeAbility(skill, describeName));
+    const attacks = actsForAttack(sel.zone);
+    const attackBlocked = myTurn && attacks.length === 0 ? attackReason(cv) : '';
+    let body = '<div class="skills">';
+    skills.forEach((skill, index) => {
+      const acts = actsForSkill(sel.zone, index);
+      const why = myTurn && acts.length === 0 ? skillReason(cv, skill, view.you) : '';
+      // 跟下面攻擊的原因一樣（例如「召喚當回合不能攻擊、不能發動技能」）就只寫一次。
+      const reason = why === attackBlocked ? '' : why;
+      body += `<button class="skill" data-skill="${sel.zone}:${index}" ${acts.length === 0 ? 'disabled' : ''}>
+        ${costBadge(skill)}<span class="skill-text">${rich(`${skill.name}：${describeEffects(skill, describeName)}`)}</span>
+        ${reason ? `<span class="skill-why">${esc(reason)}</span>` : ''}</button>`;
+    });
+    body += '</div>';
+    body += lines(describeCard(def, describeName).filter((line) => !skillLines.includes(line)), skillLines) + creatureStatus(cv);
+    const orSkill = skills.length > 0 ? '技能另外算，每回合也可以發動一次（花能量，不會被反擊）。' : '';
+    body +=
+      attacks.length > 0
+        ? `<p class="hint">點發光的對手生物或英雄攻擊：不花能量，打生物時對方會反擊。${orSkill}</p>`
+        : attackBlocked
+          ? `<p class="hint blocked">${esc(attackBlocked)}</p>`
+          : '';
+    const dismiss = app.legalActions.find((a) => a.type === 'dismiss' && a.zone === sel.zone);
+    if (dismiss && sel.confirmDismiss) {
+      const extra = cv.item === null && cv.evolutionChain.length === 1 ? '' : '（進化前的牌和道具也一起）';
+      body += `<p class="hint blocked">${esc(def.name)}會送進棄牌區${extra}，不能收回。</p>
+        <div class="respond"><button class="primary" data-do="dismiss-confirm">確定退場</button><button class="ghost" data-do="dismiss-cancel">留著</button></div>`;
+    } else if (dismiss) {
+      body += '<button class="ghost" data-do="dismiss">退場（空出這一格）</button>';
     }
     return toast + body + cancel;
   }
@@ -1256,6 +1254,25 @@ function rewardLines(): string {
   return `<div class="reward">${lines.map((line) => `<p class="d-line">${line}</p>`).join('')}</div>`;
 }
 
+/** 「怎麼玩」的規則說明：開局畫面與對戰畫面最下面共用。 */
+const howtoList = () => `<ul>
+        <li>能量：先攻第一回合 1 點、後攻 2 點，之後每回合上限 +2，最高 12。每個回合開始時補滿。</li>
+        <li>點手牌出牌。生物要選一個空格召喚；道具要選自己的生物；進化卡要點場上對應的生物。</li>
+        <li>每隻生物有攻擊力（⚔）和血量（♥）。血量滿的是綠色，受過傷的是紅色。</li>
+        <li>點你的生物，再點發光的對手生物或英雄就是攻擊：不花能量，只打得到正前方與左右兩個斜對角的生物，那幾格有一格空著就能打到英雄。打生物時對方會用牠的攻擊力反擊，打英雄不會被反擊。技能要花能量，不會被反擊。攻擊和技能每隻每回合各一次，可以都用；召喚當回合都不行（有【速攻】的例外；進化卡都算有速攻，召喚當回合就能進化、進化完馬上能動）。</li>
+        <li>標「休息」的技能不花能量，但這回合還沒攻擊才能用，用了這回合就不能攻擊（例如挑釁）。</li>
+        <li>正對面、斜對角的技能，目標格空著就會打到後面的英雄。</li>
+        <li>對手的生物在挑釁時，打得到牠的攻擊只能打牠；選得到牠的技能也必須打牠，只打英雄的技能不受影響。</li>
+        <li>手牌上限 10 張，滿手時抽到的牌直接進棄牌區。場地卡放在自己的場地區，只強化自己的生物。</li>
+        <li>有些英雄有英雄進化卡：血量上限增加、天生技變強，每局只能進化一次。</li>
+        <li>每隻生物有種族，大多有種族特色，數字是強度：人類<b>同袍 N</b>（有其他人類時 ⚔ +N）、野獸<b>猛撲</b>（召喚當回合就能攻擊生物）、亡靈<b>不死 N</b>（第一次倒下留 N♥）、元素<b>元素之力 N</b>（技能傷害 +N）、植物<b>扎根 N</b>（回合開始回復 N♥）、龍<b>龍鱗</b>（不中異常狀態）、機械<b>堅固 N</b>（受到傷害 −N）、天使<b>光輝 N</b>（召喚時英雄回復 N♥）。沉默時種族特色也失效。</li>
+        <li>卡上的粗體字是關鍵字，點卡片看說明時，下面會用小字解釋。</li>
+        <li>有<b>遺言</b>的生物死掉時（被打倒或被消滅）會發動效果，例如召喚衍生物、抽牌、回血或範圍傷害。有持續效果（<b>回合開始</b>、<b>回合結束</b>、<b>每當回復</b>）的生物，在場上時每當條件成立就自動發動。沉默中都不發動。</li>
+        <li>異常狀態只會中在生物身上：中毒（施放者的回合結束時失去血量，減傷擋不住）、灼燒（施放者的回合結束時受到傷害）、麻痺（不能攻擊也不能發動技能）、沉默（不能發動技能、吸血與再生失效，身上的增益與挑釁直接消失）、虛弱（不能攻擊，也不會反擊）。後面三種都到牠的下個回合結束，進化會解除全部。</li>
+        <li>英雄的血量沒有上限：回復可以把英雄補到比開局還高（例如 40 補到 48）。生物的血量還是有上限。</li>
+        <li>把對手英雄的血量打到 0 就贏了。要抽牌但牌庫已經空了就輸（卡牌效果的抽牌也算）。</li>
+      </ul>`;
+
 /** 背景音樂與音效的開關。 */
 const musicButton = () =>
   `<button class="ghost small" data-do="music" aria-pressed="${music.enabled}">${music.enabled ? '♪ 音樂：開' : '♪ 音樂：關'}</button>` +
@@ -1291,7 +1308,8 @@ function playScreen(): string {
         ${musicButton()}
       </div>
     </aside>
-  </div>${overlay(view)}`;
+  </div>
+  <details class="howto play-howto"><summary>怎麼玩</summary>${howtoList()}</details>${overlay(view)}`;
 }
 
 /** 登入畫面：測試帳號，或 Google 帳號（要從遊戲伺服器打開、而且伺服器設定了 Google 登入）。 */
@@ -1348,7 +1366,7 @@ function setupScreen(): string {
     return `<button class="hero-pick${chosen ? ' chosen' : ''}${locked ? ' locked' : ''}" data-hero="${h.id}" aria-pressed="${chosen}" ${locked ? 'disabled' : ''}>
       <span class="hp-big">${h.hp}</span><span class="hp-unit">♥${h.rarity ? '<b class="hp-ur">UR</b>' : ''}</span>
       <span class="hp-name">${pips(h.colors)}${esc(h.name)}</span>
-      <span class="hp-text">${body.map((line) => `<span class="hp-line">${rich(line)}</span>`).join('')}${evolves}</span>${locked ? '<span class="hp-lock">還沒有：卡包抽到或用 UR 兌換卷換</span>' : ''}
+      <span class="hp-text">${body.map((line) => `<span class="hp-line">${rich(line)}</span>`).join('')}${evolves}</span>${locked ? '<span class="hp-lock">還沒有：卡包抽到或用 1000 粉塵合成</span>' : ''}
       <span class="sr">${esc(head ?? '')}</span></button>`;
   }).join('');
   const custom = app.decks[app.heroId];
@@ -1386,23 +1404,7 @@ function setupScreen(): string {
     ${app.toast ? `<p class="toast" role="alert">${esc(app.toast)}</p>` : ''}
     <section class="howto">
       <h2>怎麼玩</h2>
-      <ul>
-        <li>能量：先攻第一回合 1 點、後攻 2 點，之後每回合上限 +2，最高 12。每個回合開始時補滿。</li>
-        <li>點手牌出牌。生物要選一個空格召喚；道具要選自己的生物；進化卡要點場上對應的生物。</li>
-        <li>每隻生物有攻擊力（⚔）和血量（♥）。血量滿的是綠色，受過傷的是紅色。</li>
-        <li>點你的生物，再點發光的對手生物或英雄就是攻擊：不花能量，只打得到正前方與左右兩個斜對角的生物，那幾格有一格空著就能打到英雄。打生物時對方會用牠的攻擊力反擊，打英雄不會被反擊。技能要花能量，不會被反擊。攻擊和技能每隻每回合各一次，可以都用；召喚當回合都不行（有【速攻】的例外；進化卡都算有速攻，召喚當回合就能進化、進化完馬上能動）。</li>
-        <li>標「休息」的技能不花能量，但這回合還沒攻擊才能用，用了這回合就不能攻擊（例如挑釁）。</li>
-        <li>正對面、斜對角的技能，目標格空著就會打到後面的英雄。</li>
-        <li>對手的生物在挑釁時，打得到牠的攻擊只能打牠；選得到牠的技能也必須打牠，只打英雄的技能不受影響。</li>
-        <li>手牌上限 10 張，滿手時抽到的牌直接進棄牌區。場地卡放在自己的場地區，只強化自己的生物。</li>
-        <li>有些英雄有英雄進化卡：血量上限增加、天生技變強，每局只能進化一次。</li>
-        <li>每隻生物有種族，大多有種族特色，數字是強度：人類<b>同袍 N</b>（有其他人類時 ⚔ +N）、野獸<b>猛撲</b>（召喚當回合就能攻擊生物）、亡靈<b>不死 N</b>（第一次倒下留 N♥）、元素<b>元素之力 N</b>（技能傷害 +N）、植物<b>扎根 N</b>（回合開始回復 N♥）、龍<b>龍鱗</b>（不中異常狀態）、機械<b>堅固 N</b>（受到傷害 −N）、天使<b>光輝 N</b>（召喚時英雄回復 N♥）。沉默時種族特色也失效。</li>
-        <li>卡上的粗體字是關鍵字，點卡片看說明時，下面會用小字解釋。</li>
-        <li>有<b>遺言</b>的生物死掉時（被打倒或被消滅）會發動效果，例如召喚衍生物、抽牌、回血或範圍傷害。有持續效果（<b>回合開始</b>、<b>回合結束</b>、<b>每當回復</b>）的生物，在場上時每當條件成立就自動發動。沉默中都不發動。</li>
-        <li>異常狀態只會中在生物身上：中毒（施放者的回合結束時失去血量，減傷擋不住）、灼燒（施放者的回合結束時受到傷害）、麻痺（不能攻擊也不能發動技能）、沉默（不能發動技能、吸血與再生失效，身上的增益與挑釁直接消失）、虛弱（不能攻擊，也不會反擊）。後面三種都到牠的下個回合結束，進化會解除全部。</li>
-        <li>英雄的血量沒有上限：回復可以把英雄補到比開局還高（例如 40 補到 48）。生物的血量還是有上限。</li>
-        <li>把對手英雄的血量打到 0 就贏了。要抽牌但牌庫已經空了就輸（卡牌效果的抽牌也算）。</li>
-      </ul>
+      ${howtoList()}
       <p class="note">試玩說明：範例卡有 ${SAMPLE_CARDS.length} 張，牌組照正式規則：${DEFAULT_RULES.deckSize} 張、同名最多 ${DEFAULT_RULES.maxCopies} 張、UR 最多 ${DEFAULT_RULES.maxUrCopies} 張、只能放英雄顏色內的卡與無色卡。
         你可以用收藏裡的卡自己組牌；電腦每局從全部的卡自動組一副。電腦用的是模擬平衡時的均衡打法。
         測試帳號的金幣與收藏存在這個瀏覽器裡；Google 帳號的存在遊戲伺服器上。牌組都存在這個瀏覽器裡。</p>
@@ -1693,7 +1695,7 @@ function builderClick(el: HTMLElement, command: string | undefined): boolean {
 
 root.addEventListener('click', (event) => {
   const el = (event.target as HTMLElement).closest<HTMLElement>(
-    '[data-do],[data-key],[data-hand],[data-skill],[data-hero],[data-mull],[data-pick],[data-add],[data-remove],[data-focus],[data-filter],[data-rarity],[data-color],[data-missing],[data-exchange],[data-difficulty]',
+    '[data-do],[data-key],[data-hand],[data-skill],[data-hero],[data-mull],[data-pick],[data-add],[data-remove],[data-focus],[data-filter],[data-rarity],[data-color],[data-missing],[data-craft],[data-difficulty]',
   );
   if (!el) {
     if (app.selection) {

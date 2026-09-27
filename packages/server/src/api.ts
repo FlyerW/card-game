@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { DEFAULT_RULES, type CardDb } from '@card-game/engine';
-import { exchange, openPacks, PACK_BATCH, parseSummary, recordGame } from '@card-game/economy';
+import { craft, openPacks, PACK_BATCH, parseSummary, recordGame } from '@card-game/economy';
 import { AccountError, accountInfo, serverDay, type Account, type AccountStore } from './accounts';
 import { parseBotRecord, type GameLog } from './gamelog';
 import { TokenError, type GoogleIdentity } from './google';
@@ -125,14 +125,14 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
         return send(response, 200, { profile: opened.profile, cards: opened.cards }), true;
       }
 
-      case 'POST /api/exchange': {
+      case 'POST /api/craft': {
         const { account } = authed();
         const { cardId } = await readJson(request);
-        if (typeof cardId !== 'string') throw new HttpError(400, '缺少要兌換的卡');
-        const swapped = exchange(account.profile, db, DEFAULT_RULES, cardId);
-        if (!swapped.ok) throw new HttpError(400, swapped.reason);
-        await store.update(account, swapped.profile);
-        return send(response, 200, { profile: swapped.profile }), true;
+        if (typeof cardId !== 'string') throw new HttpError(400, '缺少要合成的卡');
+        const crafted = craft(account.profile, db, DEFAULT_RULES, cardId);
+        if (!crafted.ok) throw new HttpError(400, crafted.reason);
+        await store.update(account, crafted.profile);
+        return send(response, 200, { profile: crafted.profile }), true;
       }
 
       case 'POST /api/decks': {

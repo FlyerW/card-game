@@ -1,6 +1,7 @@
 import {
   COLOR_NAMES,
   copyLimit,
+  RARITIES,
   deckPool,
   type CardDb,
   type Color,
@@ -12,7 +13,7 @@ import {
 } from '@card-game/engine';
 import { buildDeck } from '@card-game/sim/deck';
 
-// 經濟系統：金幣、每日任務、卡包、兌換卷。全部是純函式，輸入舊的玩家資料、輸出新的，
+// 經濟系統：金幣、每日任務、卡包、粉塵合成。全部是純函式，輸入舊的玩家資料、輸出新的，
 // 不碰網路也不碰儲存，所以能直接寫測試；目前由網頁存在瀏覽器裡，之後搬到伺服器的帳號上。
 
 export const ECONOMY = {
@@ -28,8 +29,10 @@ export const ECONOMY = {
   packSize: 5,
   /** 每一張的稀有度機率，其餘是 N。一包至少一張 R 以上。 */
   odds: { UR: 0.01, SR: 0.05, R: 0.2 },
-  /** 幾張兌換卷換一張同稀有度的卡。 */
-  vouchersPerCard: 3,
+  /** 合成一張卡要多少粉塵。 */
+  craftCost: { N: 30, R: 100, SR: 300, UR: 1000 },
+  /** 開到已經有滿的卡，換成多少粉塵（約合成價的 1/3）。 */
+  dustValue: { N: 10, R: 30, SR: 100, UR: 300 },
   /** 新玩家的金幣，可以先開一包試試。 */
   startingGold: 100,
 } as const;
@@ -45,8 +48,8 @@ export interface Profile {
   gold: number;
   /** 每張卡擁有幾張。 */
   collection: Record<string, number>;
-  /** 各稀有度的兌換卷。 */
-  vouchers: Record<Rarity, number>;
+  /** 粉塵：開到多餘的卡換來的，用來合成任意一張卡。 */
+  dust: number;
   /** 每日資料屬於哪一天（YYYY-MM-DD）。 */
   day: string;
   /** 今天從贏場拿到的金幣。 */
@@ -130,7 +133,7 @@ export function newProfile(day: string, starterDecks: readonly (readonly string[
     version: 1,
     gold: ECONOMY.startingGold,
     collection,
-    vouchers: { N: 0, R: 0, SR: 0, UR: 0 },
+    dust: 0,
     day,
     winGoldToday: 0,
     quest: { id: questFor(day).id, progress: 0, done: false },
@@ -246,8 +249,10 @@ export interface PackCard {
   rarity: Rarity;
   /** 開到的是 UR 英雄。 */
   hero: boolean;
-  /** 已經有滿了，換成一張同稀有度的兌換卷。 */
+  /** 已經有滿了，換成粉塵。 */
   duplicate: boolean;
+  /** 換到多少粉塵；新卡是 0。 */
+  dust: number;
 }
 
 export type EconomyResult<T> = ({ ok: true } & T) | { ok: false; reason: string };
@@ -270,7 +275,7 @@ function rollGuaranteed(random: () => number): Rarity {
   return 'R';
 }
 
-/** 買一包並打開：扣 100 金幣，抽 5 張（UR 可能是英雄）；已經有滿的換成兌換卷。 */
+/** 買一包並打開：扣 100 金幣，抽 5 張（UR 可能是英雄）；已經有滿的換成粉塵。 */
 export function openPack(profile: Profile, db: CardDb, rules: Rules, random: () => number): EconomyResult<{ profile: Profile; cards: PackCard[] }> {
   if (profile.gold < ECONOMY.packPrice) return { ok: false, reason: `金幣不夠：一包 ${ECONOMY.packPrice}，目前 ${profile.gold}` };
   const pool = packItems(db, rules);
@@ -284,11 +289,12 @@ export function openPack(profile: Profile, db: CardDb, rules: Rules, random: () 
     const item = choices[Math.floor(random() * choices.length)]!;
     const owned = next.collection[item.id] ?? 0;
     if (owned >= item.limit) {
-      next.vouchers[rarity] += 1;
-      return { cardId: item.id, rarity, hero: item.hero, duplicate: true };
+      const dust = ECONOMY.dustValue[rarity];
+      next.dust += dust;
+      return { cardId: item.id, rarity, hero: item.hero, duplicate: true, dust };
     }
     next.collection[item.id] = owned + 1;
-    return { cardId: item.id, rarity, hero: item.hero, duplicate: false };
+    return { cardId: item.id, rarity, hero: item.hero, duplicate: false, dust: 0 };
   });
   return { ok: true, profile: next, cards };
 }
@@ -317,20 +323,23 @@ export function openPacks(
 /** 一次最多開幾包。 */
 export const PACK_BATCH = 10;
 
-/** 用 3 張同稀有度的兌換卷換一張卡（或一個 UR 英雄）；已經有滿的不能換。 */
-export function exchange(profile: Profile, db: CardDb, rules: Rules, cardId: string): EconomyResult<{ profile: Profile }> {
+/** 用粉塵合成一張卡（或一個 UR 英雄）：N 30、R 100、SR 300、UR 1000。已經有滿的不能合成。 */
+export function craft(profile: Profile, db: CardDb, rules: Rules, cardId: string): EconomyResult<{ profile: Profile }> {
   const card = packItems(db, rules).find((each) => each.id === cardId);
-  if (!card) return { ok: false, reason: '這張卡不能兌換' };
+  if (!card) return { ok: false, reason: '這張卡不能合成' };
   const owned = profile.collection[cardId] ?? 0;
   if (owned >= card.limit) return { ok: false, reason: card.hero ? `已經有 ${card.name} 了` : `${card.name} 已經有 ${owned} 張了` };
-  if (profile.vouchers[card.rarity] < ECONOMY.vouchersPerCard) {
-    return { ok: false, reason: `${card.rarity} 兌換卷不夠：要 ${ECONOMY.vouchersPerCard} 張，目前 ${profile.vouchers[card.rarity]} 張` };
-  }
+  const cost = ECONOMY.craftCost[card.rarity];
+  if (profile.dust < cost) return { ok: false, reason: `粉塵不夠：要 ${cost}，目前 ${profile.dust}` };
   const next = structuredClone(profile);
-  next.vouchers[card.rarity] -= ECONOMY.vouchersPerCard;
+  next.dust -= cost;
   next.collection[cardId] = owned + 1;
   return { ok: true, profile: next };
 }
+
+/** 舊存檔的兌換卷換成粉塵：每張照那個稀有度多餘卡的粉塵算（N 10、R 30、SR 100、UR 300）。 */
+export const vouchersToDust = (vouchers: Partial<Record<Rarity, number>>): number =>
+  RARITIES.reduce((sum, rarity) => sum + (vouchers[rarity] ?? 0) * ECONOMY.dustValue[rarity], 0);
 
 /** 牌組裡每張卡的張數不能超過擁有的張數。 */
 export function ownershipProblems(profile: Profile, db: CardDb, deck: readonly string[]): string[] {
@@ -359,11 +368,17 @@ export function parseSummary(value: unknown): GameSummary | null {
 /** 讀回存檔：格式不對就回傳 null，讓呼叫的人建新的。 */
 export function parseProfile(value: unknown): Profile | null {
   if (typeof value !== 'object' || value === null) return null;
-  const p = value as Partial<Profile>;
+  const p = value as Partial<Profile> & { vouchers?: unknown };
   const numbers = (record: unknown) =>
     typeof record === 'object' && record !== null && Object.values(record).every((n) => typeof n === 'number' && Number.isFinite(n) && n >= 0);
   if (p.version !== 1 || typeof p.gold !== 'number' || typeof p.day !== 'string' || typeof p.winGoldToday !== 'number') return null;
-  if (!numbers(p.collection) || !numbers(p.vouchers) || typeof p.quest?.id !== 'string') return null;
+  if (!numbers(p.collection) || typeof p.quest?.id !== 'string') return null;
+  // 舊存檔：兌換卷換成粉塵。
+  if (typeof p.dust !== 'number') {
+    if (!numbers(p.vouchers)) return null;
+    const { vouchers, ...rest } = p;
+    return { ...rest, dust: vouchersToDust(vouchers as Record<Rarity, number>) } as Profile;
+  }
   return p as Profile;
 }
 
