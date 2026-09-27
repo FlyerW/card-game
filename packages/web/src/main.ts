@@ -994,8 +994,13 @@ function boardLines(def: DeckCardDef, skip: readonly string[]): string {
 const myMove = (view: PlayerView) => view.phase === 'main' && view.activePlayer === YOU && !app.busy && !app.pending;
 
 function creatureStatus(cv: CreatureView): string {
-  const tags: string[] = [`⚔ ${cv.attack}${cv.attackBonus ? `（含加成 +${cv.attackBonus}）` : ''}`, `♥ ${cv.hp} / ${cv.maxHp}`];
   const def = card(cv.cardId);
+  // HP 上限的加成（增益、道具、場地、英雄被動）：跟攻擊力一樣寫在括號裡。
+  const hpBonus = def.kind === 'creature' ? cv.maxHp - def.hp : 0;
+  const tags: string[] = [
+    `⚔ ${cv.attack}${cv.attackBonus ? `（含加成 +${cv.attackBonus}）` : ''}`,
+    `♥ ${cv.hp} / ${cv.maxHp}${hpBonus > 0 ? `（含加成 +${hpBonus}）` : ''}`,
+  ];
   // 種族特色寫在上面的說明裡；這裡只標目前的狀態（不死用過了、沉默中失效）。
   const trait = def.kind === 'creature' ? describeTrait(def) : null;
   if (def.kind === 'creature' && trait) {
@@ -1147,7 +1152,7 @@ function zone(cv: CreatureView | null, player: PlayerId, index: number, picks: M
   const badges: string[] = [];
 
   if (cv.damageReduction) badges.push(`<i class="badge def">減${cv.damageReduction}</i>`);
-  if (cv.item) badges.push(`<i class="badge item">${esc(nameOf(cv.item))}</i>`);
+  if (cv.item) badges.push(`<i class="badge item" title="${esc(nameOf(cv.item))}">${esc(nameOf(cv.item))}</i>`);
   if (cv.taunting) badges.push('<i class="badge taunt">挑釁</i>');
   if (def.kind === 'creature' && def.triggers?.length && !cv.silenced) badges.push('<i class="badge death">持續</i>');
   if (def.kind === 'creature' && def.death && !cv.silenced) badges.push('<i class="badge death">遺言</i>');
@@ -1166,8 +1171,7 @@ function zone(cv: CreatureView | null, player: PlayerId, index: number, picks: M
   classes.push('has-art');
   return `<button class="${classes.join(' ')} r-${def.rarity}" data-key="${key}" style="--art:url('${artUrl(def.id)}')" aria-label="${esc(def.name)}，費用 ${invested}，攻擊 ${cv.attack}，血量 ${cv.hp}">
     <span class="z-cost">${invested}</span><span class="z-name">${esc(def.name)}</span>${pips(def.colors)}
-    <span class="badges">${badges.join('')}</span>
-    <span class="z-foot"><span class="rarity">${def.rarity}</span><span class="z-stats"><span class="z-atk${buffed}" title="攻擊">⚔<b>${cv.attack}</b></span><span class="z-hp${hurt}" title="血量"><i aria-hidden="true">♥</i><b>${cv.hp}</b><small>/${cv.maxHp}</small></span></span></span>
+    <span class="z-foot"><span class="rarity">${def.rarity}</span><span class="badges">${badges.join('')}</span><span class="z-stats"><span class="z-atk${buffed}" title="攻擊">⚔<b>${cv.attack}</b></span><span class="z-hp${hurt}" title="血量"><i aria-hidden="true">♥</i><b>${cv.hp}</b><small>/${cv.maxHp}</small></span></span></span>
   </button>`;
 }
 

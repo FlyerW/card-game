@@ -181,7 +181,7 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 }
 .z-name { align-self: start; text-align: center; font: 700 14px/1.2 var(--display); word-break: break-all; }
 /* 最下面一列：左邊稀有度、右邊攻擊力與 HP。HP 滿的是綠色、受過傷的是紅色；攻擊力有加成時是金色。 */
-.z-foot { grid-column: 1 / -1; display: flex; align-items: flex-end; justify-content: space-between; gap: 4px; min-width: 0; }
+.z-foot { grid-column: 1 / -1; grid-row: 3; display: flex; align-items: flex-end; justify-content: space-between; gap: 4px; min-width: 0; }
 .z-stats { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; font-family: var(--num); }
 .z-atk { color: var(--ink-soft); font-size: 13px; }
 .z-atk b { font-size: 23px; font-weight: 700; line-height: 1; color: #ffd08a; margin-left: 1px; }
@@ -197,8 +197,9 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .z-hp i, .h-hp i, .c-heart { font-style: normal; color: #ff8a8a; }
 .z-hp i { font-size: 13px; margin-right: 1px; }
 .h-hp i { font-size: 16px; margin-right: 2px; }
-.badges { grid-column: 1 / -1; align-self: end; display: flex; flex-wrap: wrap; gap: 3px; min-height: 0; }
-.badge { font-style: normal; font-size: 10.5px; line-height: 1.4; padding: 0 5px; border-radius: 3px; background: #0004; color: var(--ink-soft); }
+.badges { flex: 1 1 auto; align-self: flex-end; display: flex; flex-wrap: wrap; gap: 3px; min-width: 0; margin-right: auto; }
+.badge { font-style: normal; font-size: 10.5px; line-height: 1.4; padding: 0 5px; border-radius: 3px; background: #0004; color: var(--ink-soft);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .badge.poison { color: #c9a0ff; } .badge.burn { color: #ff9a7a; } .badge.para { color: #ffe27a; } .badge.silence { color: #9fc3ff; }
 .badge.weak { color: #a8d8a0; } .badge.death { color: #d9d2c5; }
 .badge.atk { color: #ffb38a; } .badge.def { color: #9fdcea; } .badge.item { color: #d7c8f0; } .badge.taunt { color: #1d1408; background: var(--white); }
@@ -581,7 +582,12 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
   .z-stats { gap: 3px; }
   .z-hp b, .z-atk b { font-size: 16px; } .z-hp small, .z-atk { font-size: 10px; }
   .z-hp small, .zone > .pips, .badge.item { display: none; }
-  .zone .rarity { font-size: 9px; }
+  /* 格子太窄：稀有度看格子上緣的顏色線就好，字母藏起來；標籤放在攻擊、HP 的正上方 */
+  .zone .rarity { display: none; }
+  .z-foot { display: grid; grid-template-areas: 'badges' 'stats'; gap: 1px; }
+  .z-foot .badges { grid-area: badges; }
+  .z-foot .z-stats { grid-area: stats; justify-self: end; }
+  .badge { font-size: 9.5px; padding: 0 3px; }
   .f-label { display: none; } .f-name { font-size: 10px; }
   .pile { font-size: 9px; } .pile b { font-size: 14px; }
   .hero { min-width: 0; padding: 5px 12px; } .h-hand { position: static; translate: none; grid-column: 1 / -1; }

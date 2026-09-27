@@ -257,10 +257,18 @@ describe('進場效果', () => {
     expect(state.players[a].hand).toHaveLength(handSize + 1); // 給了 chick（−1）、抽 1（+1），再加上 give 的那張
   });
 
-  it('我方目標的進場效果可以選到自己', () => {
+  it('進場效果不能選自己：場上只有牠自己時照樣能召喚，只是效果不發動', () => {
     let { state, a } = start();
     state = summonAt(state, a, 'rallier', 2); // 場上只有牠自己
-    expect(at(state, a, 2)).toMatchObject({ attackCounters: 1, hpCounters: 1 });
+    expect(at(state, a, 2)).toMatchObject({ attackCounters: 0, hpCounters: 0 });
+    // 有別的我方生物就加在牠身上；指定自己不行
+    place(state, a, 0, 'wolf');
+    state.players[a].energy = 10;
+    const uid = give(state, a, 'rallier');
+    expect(reject(state, { type: 'summon', player: a, card: uid, zone: 3, target: { kind: 'creature', player: a, zone: 3 } })).toBe('ILLEGAL_TARGET');
+    state = act(state, { type: 'summon', player: a, card: uid, zone: 3, target: { kind: 'creature', player: a, zone: 0 } });
+    expect(at(state, a, 0)).toMatchObject({ attackCounters: 1, hpCounters: 1 });
+    expect(at(state, a, 3)).toMatchObject({ attackCounters: 0, hpCounters: 0 });
   });
 
   it('沒有進場效果的生物不能指定目標', () => {

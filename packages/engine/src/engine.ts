@@ -170,22 +170,25 @@ function triggerEntry(ctx: Ctx, def: CreatureDef, player: PlayerId, zone: number
   }
   const ability: Ability = { ...def.entry, cost: 0 };
   const source: AbilitySource = { kind: 'creature', player, zone };
-  if (ability.target.kind !== 'none' && legalTargets(ctx.state, ability, source).length === 0) {
+  // 進場效果不能選自己（例如「目標增益 2」不能加在自己身上）。
+  const self: Target = { kind: 'creature', player, zone };
+  if (chosen !== undefined && sameTarget(chosen, self)) fail('ILLEGAL_TARGET', `「${ability.name}」不能選自己`);
+  const others = ability.target.kind === 'none' ? [] : legalTargets(ctx.state, ability, source).filter((t) => !sameTarget(t, self));
+  if (ability.target.kind !== 'none' && others.length === 0) {
     if (chosen !== undefined) fail('ILLEGAL_TARGET', `「${ability.name}」現在沒有可以指定的目標`);
     return;
   }
-  const target = chooseTarget(ctx, ability, source, chosen);
+  const target = chooseTarget(ctx, ability, source, chosen ?? (others.length === 1 ? others[0] : undefined));
   ctx.events.push({ type: 'abilityUsed', player, source: 'entry', cardId: def.id, ability: ability.name });
   resolveAbility(ctx, ability, source, target);
 }
 
-/** 生物放到 zone 之後，進場效果能選的目標。召喚前就要算，所以把牠自己也算進我方生物。 */
-function entryTargets(state: GameState, def: CreatureDef, player: PlayerId, zone: number, alreadyThere: boolean): Target[] {
+/** 生物放到 zone 之後，進場效果能選的目標：不含牠自己。 */
+function entryTargets(state: GameState, def: CreatureDef, player: PlayerId, zone: number): Target[] {
   if (def.entry === undefined || def.entry.target.kind === 'none') return [];
   const ability: Ability = { ...def.entry, cost: 0 };
-  const targets = legalTargets(state, ability, { kind: 'creature', player, zone });
-  if (!alreadyThere && def.entry.target.kind === 'ally') targets.push({ kind: 'creature', player, zone });
-  return targets;
+  const self: Target = { kind: 'creature', player, zone };
+  return legalTargets(state, ability, { kind: 'creature', player, zone }).filter((t) => !sameTarget(t, self));
 }
 
 // ─── 回合 ────────────────────────────────────────────────────────────────────
@@ -684,7 +687,7 @@ export function createEngine(db: CardDb) {
       if (def.kind === 'creature') {
         for (const zone of zones) {
           const type = def.stage === 0 ? 'summon' : 'evolve';
-          const targets = entryTargets(state, def, player, zone, type === 'evolve');
+          const targets = entryTargets(state, def, player, zone);
           if (targets.length === 0) candidates.push({ type, player, card: card.uid, zone });
           for (const target of targets) candidates.push({ type, player, card: card.uid, zone, target });
         }
