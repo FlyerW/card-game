@@ -568,7 +568,7 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
   body:has(.detail.floating) { padding-bottom: 40vh; }
   /* 手機的卡包與收藏：點卡片跳出視窗（說明與合成按鈕），不用捲到最下面 */
   .shop-backdrop { display: block; position: fixed; inset: 0; background: #0a1015cc; z-index: 20; }
-  .shop .detail.has-focus { position: fixed; left: 12px; right: 12px; top: 50%; translate: 0 -50%; max-height: 80vh; overflow: auto; z-index: 21; box-shadow: 0 10px 40px #000c; }
+  .builder .detail.has-focus { position: fixed; left: 12px; right: 12px; top: 50%; translate: 0 -50%; max-height: 80vh; overflow: auto; z-index: 21; box-shadow: 0 10px 40px #000c; }
 }
 @media (max-width: 560px) {
   body { padding-inline: 10px; }

@@ -82,6 +82,14 @@ export const KEYWORDS: Record<string, string> = {
   衍生物: '只能由效果召喚，不能放進牌組；離場就消失',
 };
 
+/** 一個關鍵字（例如「中毒 2」）的意思，數字帶進去；不是關鍵字就是 null。 */
+export function explainKeyword(word: string): string | null {
+  const [, name = word, n] = /^(.+?)(?: (\d+))?$/.exec(word) ?? [];
+  const text = KEYWORDS[name];
+  if (!text) return null;
+  return n ? text.replaceAll('N', n) : text;
+}
+
 /** 這幾行說明裡出現的關鍵字，各自一行解釋，例如「**中毒 2**：施放者的每個回合結束時失去 2♥……」。 */
 export function explainKeywords(lines: readonly string[]): string[] {
   const seen = new Set<string>();
@@ -90,9 +98,8 @@ export function explainKeywords(lines: readonly string[]): string[] {
     for (const [, word] of line.matchAll(/\*\*([^*]+)\*\*/g)) {
       if (word === undefined || seen.has(word)) continue;
       seen.add(word);
-      const [, name = word, n] = /^(.+?)(?: (\d+))?$/.exec(word) ?? [];
-      const text = KEYWORDS[name];
-      if (text) out.push(`${keyword(word)}：${n ? text.replaceAll('N', n) : text}`);
+      const text = explainKeyword(word);
+      if (text) out.push(`${keyword(word)}：${text}`);
     }
   }
   return out;
@@ -320,21 +327,21 @@ export function describeCard(card: DeckCardDef, names: Names = ids): string[] {
       lines.push(`英雄 ♥ 上限 +${card.hpBonus}`);
       if (card.power) lines.push(`天生技換成 ${describeAbility(card.power, names)}`);
       if (card.alternatePower) lines.push(`每發動一次就跟 ${describeAbility(card.alternatePower, names)} 輪流`);
-      if (card.passive) lines.push(`多一個${describePassive(card.passive)}`);
+      if (card.passive) lines.push(`多一個被動 ${describePassive(card.passive)}`);
       lines.push('每局只能進化一次');
       return lines;
     }
   }
 }
 
+/** 英雄被動：「劍士之道：**突破**；我方生物 ⚔ +1；……」。不寫「被動」兩個字；突破寫在最前面。 */
 export function describePassive(passive: HeroPassive): string {
-  const parts = [describeOwnEffects(passive.creatures, passive.ceilingBonus)];
-  if (passive.pierce) parts.push(keyword('突破'));
+  const parts = [passive.pierce ? keyword('突破') : '', describeOwnEffects(passive.creatures, passive.ceilingBonus)];
   const own = describeModifier(passive.ownTurn);
   if (own.length > 0) parts.push(`我方回合，${ourCreatures(own)}`);
   const theirs = describeModifier(passive.opponentTurn);
   if (theirs.length > 0) parts.push(`對方回合，${ourCreatures(theirs)}`);
-  return `被動「${passive.name}」：${parts.filter((part) => part).join('；')}`;
+  return `${passive.name}：${parts.filter((part) => part).join('；')}`;
 }
 
 export function describeHero(hero: HeroDef, names: Names = ids): string[] {

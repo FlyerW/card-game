@@ -1,5 +1,6 @@
 import {
   cardNames,
+  COLOR_NAMES,
   copyLimit,
   DEFAULT_RULES,
   deckPool,
@@ -8,6 +9,7 @@ import {
   RARITIES,
   validateDeck,
   type CardDb,
+  type Color,
   type DeckCardDef,
 } from '@card-game/engine';
 import { buildDeck } from '@card-game/sim/deck';
@@ -32,9 +34,17 @@ const FILTERS: [KindFilter, string][] = [
   ['other', '道具・場地・英雄進化'],
 ];
 
+/** 顏色篩選：英雄的某個顏色、無色，或全部。 */
+export type ColorPick = Color | 'none' | 'all';
+/** 費用篩選：1–6 各自一格，7 以上合成一格。 */
+export type CostPick = number | 'all';
+const COSTS: CostPick[] = ['all', 1, 2, 3, 4, 5, 6, 7];
+
 export interface Builder {
   heroId: string;
   filter: KindFilter;
+  color: ColorPick;
+  cost: CostPick;
   /** 說明欄正在看的卡。 */
   focus: string | null;
 }
@@ -197,11 +207,16 @@ function deckList(db: CardDb, deck: readonly string[]): string {
     .join('');
 }
 
+/** 顏色與費用篩選：7 那一格是 7 費以上。 */
+const colorMatches = (card: DeckCardDef, color: ColorPick) =>
+  color === 'all' || (color === 'none' ? card.colors.length === 0 : card.colors.includes(color));
+const costMatches = (card: DeckCardDef, cost: CostPick) => cost === 'all' || (cost === 7 ? card.cost >= 7 : card.cost === cost);
+
 export function deckScreen(db: CardDb, b: Builder, deck: readonly string[], custom: boolean, owned: Owned): string {
   const hero = db.heroes.get(b.heroId)!;
   // 擁有的排前面，沒有的變暗放後面，看得到還能收集什麼。
   const pool = deckPool(db, b.heroId)
-    .filter((card) => matches(card, b.filter))
+    .filter((card) => matches(card, b.filter) && colorMatches(card, b.color) && costMatches(card, b.cost))
     .sort((x, y) => Number(owned(y) > 0) - Number(owned(x) > 0) || byCost(x, y));
   const { problems, tips } = deckIssues(db, b.heroId, deck, owned);
   const focus = b.focus ? db.cards.get(b.focus) : undefined;
@@ -209,31 +224,39 @@ export function deckScreen(db: CardDb, b: Builder, deck: readonly string[], cust
     ? `<div class="focus">${detailLines(describeCard(focus, cardNames(db)))}
         <div class="respond"><button class="ghost" data-remove="${focus.id}" ${count(deck, focus.id) === 0 ? 'disabled' : ''}>拿掉一張</button>
         <button class="primary" data-add="${focus.id}" ${addProblem(db, deck, focus.id, owned) ? 'disabled' : ''}>加一張（${count(deck, focus.id)}/${owned(focus)}）</button></div>
-        ${owned(focus) === 0 ? '<p class="d-line warn">還沒有這張卡：開卡包，或到「卡包與收藏」用粉塵合成。</p>' : ''}</div>`
+        ${owned(focus) === 0 ? '<p class="d-line warn">還沒有這張卡：開卡包，或到「卡包與收藏」用粉塵合成。</p>' : ''}
+        <button class="ghost focus-close" data-do="focus-close">關閉</button></div>`
     : '<p class="d-line">點卡片看說明；卡片下面的 − ＋ 調整張數。</p>';
   const status =
     problems.length === 0
       ? '<p class="ok">✓ 牌組合法，可以開始對戰</p>'
       : `<ul class="problems">${problems.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>`;
   const tipList = tips.length ? `<ul class="tips">${tips.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '';
-  const filters = FILTERS.map(
-    ([id, label]) => `<button class="chip${b.filter === id ? ' on' : ''}" data-filter="${id}" aria-pressed="${b.filter === id}">${label}</button>`,
-  ).join('');
+  const chip = (attr: string, value: string, label: string, on: boolean) =>
+    `<button class="chip${on ? ' on' : ''}" ${attr}="${value}" aria-pressed="${on}">${label}</button>`;
+  const filters = FILTERS.map(([id, label]) => chip('data-filter', id, label, b.filter === id)).join('');
+  // 顏色只列這個英雄能用的，加上無色。
+  const colorOptions: [ColorPick, string][] = [['all', '全部顏色'], ...hero.colors.map((c): [ColorPick, string] => [c, COLOR_NAMES[c]]), ['none', '無色']];
+  const colorChips = colorOptions.map(([c, label]) => chip('data-color', c, label, b.color === c)).join('');
+  const costChips = COSTS.map((c) => chip('data-cost', String(c), c === 'all' ? '全部費用' : c === 7 ? '7+' : String(c), b.cost === c)).join('');
 
   return `<main class="builder">
     <header class="b-head">
       <div><h1>組牌・${esc(hero.name)}</h1>
         <p>${pips(hero.colors)} ${describeColors(hero.colors)}的卡加上無色卡；${deckSize} 張，同名最多 ${maxCopies} 張，UR 最多 ${maxUrCopies} 張，只能放收藏裡有的卡。
-        ${custom ? '牌組存在這個瀏覽器裡。' : '還沒有自訂牌組，開始對戰時會用收藏自動組一副。'}</p></div>
+        ${custom ? '牌組會自動存起來。' : '還沒有自訂牌組，開始對戰時會用收藏自動組一副。'}</p></div>
       <div class="b-count${deck.length === deckSize ? ' full' : ''}"><b>${deck.length}</b>/${deckSize}</div>
     </header>
     <div class="b-body">
       <section class="b-pool" aria-label="可以放的卡">
         <div class="chips">${filters}</div>
+        <div class="chips">${colorChips}</div>
+        <div class="chips">${costChips}</div>
         <div class="pool">${pool.map((card) => poolCard(db, card, deck, b.focus, owned)).join('')}</div>
       </section>
+      ${focus ? '<div class="shop-backdrop" data-do="focus-close"></div>' : ''}
       <aside class="b-side">
-        <div class="detail">${focusBox}</div>
+        <div class="detail${focus ? ' has-focus' : ''}">${focusBox}</div>
         <div class="detail">
           ${status}${tipList}
           ${curve(db, deck)}

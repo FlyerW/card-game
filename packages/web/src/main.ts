@@ -56,6 +56,7 @@ import {
   removeOne,
   saveDecks,
   type Builder,
+  type ColorPick,
   type KindFilter,
 } from './deck-builder';
 import {
@@ -197,7 +198,7 @@ const app: App = {
   screen: 'login',
   heroId: SAMPLE_HEROES[1]!.id,
   decks: {},
-  builder: { heroId: SAMPLE_HEROES[1]!.id, filter: 'all', focus: null },
+  builder: { heroId: SAMPLE_HEROES[1]!.id, filter: 'all', color: 'all', cost: 'all', focus: null },
   state: null,
   mode: 'bot',
   view: null,
@@ -1695,7 +1696,7 @@ function decksFor(session: Session, backend: Backend, me: ServerMe | undefined):
 
 /** 組牌畫面的點擊。處理了就回傳 true。 */
 function builderClick(el: HTMLElement, command: string | undefined): boolean {
-  const { add, remove, focus, filter } = el.dataset;
+  const { add, remove, focus, filter, color, cost } = el.dataset;
   const heroId = app.builder.heroId;
   const deck = app.decks[heroId] ?? [];
   const edit = (next: string[]) => {
@@ -1712,6 +1713,12 @@ function builderClick(el: HTMLElement, command: string | undefined): boolean {
     app.builder.focus = app.builder.focus === focus ? null : focus;
   } else if (filter) {
     app.builder.filter = filter as KindFilter;
+  } else if (color) {
+    app.builder.color = color as ColorPick;
+  } else if (cost) {
+    app.builder.cost = cost === 'all' ? 'all' : Number(cost);
+  } else if (command === 'focus-close') {
+    app.builder.focus = null;
   } else if (command === 'deck-fill') {
     edit(fillRandom(db, heroId, deck, owned()));
   } else if (command === 'deck-auto') {
@@ -1734,7 +1741,7 @@ function builderClick(el: HTMLElement, command: string | undefined): boolean {
 
 root.addEventListener('click', (event) => {
   const el = (event.target as HTMLElement).closest<HTMLElement>(
-    '[data-do],[data-key],[data-hand],[data-skill],[data-hero],[data-mull],[data-pick],[data-add],[data-remove],[data-focus],[data-filter],[data-rarity],[data-color],[data-missing],[data-craft],[data-topup],[data-difficulty]',
+    '[data-do],[data-key],[data-hand],[data-skill],[data-hero],[data-mull],[data-pick],[data-add],[data-remove],[data-focus],[data-filter],[data-rarity],[data-color],[data-cost],[data-missing],[data-craft],[data-topup],[data-difficulty]',
   );
   if (!el) {
     // 點在說明欄裡（正在看卡片資訊、點關鍵字看意思）不取消選取；點其他地方才回到對戰紀錄。
@@ -1792,7 +1799,8 @@ root.addEventListener('click', (event) => {
     } else if (act) perform(act);
     else if (app.view) inspect(key);
   } else if (command === 'builder') {
-    app.builder = { heroId: app.heroId, filter: app.builder.filter, focus: null };
+    // 換英雄時顏色篩選回到全部（每個英雄能用的顏色不一樣）；種類與費用照舊。
+    app.builder = { heroId: app.heroId, filter: app.builder.filter, color: 'all', cost: app.builder.cost, focus: null };
     app.screen = 'deck';
     app.toast = null;
     render();
