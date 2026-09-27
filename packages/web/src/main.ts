@@ -777,7 +777,7 @@ function heroInfo(side: SideView): string {
   if (evolution?.kind === 'heroEvolution' && evolution.passive) lines.push(describePassive(evolution.passive));
   const current = powerOf(side);
   if (current) {
-    lines.push(`天生技 ${describeAbility(current.power, describeName)}${current.next ? `；用完換成「${current.next.name}」` : ''}`);
+    lines.push(`${describeAbility(current.power, describeName)}${current.next ? `；用完換成「${current.next.name}」` : ''}`);
   }
   return `<div class="hero-info"><span class="hi-hand">手牌 ${side.handCount}</span>${lines.map((line) => `<p>${rich(line)}</p>`).join('')}</div>`;
 }
@@ -1098,7 +1098,7 @@ function sideRows(side: SideView, player: PlayerId, picks: Map<string, Action>, 
       const left = power.uses === undefined ? '' : `（剩 ${Math.max(0, power.uses - side.heroPowerUses)} 次）`;
       const then = next ? `<small>・用完換成「${esc(next.name)}」</small>` : '';
       heroRow += `<button class="power${app.selection?.kind === 'heroPower' ? ' selected' : ''}" data-do="power" ${usable ? '' : 'disabled'}>
-        ${costBadge(power)}天生技「${esc(power.name)}」${left}${then}</button>`;
+        ${costBadge(power)}${esc(power.name)}${left}${then}</button>`;
     }
   }
   heroRow += '</div>';

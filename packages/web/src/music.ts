@@ -1,5 +1,6 @@
 // 背景音樂：用 Web Audio 即時合成，不用音樂檔（沒有版權問題，也不佔下載量）。
-// 選單一首、對戰一首，換畫面時淡入淡出。瀏覽器規定使用者點過頁面才能出聲，所以第一次點擊時才開始。
+// 選單一首、對戰一首，換畫面時舊的那首很快收掉，不會兩首疊在一起。瀏覽器規定使用者點過頁面才能出聲，所以第一次點擊時才開始。
+// 同時開了好幾個遊戲頁面時，只有最後點過的那一頁出聲（用 BroadcastChannel 互相通知）。
 
 export type Scene = 'menu' | 'battle';
 
@@ -9,8 +10,6 @@ interface Song {
   chords: number[][];
   /** 每個和弦的低音根音。 */
   bass: number[];
-  /** 旋律用的音階（MIDI）。 */
-  scale: number[];
   /** 琶音一小節幾個音：8 或 16。 */
   arpNotes: 8 | 16;
   drums: boolean;
@@ -24,7 +23,6 @@ const SONGS: Record<Scene, Song> = {
     bpm: 72,
     chords: [[57, 60, 64], [53, 57, 60], [55, 60, 64], [55, 59, 62]],
     bass: [45, 41, 48, 43],
-    scale: [69, 72, 74, 76, 79, 81, 84],
     arpNotes: 8,
     drums: false,
     pad: 0.05,
@@ -34,7 +32,6 @@ const SONGS: Record<Scene, Song> = {
     bpm: 108,
     chords: [[50, 53, 57], [50, 53, 58], [48, 52, 55], [49, 52, 57]],
     bass: [38, 34, 36, 33],
-    scale: [62, 65, 67, 69, 72, 74, 77],
     arpNotes: 16,
     drums: true,
     pad: 0.035,
@@ -61,6 +58,8 @@ interface Playing {
   scene: Scene;
   song: Song;
   out: GainNode;
+  /** 這首排好、還沒響完的音；換曲時一起停掉。 */
+  sources: Set<AudioScheduledSourceNode>;
   pad: BiquadFilterNode;
   bar: number;
   step: number;
@@ -78,12 +77,20 @@ class Music {
   private noise: AudioBuffer | null = null;
   private playing: Playing | null = null;
   private timer: number | null = null;
+  private readonly id = Math.random().toString(36).slice(2);
+  private readonly channel: BroadcastChannel | null = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('card-game.music');
 
   constructor() {
-    // 第一次點擊或按鍵時才建立聲音（瀏覽器的自動播放限制）。
+    // 第一次點擊或按鍵時才建立聲音（瀏覽器的自動播放限制）。每次點擊也順便宣告「現在由這一頁出聲」。
     const unlock = () => {
-      if (this.enabled) this.start();
+      if (!this.enabled) return;
+      this.start();
+      this.channel?.postMessage(this.id);
     };
+    // 別的遊戲頁面開始出聲：這一頁安靜下來，等使用者再點這一頁才接回來。
+    this.channel?.addEventListener('message', (event: MessageEvent<string>) => {
+      if (event.data !== this.id) this.stop();
+    });
     document.addEventListener('pointerdown', unlock);
     document.addEventListener('keydown', unlock);
     document.addEventListener('visibilitychange', () => {
@@ -126,7 +133,7 @@ class Music {
   private stop(): void {
     if (this.timer !== null) window.clearInterval(this.timer);
     this.timer = null;
-    if (this.playing && this.ctx) this.fadeOut(this.playing.out, 0.4);
+    if (this.playing && this.ctx) this.end(this.playing, 0.4);
     this.playing = null;
   }
 
@@ -154,7 +161,7 @@ class Music {
 
   private play(scene: Scene): void {
     const ctx = this.ctx!;
-    if (this.playing) this.fadeOut(this.playing.out, 1.2);
+    if (this.playing) this.end(this.playing, 0.3);
     const out = ctx.createGain();
     out.gain.setValueAtTime(0, ctx.currentTime);
     out.gain.linearRampToValueAtTime(1, ctx.currentTime + 1.5);
@@ -164,15 +171,39 @@ class Music {
     pad.type = 'lowpass';
     pad.frequency.value = 1100;
     pad.connect(out);
-    this.playing = { scene, song: SONGS[scene], out, pad, bar: 0, step: 0, next: ctx.currentTime + 0.1, seed: scene === 'menu' ? 7 : 13 };
+    this.playing = {
+      scene,
+      song: SONGS[scene],
+      out,
+      sources: new Set(),
+      pad,
+      bar: 0,
+      step: 0,
+      next: ctx.currentTime + 0.1,
+      seed: scene === 'menu' ? 7 : 13,
+    };
   }
 
-  private fadeOut(gain: GainNode, seconds: number): void {
+  /** 收掉一首：很快淡出，排好的音全部停掉，再把線拔掉。 */
+  private end(p: Playing, seconds: number): void {
     const now = this.ctx!.currentTime;
-    gain.gain.cancelScheduledValues(now);
-    gain.gain.setValueAtTime(gain.gain.value, now);
-    gain.gain.linearRampToValueAtTime(0, now + seconds);
-    window.setTimeout(() => gain.disconnect(), (seconds + 0.5) * 1000);
+    p.out.gain.cancelScheduledValues(now);
+    p.out.gain.setValueAtTime(p.out.gain.value, now);
+    p.out.gain.linearRampToValueAtTime(0, now + seconds);
+    for (const source of p.sources) {
+      try {
+        source.stop(now + seconds);
+      } catch {
+        // 已經停了。
+      }
+    }
+    window.setTimeout(() => p.out.disconnect(), (seconds + 0.2) * 1000);
+  }
+
+  /** 記下這首排好的音，響完就移掉。 */
+  private track(p: Playing, source: AudioScheduledSourceNode): void {
+    p.sources.add(source);
+    source.onended = () => p.sources.delete(source);
   }
 
   /** 把接下來一小段時間要響的音先排好。 */
@@ -209,8 +240,8 @@ class Music {
 
     if (step === 0) {
       for (const note of chord) {
-        this.voice(time, freq(note), barLength * 1.05, 'sawtooth', song.pad, p.pad, 0.5, 0.6, -6);
-        this.voice(time, freq(note), barLength * 1.05, 'sawtooth', song.pad, p.pad, 0.5, 0.6, 6);
+        this.voice(p, time, freq(note), barLength * 1.05, 'sawtooth', song.pad, 0.5, 0.6, -6);
+        this.voice(p, time, freq(note), barLength * 1.05, 'sawtooth', song.pad, 0.5, 0.6, 6);
       }
     }
 
@@ -218,35 +249,35 @@ class Music {
     const bassEvery = song.drums ? 4 : 8;
     if (step % bassEvery === 0) {
       const octave = song.drums && step === 8 ? 12 : 0;
-      this.pluck(time, freq(song.bass[index]! + octave), stepTime * bassEvery * 0.9, 'triangle', 0.22, p.out);
+      this.pluck(p, time, freq(song.bass[index]! + octave), stepTime * bassEvery * 0.9, 'triangle', 0.22);
     }
 
-    // 琶音：和弦音往上走。
+    // 琶音：根音、三音、五音、三音，4 個音一輪，剛好對齊拍子。
     const arpEvery = STEPS_PER_BAR / song.arpNotes;
     if (section === 0 && step % arpEvery === 0) {
-      const tones = [...chord, chord[0]! + 12, chord[1]! + 12];
+      const tones = [chord[0]!, chord[1]!, chord[2]!, chord[1]!];
       const n = step / arpEvery;
       const note = tones[n % tones.length]! + 12;
-      this.pluck(time, freq(note), stepTime * arpEvery * 1.6, 'square', song.drums ? 0.025 : 0.03, p.out);
+      this.pluck(p, time, freq(note), stepTime * arpEvery * 1.6, 'triangle', 0.05);
     }
 
-    // 旋律：第二段才有，大多挑和弦音，偶爾經過音。
-    if (section === 1 && step % 4 === 0 && this.random(p) < (song.drums ? 0.7 : 0.55)) {
-      const pool = this.random(p) < 0.7 ? chord.map((n) => n + 12) : song.scale;
-      const note = pool[Math.floor(this.random(p) * pool.length)]!;
-      this.pluck(time, freq(note + (note < 60 ? 12 : 0)), stepTime * 6, 'sine', 0.09, p.out);
-      this.pluck(time, freq(note + 12 + (note < 60 ? 12 : 0)), stepTime * 3, 'sine', 0.02, p.out);
+    // 旋律：第二段才有，每拍一個和弦音，第一拍用根音，聽起來跟和弦是同一首。
+    if (section === 1 && step % 4 === 0 && (step === 0 || this.random(p) < 0.6)) {
+      const note = step === 0 ? chord[0]! + 12 : chord[Math.floor(this.random(p) * chord.length)]! + 12;
+      const up = note < 60 ? 12 : 0;
+      this.pluck(p, time, freq(note + up), stepTime * 6, 'sine', 0.09);
+      this.pluck(p, time, freq(note + up + 12), stepTime * 3, 'sine', 0.02);
     }
 
     if (song.drums) {
-      if (step === 0 || step === 8 || (step === 10 && p.bar % 2 === 1)) this.kick(time, p.out);
-      if (step === 4 || step === 12) this.hit(time, 0.18, 1800, 'bandpass', 0.09, p.out);
-      if (step % 2 === 0) this.hit(time, 0.04, 7000, 'highpass', step % 4 === 2 ? 0.035 : 0.02, p.out);
+      if (step === 0 || step === 8 || (step === 10 && p.bar % 2 === 1)) this.kick(p, time);
+      if (step === 4 || step === 12) this.hit(p, time, 0.18, 1800, 'bandpass', 0.09);
+      if (step % 2 === 0) this.hit(p, time, 0.04, 7000, 'highpass', step % 4 === 2 ? 0.035 : 0.02);
     }
   }
 
   /** 慢慢起來、慢慢收掉的長音（墊底和弦）。 */
-  private voice(time: number, hz: number, length: number, type: OscillatorType, level: number, dest: AudioNode, attack: number, release: number, detune = 0): void {
+  private voice(p: Playing, time: number, hz: number, length: number, type: OscillatorType, level: number, attack: number, release: number, detune = 0): void {
     const ctx = this.ctx!;
     const osc = ctx.createOscillator();
     osc.type = type;
@@ -257,13 +288,14 @@ class Music {
     gain.gain.linearRampToValueAtTime(level, time + attack);
     gain.gain.setValueAtTime(level, time + Math.max(attack, length - release));
     gain.gain.linearRampToValueAtTime(0, time + length);
-    osc.connect(gain).connect(dest);
+    osc.connect(gain).connect(p.pad);
     osc.start(time);
     osc.stop(time + length + 0.05);
+    this.track(p, osc);
   }
 
   /** 撥弦：一下就衰減。 */
-  private pluck(time: number, hz: number, length: number, type: OscillatorType, level: number, dest: AudioNode): void {
+  private pluck(p: Playing, time: number, hz: number, length: number, type: OscillatorType, level: number): void {
     const ctx = this.ctx!;
     const osc = ctx.createOscillator();
     osc.type = type;
@@ -272,12 +304,13 @@ class Music {
     gain.gain.setValueAtTime(0.0001, time);
     gain.gain.exponentialRampToValueAtTime(level, time + 0.01);
     gain.gain.exponentialRampToValueAtTime(0.0001, time + length);
-    osc.connect(gain).connect(dest);
+    osc.connect(gain).connect(p.out);
     osc.start(time);
     osc.stop(time + length + 0.05);
+    this.track(p, osc);
   }
 
-  private kick(time: number, dest: AudioNode): void {
+  private kick(p: Playing, time: number): void {
     const ctx = this.ctx!;
     const osc = ctx.createOscillator();
     osc.frequency.setValueAtTime(130, time);
@@ -285,13 +318,14 @@ class Music {
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.35, time);
     gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.3);
-    osc.connect(gain).connect(dest);
+    osc.connect(gain).connect(p.out);
     osc.start(time);
     osc.stop(time + 0.32);
+    this.track(p, osc);
   }
 
   /** 雜訊打擊：小鼓（帶通）與鈸（高通）。 */
-  private hit(time: number, length: number, hz: number, type: BiquadFilterType, level: number, dest: AudioNode): void {
+  private hit(p: Playing, time: number, length: number, hz: number, type: BiquadFilterType, level: number): void {
     const ctx = this.ctx!;
     const source = ctx.createBufferSource();
     source.buffer = this.noise;
@@ -301,9 +335,10 @@ class Music {
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(level, time);
     gain.gain.exponentialRampToValueAtTime(0.0001, time + length);
-    source.connect(filter).connect(gain).connect(dest);
+    source.connect(filter).connect(gain).connect(p.out);
     source.start(time, Math.random() * 0.5);
     source.stop(time + length + 0.02);
+    this.track(p, source);
   }
 }
 

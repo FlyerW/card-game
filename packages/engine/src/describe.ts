@@ -248,10 +248,10 @@ function describeModifier(modifier: CreatureModifier | undefined): string[] {
   return parts;
 }
 
-/** 「我方生物 ⚔ +1」；符號開頭的（⚔、♥）前面空一格。 */
+/** 「我方生物 ⚔ +1」；符號或關鍵字開頭的（⚔、♥、**再生 1**）前面空一格。 */
 const ourCreatures = (parts: string[]) => {
   const text = parts.join('、');
-  return `我方生物${/^[A-Za-z⚔♥]/.test(text) ? ' ' : ''}${text}`;
+  return `我方生物${/^[A-Za-z⚔♥*]/.test(text) ? ' ' : ''}${text}`;
 };
 
 function describeOwnEffects(creatures: CreatureModifier | undefined, ceilingBonus: number | undefined): string {

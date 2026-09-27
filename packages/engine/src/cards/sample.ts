@@ -51,7 +51,8 @@ export const SAMPLE_HEROES: HeroDef[] = [
   },
   {
     kind: 'hero', id: 'forest-king', name: '林海之王', colors: ['green'], hp: 45,
-    // 比能量結晶（2 費上限 +1）、森林之息（2 費全體回復 3）貴，那兩張牌才有人帶。
+    passive: { name: '林海之息', creatures: { regenerate: 1 } },
+    // 比能量結晶（1 費上限 +1）、森林之息（2 費全體回復 3）貴，那兩張牌才有人帶。
     power: { name: '萌發', cost: 3, target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }, { type: 'healAll', amount: 2 }] },
   },
   // ── UR 英雄：多色。技能盡量不跟別的英雄重複 ──
@@ -250,7 +251,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'kraken', name: '深海巨妖', rarity: 'SR', colors: ['blue'], race: 'beast',
-    stage: 0, cost: 9, attack: 9, hp: 10,
+    stage: 0, cost: 9, attack: 8, hp: 10,
     entry: { name: '萬觸纏身', target: NONE, effects: [{ type: 'paralyze', all: true }] },
     skills: [{ name: '纏繞', cost: 5, target: CREATURE, effects: [{ type: 'damage', amount: 5 }, { type: 'paralyze' }] }],
   },
@@ -323,7 +324,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'soul-eater', name: '影噬魔', rarity: 'SR', colors: ['black'], race: 'undead',
-    stage: 0, cost: 5, attack: 5, hp: 7,
+    stage: 0, cost: 5, attack: 5, hp: 6,
     skills: [{ name: '蝕魂', cost: 5, target: CREATURE, effects: [{ type: 'halveHp' }] }],
   },
   {
@@ -507,7 +508,8 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   { kind: 'spell', id: 'entangle', name: '藤蔓纏繞', rarity: 'N', colors: ['green'], cost: 1, target: CREATURE, effects: [{ type: 'weaken' }] },
   { kind: 'spell', id: 'forest-breath', name: '森林之息', rarity: 'N', colors: ['green'], cost: 2, target: NONE, effects: [{ type: 'healAll', amount: 3 }] },
   { kind: 'spell', id: 'hunt', name: '獵殺', rarity: 'N', colors: ['green'], cost: 4, target: CREATURE, effects: [{ type: 'damage', amount: 6 }] },
-  { kind: 'spell', id: 'energy-crystal', name: '能量結晶', rarity: 'R', colors: ['green'], cost: 2, target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }] },
+  // 比林海之王的萌發（3 費）便宜 2 費，多花一張牌換來的。
+  { kind: 'spell', id: 'energy-crystal', name: '能量結晶', rarity: 'R', colors: ['green'], cost: 1, target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }] },
   // 跳費：能量上限 +1 約 2 能量，所以 4 費跳兩費。
   { kind: 'spell', id: 'earth-pulse', name: '大地脈動', rarity: 'R', colors: ['green'], cost: 4, target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 2 }] },
   // 能量上限 +1 ≈ 2 能量、抽 1 ≈ 1.5，原本 4 費太弱，改 3 費。
