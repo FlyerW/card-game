@@ -83,6 +83,16 @@ export function saveBook(book: DeckBook, accountId: string): void {
   }
 }
 
+/** 刪掉這個帳號存在瀏覽器裡的牌組（測試帳號登出時用）。 */
+export function forgetBook(accountId: string): void {
+  try {
+    localStorage.removeItem(keyFor(accountId));
+    localStorage.removeItem(keyFor(accountId, OLD_STORAGE_KEY));
+  } catch {
+    // 存取不了就算了。
+  }
+}
+
 /** 一副牌組的狀態：可以用、還差幾張、缺卡或不合法。 */
 export function deckStatus(db: CardDb, deck: SavedDeck, owned: Owned): { ok: boolean; text: string } {
   if (deck.cards.length < deckSize) return { ok: false, text: `還差 ${deckSize - deck.cards.length} 張` };

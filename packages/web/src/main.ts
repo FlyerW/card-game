@@ -72,6 +72,7 @@ import {
   deckScreen,
   fillRandom,
   deckStatus,
+  forgetBook,
   loadBook,
   removeOne,
   saveBook,
@@ -87,6 +88,7 @@ import {
   googleLogin,
   passwordLogin,
   loadSession,
+  clearTestProfile,
   logout,
   mountGoogleButton,
   resetTestProfile,
@@ -372,6 +374,11 @@ function onPasswordLogin(create: boolean): void {
 
 async function signOut(): Promise<void> {
   if (app.session) await logout(app.session);
+  // 測試帳號登出就整個清掉（金幣、收藏、牌組、冒險進度），下次進來是全新的。
+  if (app.session?.kind === 'test') {
+    clearTestProfile();
+    forgetBook(app.session.account.id);
+  }
   Object.assign(app, { session: null, backend: null, screen: 'login', book: emptyBook(), state: null, view: null, toast: null });
   render();
 }
@@ -1484,7 +1491,7 @@ function loginScreen(): string {
     <div class="login-options">
       <section class="login-card">
         <p class="d-head">測試帳號</p>
-        <p class="d-line">一進來就有 10000 金幣、全部的卡都收滿、UR 英雄都有，方便試玩各種牌組。資料存在這個瀏覽器裡，隨時可以重設。</p>
+        <p class="d-line">一進來就有 10000 金幣、全部的卡都收滿、UR 英雄都有，方便試玩各種牌組。資料只存在這個瀏覽器裡，<b>登出就會清掉</b>，下次進來是全新的測試帳號。</p>
         <button class="primary big" data-do="login-test" ${app.loggingIn ? 'disabled' : ''}>用測試帳號進入</button>
       </section>
       ${
@@ -1558,7 +1565,7 @@ function setupScreen(): string {
       ${who ? `<div class="who">${who.account.picture ? `<img src="${esc(who.account.picture)}" alt="" referrerpolicy="no-referrer">` : ''}
         <span>${esc(who.account.name)}${who.kind === 'google' ? '<small>Google</small>' : ''}</span>
         ${who.kind === 'test' ? '<button class="ghost small" data-do="reset-test">重設</button>' : ''}
-        ${musicButton()}<button class="ghost small" data-do="logout">登出</button></div>` : ''}
+        ${musicButton()}<button class="ghost small" data-do="logout">${who.kind === 'test' ? '登出並清除' : '登出'}</button></div>` : ''}
     </header>
     ${walletBar(app.profile)}
     ${PREVIEW ? `<p class="notice" role="status">預覽模式：看得到還沒發布的卡包（${esc(CARD_SETS.filter((set) => !set.released).map((set) => set.name).join('、'))}）。預覽建議用測試帳號。</p>` : ''}
@@ -1582,7 +1589,7 @@ function setupScreen(): string {
       ${howtoList()}
       <p class="note">試玩說明：範例卡有 ${SAMPLE_CARDS.length} 張，牌組照正式規則：${DEFAULT_RULES.deckSize} 張、同名最多 ${DEFAULT_RULES.maxCopies} 張、UR 最多 ${DEFAULT_RULES.maxUrCopies} 張、只能放英雄顏色內的卡與無色卡。
         你可以用收藏裡的卡自己組牌；電腦每局從全部的卡自動組一副。電腦用的是模擬平衡時的均衡打法。
-        測試帳號的金幣與收藏存在這個瀏覽器裡；Google 帳號的存在遊戲伺服器上。牌組都存在這個瀏覽器裡。</p>
+        測試帳號的金幣、收藏與牌組只存在這個瀏覽器裡，登出就清掉；伺服器帳號（名字＋密碼或 Google）的存在遊戲伺服器上。</p>
     </section>
   </main>`;
 }
