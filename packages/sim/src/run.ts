@@ -6,7 +6,7 @@ import { DEFAULT_RULES, SAMPLE_CARDS, SAMPLE_HEROES } from '@card-game/engine';
 import { writeFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { Worker } from 'node:worker_threads';
-import { BASE_HP, EXPERIMENTS, type Experiment } from './experiments';
+import { BASE_HP, EXPERIMENTS, HERO_HPS, type Experiment } from './experiments';
 import type { MatchOutcome } from './match';
 import { estimateSeconds, PACE } from './pace';
 import type { Task, TaskResult } from './worker';
@@ -18,6 +18,8 @@ const arg = (name: string, fallback: number) => {
 const GAMES = arg('games', 2000);
 const WORKERS = arg('workers', Math.max(1, Math.min(16, availableParallelism() - 4)));
 const CHUNK = 100;
+/** 能放進牌組的卡（不算衍生物）。 */
+const DECK_CARDS = SAMPLE_CARDS.filter((card) => !(card.kind === 'creature' && card.token)).length;
 /** 每組實驗打幾局：英雄對戰只打一半，組數多，而且只要看出明顯的強弱。 */
 const gamesFor = (experiment: Experiment) => Math.round(GAMES * (experiment.share ?? 1));
 
@@ -137,11 +139,11 @@ function report(summaries: Summary[], seconds: number): string {
   const verdict = (s: Summary) => (s.ci[0] > 0.5 ? '先攻有利' : s.ci[1] < 0.5 ? '後攻有利' : '看不出差距');
   const time = (s: Summary) => `${s.medianMinutes.toFixed(1)} 分 | ${s.p10Minutes.toFixed(1)}–${s.p90Minutes.toFixed(1)} | ${pct(s.inTarget)}`;
   const row = (s: Summary) =>
-    `| ${s.experiment.label} | ${s.experiment.style.name} | ${s.experiment.heroHp} | **${pct(s.firstWinRate)}** | ` +
+    `| ${s.experiment.style.name} | ${s.experiment.heroHp} | **${pct(s.firstWinRate)}** | ` +
     `${pct(s.ci[0])} – ${pct(s.ci[1])} | ${verdict(s)} | ${s.meanTurns.toFixed(1)} | ${s.p10Turns}–${s.p90Turns} | ${time(s)} |`;
   const header =
-    '| 能量制度 | 打法 | 英雄 HP | 先攻勝率 | 95% 信賴區間 | 判讀 | 平均回合數 | 回合數 10–90% | 預估時間 | 時間 10–90% | 5–10 分鐘 |\n' +
-    '|---|---|---|---|---|---|---|---|---|---|---|';
+    '| 打法 | 英雄 HP | 先攻勝率 | 95% 信賴區間 | 判讀 | 平均回合數 | 回合數 10–90% | 預估時間 | 時間 10–90% | 5–10 分鐘 |\n' +
+    '|---|---|---|---|---|---|---|---|---|---|';
   const heroRow = (s: Summary) =>
     `| ${s.experiment.label} | ${s.experiment.heroHp} | **${pct(s.firstWinRate)}** | ${pct(s.ci[0])} – ${pct(s.ci[1])} | ${verdict(s)} | ` +
     `${s.meanTurns.toFixed(1)} | ${s.meanPlays.toFixed(1)} | ${s.meanAttacks.toFixed(1)} | ${time(s)} | ${s.meanWinnerHp.toFixed(1)} |`;
@@ -178,13 +180,21 @@ function report(summaries: Summary[], seconds: number): string {
     '',
     `> 由 \`npm run sim\` 產生，請勿手動編輯。每組 ${GAMES} 局（英雄對戰每組 ${Math.round(GAMES / 2)} 局），共 ${total} 局，耗時 ${seconds.toFixed(0)} 秒。`,
     '',
+    '## 規則（已經定案）',
+    '',
+    `- **能量**：先攻第一回合能量上限 ${DEFAULT_RULES.startingMaxEnergy[0]}、後攻 ${DEFAULT_RULES.startingMaxEnergy[1]}，之後每回合 +${DEFAULT_RULES.energyGrowth}，` +
+      `上限 ${DEFAULT_RULES.baseCeiling}；後攻沒有額外的能量補償。`,
+    `- **英雄 HP**：35–45（快攻比較打得死）。這裡測 ${HERO_HPS.join('／')}。`,
+    `- **牌組**：${DEFAULT_RULES.deckSize} 張，同名最多 ${DEFAULT_RULES.maxCopies} 張，UR 最多 ${DEFAULT_RULES.maxUrCopies} 張。`,
+    '- 舊的能量制度（每回合 +1、後攻多 1 點）與其他方案的比較，見 docs/design.md 的「規則草案」與「平衡模擬」。',
+    '',
     '## 環境',
     '',
     '- **鏡像對戰**：兩邊同一副牌、同一個英雄、同一種打法，唯一的差別是誰先手。先攻勝率偏離 50% 多少，就是先後手差距有多大。',
-    `- **牌組**：前兩組實驗每局從整個範例卡池（${SAMPLE_CARDS.length} 張）組 ${DEFAULT_RULES.deckSize} 張，進化線照 2/2 帶，雙方用同一副。` +
+    `- **牌組**：前兩組實驗每局從整個範例卡池（${DECK_CARDS} 張）組 ${DEFAULT_RULES.deckSize} 張，進化線照 2/2 帶，雙方用同一副。` +
       '最後一組用範例卡的英雄，牌組只從他自己能用的卡組。',
     '- **英雄**：前兩組是模擬專用的英雄，沒有任何效果、五色都能用，HP 依實驗設定，只測規則本身。',
-    '- **共同隨機數**：第 i 局在每個實驗裡都用同一個種子、同一副牌，所以不同規則之間的差異不是抽到不同牌造成的。',
+    '- **共同隨機數**：第 i 局在每個實驗裡都用同一個種子、同一副牌，所以不同設定之間的差異不是抽到不同牌造成的。',
     '- **機器人**：貪婪策略。每一步把所有合法動作試一遍，挑讓局面評分最高的；沒有動作能讓局面變好就結束回合。' +
       '只看一步，不預測對手。',
     '- **打法**：均衡、快攻（重視打英雄）、控場（重視場面與手牌）三種評分權重，用來確認結論不是某種打法造成的。',
@@ -207,19 +217,20 @@ function report(summaries: Summary[], seconds: number): string {
     '',
     '「判讀」：信賴區間包含 50% 表示在這個樣本數下看不出先後手差距；整個區間都高於 50% 才算先攻有利。',
     '',
-    '## 英雄血量與對局時間（新制、均衡打法）',
+    '## 英雄血量與對局時間（均衡打法）',
     '',
     header,
     ...hp.map(row),
     '',
-    '## 範例卡的英雄（新制、均衡打法、各自的卡池）',
+    '## 範例卡的英雄（均衡打法、各自的卡池）',
     '',
     heroHeader,
     ...heroes.map(heroRow),
     '',
-    `## 英雄對戰（新制、均衡打法、各自的卡池，每組 ${Math.round(GAMES / 2)} 局）`,
+    `## 英雄對戰（均衡打法、各自的卡池，每組 ${Math.round(GAMES / 2)} 局）`,
     '',
-    '兩個範例卡的英雄各用自己能用的卡組牌對打，先後手隨機。看哪個英雄、哪個顏色太強或太弱。',
+    '兩個範例卡的英雄各用自己能用的卡組牌對打，先後手隨機。這裡用的是普通（貪婪）電腦，只能當參考：' +
+      '它偏好直接打臉，白色的快攻會被高估、藍黑的控場會被低估。**英雄與單卡強度以困難電腦的模擬為準**（見 docs/design.md 的「平衡模擬」）。',
     '',
     matchupHeader,
     ...summaries.filter(matchup).map(matchupRow),
@@ -235,7 +246,7 @@ function report(summaries: Summary[], seconds: number): string {
     '- 機器人比人弱：只看一步，不會為下回合布局，也不會預判對手。人類玩家對「先手搶節奏」的利用更充分，實際的先攻優勢可能比這裡量到的大。',
     '- 機器人常常剩能量沒花完。它只在動作能讓評分變好時才出手，所以對雙方效果對稱的場地卡從來不放。鏡像對戰中兩邊一樣，不影響先後手比較。',
     '- 對局時間是用動作數推算的，不是實測；真人想得比較久的話，時間會更長。',
-    `- 範例卡只有 ${SAMPLE_CARDS.length} 張，也還沒經過試玩調整；卡池改變後，結論要重跑確認。`,
+    `- 範例卡只有 ${DECK_CARDS} 張，也還沒經過試玩調整；卡池改變後，結論要重跑確認。`,
     '',
   ].join('\n');
 }

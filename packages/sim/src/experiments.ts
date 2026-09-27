@@ -4,7 +4,6 @@ import {
   buildCardDb,
   createEngine,
   deckPool,
-  LEGACY_ENERGY_RULES,
   SAMPLE_CARDS,
   SAMPLE_HEROES,
   type Color,
@@ -27,7 +26,8 @@ import { buildDeck } from './deck';
 const ALL_COLORS: Color[] = ['white', 'blue', 'black', 'red', 'green'];
 /** 英雄基準 HP。 */
 export const BASE_HP = 40;
-export const HERO_HPS = [30, 35, 40, 45, 50] as const;
+/** 英雄的 HP 定在 35–45 之間。 */
+export const HERO_HPS = [35, 40, 45] as const;
 const simHero = (hp: number): HeroDef => ({ kind: 'hero', id: `sim-${hp}`, name: `模擬英雄 ${hp}`, colors: ALL_COLORS, hp });
 
 /** CARD_PREVIEW=1：連還沒發布的卡包系列一起模擬（發布前測強度用）。 */
@@ -50,31 +50,26 @@ export interface Experiment {
   share?: number;
 }
 
-const ENERGY_SYSTEMS = [
-  { id: 'legacy', label: '舊制', rules: LEGACY_ENERGY_RULES },
-  { id: 'new', label: '新制', rules: {} },
-  { id: 'new-flat', label: '新制・無補償', rules: { startingMaxEnergy: [1, 1] as [number, number] } },
-];
-
 /**
- * 1. 三種能量制度 × 三種打法（英雄 40 HP）：先後手平衡，以及結論會不會因打法而變。
- * 2. 新制 × 英雄 30–50 HP（均衡打法）：英雄血量怎麼影響對局長度。
- * 3. 新制 × 範例卡的每個英雄（均衡打法）：用他自己能用的卡組牌，看實際的對局長度與先後手。
+ * 規則已經定案（DEFAULT_RULES：先攻能量上限 1、後攻 2，每回合 +2，後攻沒有額外的能量），
+ * 英雄 HP 定在 35–45。舊的能量制度（LEGACY_ENERGY_RULES）與無補償的比較見 docs/design.md。
+ *
+ * 1. 三種打法（英雄 40 HP）：先後手平衡，以及結論會不會因打法而變。
+ * 2. 英雄 35／40／45 HP（均衡打法）：英雄血量怎麼影響對局長度。
+ * 3. 範例卡的每個英雄（均衡打法）：用他自己能用的卡組牌，看實際的對局長度與先後手。
  * 4. 範例卡的英雄兩兩對戰（均衡打法、各自的卡池）：看哪個英雄、哪個顏色太強或太弱。局數是其他組的一半。
  */
 export const EXPERIMENTS: Experiment[] = [
-  ...ENERGY_SYSTEMS.flatMap((system) =>
-    Object.entries(STYLES).map(([styleId, style]) => ({
-      id: `${system.id}/${styleId}/${BASE_HP}`,
-      label: system.label,
-      rules: system.rules,
-      heroHp: BASE_HP,
-      style,
-    })),
-  ),
+  ...Object.entries(STYLES).map(([styleId, style]) => ({
+    id: `new/${styleId}/${BASE_HP}`,
+    label: '現行規則',
+    rules: {},
+    heroHp: BASE_HP,
+    style,
+  })),
   ...HERO_HPS.filter((hp) => hp !== BASE_HP).map((hp) => ({
     id: `new/balanced/${hp}`,
-    label: '新制',
+    label: '現行規則',
     rules: {},
     heroHp: hp,
     style: STYLES.balanced,
