@@ -813,7 +813,7 @@ function tutorialPanel(): string {
       : '<button class="primary" data-do="tut-next">下一步</button>';
   return `<div class="tutorial" role="status">
     <p class="tut-step">新手教學 ${tutorial.step + 1}/${STEPS.length}・${esc(current.title)}</p>
-    ${waiting || `<p class="tut-text">${esc(current.text)}</p>`}
+    ${waiting || `<p class="tut-text">${rich(current.text)}</p>`}
     <div class="tut-actions">${action}<button class="ghost small" data-do="tut-leave">離開教學</button></div>
   </div>`;
 }

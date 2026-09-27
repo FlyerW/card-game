@@ -21,6 +21,10 @@ export interface TutorialStep {
 const handUid = (state: GameState, cardId: string): number | undefined =>
   state.players[YOU].hand.find((card) => card.cardId === cardId)?.uid;
 
+/** 殉道騎士（死掉後是牠遺言召喚的士兵）在哪一格。 */
+export const martyrZone = (state: GameState): number =>
+  state.players[YOU].zones.findIndex((creature) => creature !== null && ['martyr-knight', 'soldier-token'].includes(creature.cards[0]!.cardId));
+
 /** 見習騎士（進化後是聖騎士）在哪一格。 */
 export const knightZone = (state: GameState): number =>
   state.players[YOU].zones.findIndex((creature) => creature !== null && creature.cards[0]!.cardId === 'squire');
@@ -36,7 +40,7 @@ const enemyZone = (state: GameState, cardId: string) =>
 export const STEPS: TutorialStep[] = [
   {
     title: '歡迎',
-    text: '下面是你的英雄「無名劍士」，上面是對手。把對手英雄的 ♥ 打到 0 就贏了。無名劍士的被動讓你的生物攻擊 +1。',
+    text: '下面是你的英雄「無名劍士」，上面是對手。把對手英雄的 ♥ 打到 0 就贏了。無名劍士讓你的生物攻擊力變高，還有 **突破**（被擋住也打得到英雄）。',
     highlight: () => ['.hero'],
   },
   {
@@ -93,8 +97,30 @@ export const STEPS: TutorialStep[] = [
     allow: (action) => action.type === 'attack' && action.target.kind === 'hero',
   },
   {
+    title: '關鍵字',
+    text: '卡片說明裡的粗體字是關鍵字，例如聖騎士的 **同袍 2**、**速攻**。滑鼠移到粗體字上，或在手機上點一下，就會跳出它的意思。點你的聖騎士看看，看完按「下一步」。',
+    highlight: (state) => zoneSel(YOU, knightZone(state)),
+  },
+  {
+    title: '遺言',
+    text: '點手牌裡的「殉道騎士」，召喚到一個空格。牠有 **遺言**：死掉的時候會發動效果，牠的是召喚一隻士兵。',
+    highlight: (state) => handSel(state, 'martyr-knight'),
+    allow: (action, state) => action.type === 'summon' && action.card === handUid(state, 'martyr-knight'),
+  },
+  {
+    title: '結束回合',
+    text: '按「結束回合」，看看對手會做什麼。',
+    highlight: () => ['.end-turn'],
+    allow: (action) => action.type === 'endTurn',
+  },
+  {
+    title: '遺言發動了',
+    text: '對手用火球術打死了殉道騎士，牠的 **遺言** 在同一格召喚了一隻士兵（2/2）。場上有「遺言」標記的生物死掉時會發動效果；有「持續」標記的，在場上時條件成立（例如 **回合結束**、**每當回復**）就會自動發動。',
+    highlight: (state) => zoneSel(YOU, martyrZone(state)),
+  },
+  {
     title: '完成！',
-    text: '你學會基本玩法了。還有種族特色、異常狀態、英雄進化卡、組牌與卡包，都寫在開局畫面的「怎麼玩」。去跟電腦打一局吧！',
+    text: '你學會基本玩法了！開局畫面可以為每個英雄存好幾副牌組，也能複製牌組代碼給朋友；卡包開到多餘的卡會變成粉塵，可以合成想要的卡。種族、異常狀態、英雄進化卡等規則都寫在「怎麼玩」。去跟電腦打一局吧！',
   },
 ];
 
@@ -124,7 +150,7 @@ export function startTutorial(engine: Engine): GameState {
     }
     if (state.activePlayer !== YOU) continue;
     const me = state.players[YOU];
-    me.hand = [card(state, 'squire'), card(state, 'holy-ward'), card(state, 'paladin')];
+    me.hand = [card(state, 'squire'), card(state, 'holy-ward'), card(state, 'paladin'), card(state, 'martyr-knight')];
     me.maxEnergy = me.energy = 4;
     const nun = newCreature(state.nextUid++, YOU, 'spring-nun', 0);
     me.zones[4] = nun;
@@ -133,7 +159,10 @@ export function startTutorial(engine: Engine): GameState {
   }
 }
 
-/** 對手的回合（照劇本）：第一次召喚灰狼到見習騎士的正對面；第二次召喚石像鬼到打不到的地方。 */
+/**
+ * 對手的回合（照劇本）：第一次召喚灰狼到見習騎士的正對面；第二次召喚石像鬼到打不到的地方；
+ * 第三次用火球術打死殉道騎士，讓玩家看到遺言發動。
+ */
 export function scriptedTurn(engine: Engine, state: GameState, round: number): { state: GameState; events: import('@card-game/engine').GameEvent[] } {
   const events: import('@card-game/engine').GameEvent[] = [];
   let current = state;
@@ -150,6 +179,14 @@ export function scriptedTurn(engine: Engine, state: GameState, round: number): {
     them.hand.push(wolf);
     them.energy = Math.max(them.energy, 1);
     run({ type: 'summon', player: THEM, card: wolf.uid, zone: knight });
+  } else if (round >= 2) {
+    const martyr = martyrZone(current);
+    if (martyr >= 0) {
+      const fireball = card(current, 'fireball');
+      them.hand.push(fireball);
+      them.energy = Math.max(them.energy, 3);
+      run({ type: 'castSpell', player: THEM, card: fireball.uid, target: { kind: 'creature', player: YOU, zone: martyr } });
+    }
   } else {
     const gargoyle = card(current, 'gargoyle');
     them.hand.push(gargoyle);
