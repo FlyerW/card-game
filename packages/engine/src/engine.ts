@@ -258,6 +258,7 @@ function summon(ctx: Ctx, a: ActionOf<'summon'>): void {
   removeFromHand(p, card.uid);
   p.zones[a.zone] = newCreature(card.uid, a.player, card.cardId, state.turn);
   ctx.events.push({ type: 'summoned', player: a.player, zone: a.zone, cardId: card.cardId });
+  fireTriggers(ctx, a.player, 'allySummoned', p.zones[a.zone]!);
   // 天使的「光輝 N」：召喚時你的英雄回復 N。
   if (def.race === 'angel' && traitOf(def) > 0) healHero(ctx, a.player, traitOf(def));
   triggerEntry(ctx, def, a.player, a.zone, a.target);

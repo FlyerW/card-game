@@ -12,7 +12,8 @@
     "sim": "tsx packages/sim/src/run.ts",
     "dev": "npm run dev -w @card-game/web",
     "build:web": "npm run build -w @card-game/web",
-    "server": "npm run build:web && tsx packages/server/src/main.ts"
+    "server": "npm run build:web && tsx packages/server/src/main.ts",
+    "game-stats": "tsx packages/server/scripts/game-stats.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.4",

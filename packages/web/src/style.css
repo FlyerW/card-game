@@ -87,7 +87,9 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .hp-unit { font: 600 13px var(--num); color: var(--ink-faint); }
 .hp-name { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; font: 700 17px/1.3 var(--display); color: var(--hero-ink); margin-top: 6px; }
 .hp-name .pips { flex: none; }
-.hp-text { grid-column: 1 / -1; font-size: 12.5px; color: var(--ink-soft); margin-top: 4px; }
+.hp-text { grid-column: 1 / -1; font-size: 12.5px; color: var(--ink-soft); margin-top: 4px; display: grid; gap: 4px; }
+.hp-line { display: block; }
+.hp-evo { color: var(--ink-faint); }
 .howto { background: var(--mat); border: 1px solid var(--mat-edge); border-radius: var(--radius); padding: 16px 20px; }
 .howto h2 { font: 700 17px var(--display); margin: 0 0 8px; }
 .howto ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
@@ -434,6 +436,11 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .pack-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 18px 14px; padding: 18px 8px 8px; }
 .p-card { display: grid; justify-items: center; gap: 8px; }
 .pack-row.deal .p-card { animation: deal .45s calc(var(--i) * .18s) both ease-out; }
+.pack-row.many { gap: 12px 10px; }
+.pack-row.many.deal .p-card { animation-delay: calc(var(--i) * .03s); }
+.pack-row.many .p-card .card { width: 104px; min-height: 140px; }
+.pack-summary { margin: 14px 0 0; text-align: center; color: var(--ink-soft); }
+.pack-buttons { display: grid; gap: 8px; }
 .p-card .card { width: 130px; min-height: 170px; }
 .p-card .card.r-SR { box-shadow: 0 0 14px #c38bff88; border-color: var(--r-sr); }
 .p-card .card.r-UR { box-shadow: 0 0 20px #ffcf5aaa; border-color: var(--r-ur); }
@@ -542,6 +549,9 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
   .b-side { position: static; }
   .table { grid-template-columns: 1fr; }
   .panel { position: static; max-height: none; grid-template-rows: auto 220px auto; }
+  /* 手機：選到東西時，說明與按鈕固定在畫面底部，不用捲到棋盤下面；頁面底下多留空間，棋盤照樣捲得到 */
+  .detail.floating { position: fixed; left: 8px; right: 8px; bottom: 8px; z-index: 9; max-height: 36vh; overflow: auto; border-color: var(--pick); box-shadow: 0 -8px 30px #000c; }
+  body:has(.detail.floating) { padding-bottom: 40vh; }
 }
 @media (max-width: 560px) {
   body { padding-inline: 10px; }

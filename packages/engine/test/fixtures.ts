@@ -203,6 +203,12 @@ export const TEST_CARDS: DeckCardDef[] = [
   creature('ember', [], { rarity: 'N', attack: 1, hp: 4, triggers: [{ when: 'turnEnd', name: 'embers', effects: [{ type: 'damageEnemyCreatures', amount: 1 }] }] }),
   creature('spring', [], { rarity: 'N', attack: 1, hp: 4, triggers: [{ when: 'turnStart', name: 'well', effects: [{ type: 'healHero', amount: 2 }] }] }),
 
+  // 種族相關：同族加成、每當召喚
+  creature('alpha', [], { rarity: 'N', race: 'beast', attack: 2, hp: 4, kin: { race: 'beast', attack: 1 } }),
+  creature('keeper', [], { rarity: 'N', attack: 1, hp: 4, triggers: [{ when: 'allySummoned', race: 'undead', name: 'toll', effects: [{ type: 'draw', count: 1 }] }] }),
+  creature('bone-token', [], { rarity: 'N', race: 'undead', cost: 0, attack: 1, hp: 1, token: true }),
+  { kind: 'spell', id: 'raise', name: 'raise', rarity: 'R', colors: [], cost: 1, target: NONE, effects: [{ type: 'summonToken', token: 'bone-token', count: 2 }] },
+
   // 顏色測試
   creature('red-imp', [hit('x', ANY, 1), hit('y', ANY, 1)], { colors: ['red'] }),
   creature('gold-griffin', [hit('x', ANY, 1), hit('y', ANY, 1)], { colors: ['red', 'green'] }),

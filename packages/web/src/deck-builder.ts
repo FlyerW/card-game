@@ -45,16 +45,20 @@ const keyFor = (accountId: string) => `${STORAGE_KEY}:${accountId}`;
 /** 讀出這個帳號存著的牌組。讀不到（隱私模式、被清掉）就當作沒有；不認得的卡直接拿掉。 */
 export function loadDecks(db: CardDb, accountId: string): Record<string, string[]> {
   try {
-    const raw: unknown = JSON.parse(localStorage.getItem(keyFor(accountId)) ?? '{}');
-    if (typeof raw !== 'object' || raw === null) return {};
-    const decks: Record<string, string[]> = {};
-    for (const [heroId, deck] of Object.entries(raw)) {
-      if (db.heroes.has(heroId) && Array.isArray(deck)) decks[heroId] = deck.filter((id) => typeof id === 'string' && db.cards.has(id));
-    }
-    return decks;
+    return cleanDecks(db, JSON.parse(localStorage.getItem(keyFor(accountId)) ?? '{}'));
   } catch {
     return {};
   }
+}
+
+/** 讀回的牌組：拿掉不存在的英雄與卡（卡牌資料改過之後可能有）。 */
+export function cleanDecks(db: CardDb, raw: unknown): Record<string, string[]> {
+  if (typeof raw !== 'object' || raw === null) return {};
+  const decks: Record<string, string[]> = {};
+  for (const [heroId, deck] of Object.entries(raw)) {
+    if (db.heroes.has(heroId) && Array.isArray(deck)) decks[heroId] = deck.filter((id) => typeof id === 'string' && db.cards.has(id));
+  }
+  return decks;
 }
 
 export function saveDecks(decks: Record<string, string[]>, accountId: string): void {

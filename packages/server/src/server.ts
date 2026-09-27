@@ -1,12 +1,13 @@
 import { readFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
-import { extname, normalize, resolve, sep } from 'node:path';
+import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createEngine, sampleDb } from '@card-game/engine';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { ownershipProblems, ownsHero } from '@card-game/economy';
 import { AccountStore } from './accounts';
 import { handleApi } from './api';
+import { GameLog } from './gamelog';
 import { googleVerifier, type GoogleIdentity } from './google';
 import { Lobby, type Client } from './lobby';
 import type { ClientMessage } from './protocol';
@@ -55,6 +56,7 @@ export async function startServer(options: ServerOptions): Promise<Running> {
   const db = sampleDb();
   const googleClientId = options.googleClientId ?? null;
   const store = await AccountStore.open(options.dataDir ?? null, db);
+  const log = new GameLog(options.dataDir ? join(options.dataDir, 'games.jsonl') : null);
   // 排位賽：用帳號的 session 驗證身分、檢查收藏，結果記進帳號。
   const lobby = new Lobby(createEngine(db), Math.random, Date.now, {
     authenticate: (token) => {
@@ -72,12 +74,13 @@ export async function startServer(options: ServerOptions): Promise<Running> {
       };
     },
     report: (players) => store.recordRanked(players),
-  });
+  }, log);
   const api = {
     store,
     db,
     googleClientId,
     verify: options.verify ?? (googleClientId ? googleVerifier(googleClientId) : null),
+    log,
   };
 
   const server = createServer(async (request, response) => {

@@ -1,8 +1,9 @@
 import { randomInt } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { DEFAULT_RULES, type CardDb } from '@card-game/engine';
-import { exchange, openPack, parseSummary, recordGame } from '@card-game/economy';
+import { exchange, openPacks, PACK_BATCH, parseSummary, recordGame } from '@card-game/economy';
 import { AccountError, accountInfo, serverDay, type Account, type AccountStore } from './accounts';
+import { parseBotRecord, type GameLog } from './gamelog';
 import { TokenError, type GoogleIdentity } from './google';
 
 // 帳號與經濟的 HTTP API，全部在 /api/ 底下，收發 JSON。登入後的請求帶 Authorization: Bearer <token>。
@@ -17,6 +18,8 @@ export interface ApiOptions {
   /** Google 登入用的 OAuth client id；沒設定就不能用 Google 登入。 */
   googleClientId: string | null;
   verify: ((credential: string) => Promise<GoogleIdentity>) | null;
+  /** 對局紀錄；null 就不記。 */
+  log?: GameLog | null;
 }
 
 class HttpError extends Error {
@@ -80,7 +83,7 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
           throw new HttpError(401, error instanceof TokenError ? error.message : 'Google 登入驗證失敗');
         }
         const { token, account } = await store.login(identity);
-        return send(response, 200, { token, account: accountInfo(account), profile: account.profile }), true;
+        return send(response, 200, { token, account: accountInfo(account), profile: account.profile, decks: account.decks ?? {} }), true;
       }
 
       case 'GET /api/me': {
@@ -88,7 +91,7 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
         const rank = store.rankOf(account);
         const seasonReward = account.seasonReward ?? null;
         if (seasonReward) await store.clearSeasonReward(account);
-        return send(response, 200, { account: accountInfo(account), profile: account.profile, rank, seasonReward }), true;
+        return send(response, 200, { account: accountInfo(account), profile: account.profile, rank, seasonReward, decks: account.decks ?? {} }), true;
       }
 
       case 'POST /api/login/password': {
@@ -96,7 +99,7 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
         if (typeof name !== 'string' || typeof password !== 'string' || password.length > 200) throw new HttpError(400, '名字或密碼格式不對');
         try {
           const { token, account } = await store.loginWithPassword(name, password, create === true);
-          return send(response, 200, { token, account: accountInfo(account), profile: account.profile, rank: store.rankOf(account) }), true;
+          return send(response, 200, { token, account: accountInfo(account), profile: account.profile, rank: store.rankOf(account), decks: account.decks ?? {} }), true;
         } catch (error) {
           if (error instanceof AccountError) throw new HttpError(error.status, error.message);
           throw error;
@@ -114,7 +117,9 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
 
       case 'POST /api/pack': {
         const { account } = authed();
-        const opened = openPack(account.profile, db, DEFAULT_RULES, () => randomInt(2 ** 32) / 2 ** 32);
+        const { count = 1 } = await readJson(request);
+        if (count !== 1 && count !== PACK_BATCH) throw new HttpError(400, `一次只能開 1 包或 ${PACK_BATCH} 包`);
+        const opened = openPacks(account.profile, db, DEFAULT_RULES, () => randomInt(2 ** 32) / 2 ** 32, count);
         if (!opened.ok) throw new HttpError(400, opened.reason);
         await store.update(account, opened.profile);
         return send(response, 200, { profile: opened.profile, cards: opened.cards }), true;
@@ -130,10 +135,30 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
         return send(response, 200, { profile: swapped.profile }), true;
       }
 
+      case 'POST /api/decks': {
+        // 自訂牌組：可以是還沒組完的（最多 30 張）；卡要存在、不能是衍生物。收藏夠不夠在開局時才檢查。
+        const { account } = authed();
+        const { heroId, deck } = await readJson(request);
+        if (typeof heroId !== 'string' || !db.heroes.has(heroId)) throw new HttpError(400, '沒有這個英雄');
+        const valid = (id: unknown) => {
+          const card = typeof id === 'string' ? db.cards.get(id) : undefined;
+          return card !== undefined && !(card.kind === 'creature' && card.token);
+        };
+        if (deck !== null && (!Array.isArray(deck) || deck.length > DEFAULT_RULES.deckSize || !deck.every(valid))) {
+          throw new HttpError(400, '牌組格式不對');
+        }
+        await store.saveDeck(account, heroId, deck as string[] | null);
+        return send(response, 200, {}), true;
+      }
+
       case 'POST /api/game': {
         const { account } = authed();
-        const summary = parseSummary((await readJson(request)).summary);
+        const body = await readJson(request);
+        const summary = parseSummary(body.summary);
         if (!summary) throw new HttpError(400, '對局資料格式不對');
+        // 跟電腦打的對局紀錄：格式不對就不記，不影響領獎。
+        const record = options.log ? parseBotRecord(body.record, db, account.id) : null;
+        if (record) void options.log!.add(record).catch((error: unknown) => console.error('對局紀錄寫不進去', error));
         const reward = recordGame(account.profile, summary, serverDay());
         await store.update(account, reward.profile);
         return send(response, 200, reward), true;

@@ -7,6 +7,7 @@ import {
   fullProfile,
   newProfile,
   openPack,
+  openPacks,
   ownsHero,
   ownedDeck,
   ownershipProblems,
@@ -156,6 +157,15 @@ describe('卡包', () => {
     expect(opened.cards).toHaveLength(ECONOMY.packSize);
     expect(opened.profile.gold).toBe(0);
     expect(openPack(opened.profile, db, DEFAULT_RULES, seededRandom(2))).toMatchObject({ ok: false });
+  });
+
+  it('一次開 10 包：金幣要夠付全部，50 張照同樣的規則抽', () => {
+    const rich = { ...fresh(), gold: ECONOMY.packPrice * 10 };
+    const opened = openPacks(rich, db, DEFAULT_RULES, seededRandom(3), 10);
+    if (!opened.ok) throw new Error(opened.reason);
+    expect(opened.cards).toHaveLength(ECONOMY.packSize * 10);
+    expect(opened.profile.gold).toBe(0);
+    expect(openPacks({ ...rich, gold: ECONOMY.packPrice * 10 - 1 }, db, DEFAULT_RULES, seededRandom(3), 10)).toMatchObject({ ok: false });
   });
 
   it('每包至少一張 R 以上；開很多包，各稀有度的比例接近 N 74%、R 20%、SR 5%、UR 1%（保底另外加）', () => {

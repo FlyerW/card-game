@@ -4,6 +4,9 @@
 
 export type Scene = 'menu' | 'battle';
 
+/** 音效：出牌、法術或技能、攻擊、受傷、生物倒下、回復、輪到你、勝利、落敗。 */
+export type Sound = 'card' | 'spell' | 'attack' | 'hit' | 'death' | 'heal' | 'turn' | 'win' | 'lose';
+
 interface Song {
   bpm: number;
   /** 每小節一個和弦（MIDI 音高），四小節一輪。 */
@@ -39,6 +42,8 @@ const SONGS: Record<Scene, Song> = {
 };
 
 const STORAGE_KEY = 'card-game.music';
+const SFX_KEY = 'card-game.sfx';
+const SFX_VOLUME = 0.7;
 const VOLUME = 0.5;
 const STEPS_PER_BAR = 16;
 /** 排程往前看多久（秒）。 */
@@ -46,11 +51,19 @@ const LOOKAHEAD = 0.3;
 
 const freq = (midi: number) => 440 * 2 ** ((midi - 69) / 12);
 
-function loadEnabled(): boolean {
+function loadFlag(key: string): boolean {
   try {
-    return localStorage.getItem(STORAGE_KEY) !== 'off';
+    return localStorage.getItem(key) !== 'off';
   } catch {
     return true;
+  }
+}
+
+function saveFlag(key: string, on: boolean): void {
+  try {
+    localStorage.setItem(key, on ? 'on' : 'off');
+  } catch {
+    // 存不了就只在這次開著的頁面有效。
   }
 }
 
@@ -69,7 +82,9 @@ interface Playing {
 }
 
 class Music {
-  enabled = loadEnabled();
+  enabled = loadFlag(STORAGE_KEY);
+  sfxEnabled = loadFlag(SFX_KEY);
+  private sfx: GainNode | null = null;
   private scene: Scene = 'menu';
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -83,6 +98,7 @@ class Music {
   constructor() {
     // 第一次點擊或按鍵時才建立聲音（瀏覽器的自動播放限制）。每次點擊也順便宣告「現在由這一頁出聲」。
     const unlock = () => {
+      if (this.sfxEnabled && !this.enabled) void this.context()?.resume();
       if (!this.enabled) return;
       this.start();
       this.channel?.postMessage(this.id);
@@ -96,20 +112,41 @@ class Music {
     document.addEventListener('visibilitychange', () => {
       if (!this.ctx) return;
       if (document.hidden) void this.ctx.suspend();
-      else if (this.enabled) void this.ctx.resume();
+      else if (this.enabled || this.sfxEnabled) void this.ctx.resume();
     });
   }
 
   toggle(): boolean {
     this.enabled = !this.enabled;
-    try {
-      localStorage.setItem(STORAGE_KEY, this.enabled ? 'on' : 'off');
-    } catch {
-      // 存不了就只在這次開著的頁面有效。
-    }
+    saveFlag(STORAGE_KEY, this.enabled);
     if (this.enabled) this.start();
     else this.stop();
     return this.enabled;
+  }
+
+  toggleSfx(): boolean {
+    this.sfxEnabled = !this.sfxEnabled;
+    saveFlag(SFX_KEY, this.sfxEnabled);
+    return this.sfxEnabled;
+  }
+
+  /** 播音效，一個接一個錯開一點。音效關著、或這一頁還沒被點過（瀏覽器不讓出聲）就不播。 */
+  effects(sounds: readonly Sound[]): void {
+    if (!this.sfxEnabled || sounds.length === 0) return;
+    const ctx = this.context();
+    if (!ctx || ctx.state !== 'running') return;
+    sounds.forEach((sound, i) => this.effect(sound, ctx.currentTime + 0.02 + i * 0.12));
+  }
+
+  /** 聲音環境：第一次要用時才建立。 */
+  private context(): AudioContext | null {
+    const AudioCtx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return null;
+    if (!this.ctx) {
+      this.ctx = new AudioCtx();
+      this.setup(this.ctx);
+    }
+    return this.ctx;
   }
 
   setScene(scene: Scene): void {
@@ -119,13 +156,9 @@ class Music {
   }
 
   private start(): void {
-    const AudioCtx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioCtx) return;
-    if (!this.ctx) {
-      this.ctx = new AudioCtx();
-      this.setup(this.ctx);
-    }
-    void this.ctx.resume();
+    const ctx = this.context();
+    if (!ctx) return;
+    void ctx.resume();
     if (this.playing?.scene !== this.scene) this.play(this.scene);
     if (this.timer === null) this.timer = window.setInterval(() => this.schedule(), 60);
   }
@@ -142,6 +175,9 @@ class Music {
     this.master.gain.value = VOLUME;
     const compressor = ctx.createDynamicsCompressor();
     this.master.connect(compressor).connect(ctx.destination);
+    this.sfx = ctx.createGain();
+    this.sfx.gain.value = SFX_VOLUME;
+    this.sfx.connect(compressor);
     // 簡單的殘響：衰減的雜訊當脈衝響應。
     const length = Math.floor(ctx.sampleRate * 2.2);
     const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
@@ -339,6 +375,94 @@ class Music {
     source.start(time, Math.random() * 0.5);
     source.stop(time + length + 0.02);
     this.track(p, source);
+  }
+
+  // ─── 音效 ──────────────────────────────────────────────────────────────────
+
+  private effect(sound: Sound, t: number): void {
+    const out = this.sfx!;
+    switch (sound) {
+      case 'card':
+        this.sweep(t, 0.16, 700, 2600, 'bandpass', 0.25, out);
+        this.tone(t + 0.04, 880, 0.18, 'triangle', 0.18, out);
+        return;
+      case 'spell':
+        this.tone(t, 660, 0.3, 'sine', 0.2, out);
+        this.tone(t + 0.07, 990, 0.35, 'sine', 0.16, out);
+        this.tone(t + 0.14, 1320, 0.4, 'sine', 0.1, out);
+        return;
+      case 'attack':
+        this.sweep(t, 0.14, 3000, 600, 'bandpass', 0.35, out);
+        return;
+      case 'hit':
+        this.drop(t, 170, 55, 0.2, 'sine', 0.55, out);
+        this.sweep(t, 0.08, 400, 200, 'lowpass', 0.3, out);
+        return;
+      case 'death':
+        this.drop(t, 320, 70, 0.4, 'sawtooth', 0.12, out);
+        return;
+      case 'heal':
+        [523, 659, 784].forEach((hz, i) => this.tone(t + i * 0.07, hz, 0.3, 'sine', 0.14, out));
+        return;
+      case 'turn':
+        this.tone(t, 784, 0.7, 'sine', 0.18, out);
+        this.tone(t, 1568, 0.4, 'sine', 0.05, out);
+        return;
+      case 'win':
+        [523, 659, 784, 1047].forEach((hz, i) => this.tone(t + i * 0.12, hz, i === 3 ? 0.9 : 0.25, 'triangle', 0.2, out));
+        [523, 659, 784].forEach((hz) => this.tone(t + 0.48, hz, 0.9, 'sine', 0.08, out));
+        return;
+      case 'lose':
+        [440, 349, 294].forEach((hz, i) => this.tone(t + i * 0.2, hz, i === 2 ? 0.9 : 0.3, 'triangle', 0.18, out));
+        return;
+    }
+  }
+
+  private tone(t: number, hz: number, length: number, type: OscillatorType, level: number, out: AudioNode): void {
+    const ctx = this.ctx!;
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.value = hz;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(level, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + length);
+    osc.connect(gain).connect(out);
+    osc.start(t);
+    osc.stop(t + length + 0.05);
+  }
+
+  /** 音高一路往下掉：受傷的悶響、倒下的聲音。 */
+  private drop(t: number, from: number, to: number, length: number, type: OscillatorType, level: number, out: AudioNode): void {
+    const ctx = this.ctx!;
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.setValueAtTime(from, t);
+    osc.frequency.exponentialRampToValueAtTime(to, t + length);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(level, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + length);
+    osc.connect(gain).connect(out);
+    osc.start(t);
+    osc.stop(t + length + 0.05);
+  }
+
+  /** 雜訊掃過一段頻率：出牌的刷聲、攻擊的揮擊聲。 */
+  private sweep(t: number, length: number, from: number, to: number, type: BiquadFilterType, level: number, out: AudioNode): void {
+    const ctx = this.ctx!;
+    const source = ctx.createBufferSource();
+    source.buffer = this.noise;
+    const filter = ctx.createBiquadFilter();
+    filter.type = type;
+    filter.Q.value = 1.2;
+    filter.frequency.setValueAtTime(from, t);
+    filter.frequency.exponentialRampToValueAtTime(to, t + length);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(level, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + length);
+    source.connect(filter).connect(gain).connect(out);
+    source.start(t, Math.random() * 0.5);
+    source.stop(t + length + 0.02);
   }
 }
 

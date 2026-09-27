@@ -51,6 +51,7 @@ import {
   deckIssues,
   deckScreen,
   fillRandom,
+  cleanDecks,
   loadDecks,
   removeOne,
   saveDecks,
@@ -74,10 +75,11 @@ import {
   today,
   type Backend,
   type LeaderboardRow,
+  type BotGameRecord,
   type ServerMe,
   type Session,
 } from './account';
-import { music } from './music';
+import { music, type Sound } from './music';
 import { ONLINE_AVAILABLE, OnlineClient } from './online';
 import { scriptedTurn, startTutorial, STEPS, TUTORIAL_KEY } from './tutorial';
 import { newShop, ownedOf, shopClick, shopScreen, walletBar, type Shop } from './shop';
@@ -132,6 +134,8 @@ interface Saved {
   redraw: number[];
   /** 這局你用的牌組，結算任務（例如用有綠色卡的牌組贏）時看顏色。 */
   gameDeck: string[];
+  /** 跟電腦打的這一局：對手的英雄與牌組、開始的時間，給對局紀錄用。 */
+  botGame: { rival: string; rivalDeck: string[]; startedAt: number } | null;
   /** 這局邊打邊累計的召喚、抽牌、法術。 */
   tally: GameTally;
   /** 這局的獎勵；null 表示還沒結算。 */
@@ -207,6 +211,7 @@ const app: App = {
   roomCode: new URLSearchParams(location.search).get('room')?.toUpperCase() ?? '',
   picks: [],
   gameDeck: [],
+  botGame: null,
   tally: emptyTally(),
   reward: null,
   session: null,
@@ -228,12 +233,13 @@ const app: App = {
 /** 登入成功：記住帳號、換成這個帳號的資料與牌組。伺服器帳號另外帶牌位。 */
 function signIn(session: Session, profile: Profile, me?: ServerMe): void {
   saveSession(session);
+  const backend = backendFor(session, db);
   Object.assign(app, {
     session,
-    backend: backendFor(session, db),
+    backend,
     profile,
     rank: me?.rank ?? null,
-    decks: loadDecks(db, session.account.id),
+    decks: decksFor(session, backend, me),
     loggingIn: false,
     toast: null,
     shop: newShop(),
@@ -334,6 +340,27 @@ function resetGameRecord(deck: string[]): void {
   Object.assign(app, { gameDeck: deck, tally: emptyTally(), reward: null });
 }
 
+/** 跟電腦打的這一局的紀錄；連線對戰由伺服器自己記，這裡不送。 */
+function botRecord(view: PlayerView): BotGameRecord | undefined {
+  const state = app.state;
+  if (app.mode !== 'bot' || !app.botGame || !state?.result) return undefined;
+  const { winner, reason } = state.result;
+  return {
+    hero: state.players[YOU].heroId,
+    heroEvolution: view.you.heroEvolution,
+    deck: app.gameDeck,
+    opponentHero: app.botGame.rival,
+    opponentHeroEvolution: view.opponent.heroEvolution,
+    opponentDeck: app.botGame.rivalDeck,
+    difficulty: app.difficulty,
+    first: state.firstPlayer === YOU,
+    winner: winner === 'draw' ? 'draw' : winner === YOU ? 'you' : 'bot',
+    reason,
+    turns: state.turn,
+    seconds: Math.round((Date.now() - app.botGame.startedAt) / 1000),
+  };
+}
+
 /** 這局已經送去結算了，避免重複。 */
 let settling = false;
 
@@ -345,7 +372,7 @@ function settle(view: PlayerView): void {
   const conceded = reason === 'concede' && winner !== YOU;
   const summary = gameSummary(db, app.tally, app.gameDeck, winner === YOU, conceded);
   settling = true;
-  app.backend.recordGame(app.profile, summary).then(
+  app.backend.recordGame(app.profile, summary, botRecord(view)).then(
     (result) => {
       settling = false;
       app.profile = result.profile;
@@ -592,7 +619,25 @@ function step(before: PlayerView, after: PlayerView, legalActions: Action[], eve
   app.selection = null;
   app.toast = null;
   floats = floatsFrom(events);
+  music.effects(soundsFor(events));
   render();
+}
+
+/** 這一步要播的音效，最多三個，照重要的先。 */
+function soundsFor(events: GameEvent[]): Sound[] {
+  const heard = new Set<Sound>();
+  for (const e of events) {
+    if (e.type === 'gameOver') heard.add(e.result.winner === YOU ? 'win' : 'lose');
+    else if (e.type === 'turnStarted' && e.player === YOU) heard.add('turn');
+    else if (e.type === 'summoned' || e.type === 'evolved' || e.type === 'heroEvolved' || e.type === 'itemAttached' || e.type === 'fieldPlayed') heard.add('card');
+    else if (e.type === 'abilityUsed') heard.add('spell');
+    else if (e.type === 'attacked') heard.add('attack');
+    else if (e.type === 'damaged' && e.amount > 0) heard.add('hit');
+    else if (e.type === 'creatureDestroyed') heard.add('death');
+    else if (e.type === 'healed' && e.amount > 0) heard.add('heal');
+  }
+  const order: Sound[] = ['win', 'lose', 'turn', 'card', 'spell', 'attack', 'hit', 'death', 'heal'];
+  return order.filter((sound) => heard.has(sound)).slice(0, 3);
 }
 
 // ─── 跟電腦打：完整的狀態在這個瀏覽器裡 ───────────────────────────────────────
@@ -742,11 +787,12 @@ function startGame(): void {
   YOU = 0;
   // 雙方都照正式規則組牌；你有自訂牌組就用你的，沒有就用收藏自動組一副。電腦每局從全部的卡自動組一副。
   const deck = myDeck();
+  const rivalDeck = autoDeck(db, rival, seed + 1);
   const created = engine.createGame({
     seed,
     players: [
       { heroId: app.heroId, deck },
-      { heroId: rival, deck: autoDeck(db, rival, seed + 1) },
+      { heroId: rival, deck: rivalDeck },
     ],
   });
   if (!created.ok) {
@@ -758,6 +804,7 @@ function startGame(): void {
   if (!kept.ok) return;
   Object.assign(app, { mode: 'bot', screen: 'play', log: [], redraw: [], selection: null, toast: null, view: null });
   resetGameRecord(deck);
+  app.botGame = { rival, rivalDeck, startedAt: Date.now() };
   localStep(kept.state, []);
 }
 
@@ -1159,7 +1206,7 @@ function overlay(view: PlayerView): string {
       })
       .join('');
     const plate = (id: string, label: string) =>
-      `<div class="vs-hero"><span class="vs-label">${label}</span>${lines(describeHero(hero(id), describeName))}</div>`;
+      `<div class="vs-hero"><span class="vs-label">${label}</span>${lines(describeHero(hero(id), describeName).map((line) => line.replace(/^天生技 /, '')))}</div>`;
     return `<div class="overlay"><div class="dialog" role="dialog" aria-label="起手">
       <h2>起手</h2>
       <p class="d-line">你是<b>${first ? '先攻' : '後攻'}</b>，${first ? '第一回合 1 點能量' : '第一回合 2 點能量'}。先看對手是誰，再決定要不要重抽。</p>
@@ -1209,9 +1256,10 @@ function rewardLines(): string {
   return `<div class="reward">${lines.map((line) => `<p class="d-line">${line}</p>`).join('')}</div>`;
 }
 
-/** 背景音樂的開關。 */
+/** 背景音樂與音效的開關。 */
 const musicButton = () =>
-  `<button class="ghost small" data-do="music" aria-pressed="${music.enabled}">${music.enabled ? '♪ 音樂：開' : '♪ 音樂：關'}</button>`;
+  `<button class="ghost small" data-do="music" aria-pressed="${music.enabled}">${music.enabled ? '♪ 音樂：開' : '♪ 音樂：關'}</button>` +
+  `<button class="ghost small" data-do="sfx" aria-pressed="${music.sfxEnabled}">${music.sfxEnabled ? '音效：開' : '音效：關'}</button>`;
 
 function playScreen(): string {
   const view = app.view!;
@@ -1234,7 +1282,7 @@ function playScreen(): string {
       ${hand(view)}
     </section>
     <aside class="panel">
-      <div class="detail">${detail(view)}</div>
+      <div class="detail${app.selection || app.toast ? ' floating' : ''}">${detail(view)}</div>
       <div class="log-wrap"><p class="log-title">對戰紀錄</p><ol class="log">${log}</ol></div>
       <div class="panel-tools">
         <button class="ghost small" data-do="concede" ${view.phase === 'main' ? '' : 'disabled'}>投降</button>
@@ -1291,15 +1339,16 @@ function loginScreen(): string {
 function setupScreen(): string {
   // 基礎英雄每個人都有；多色的 UR 英雄沒抽到就鎖著，看得到但不能選。
   const heroes = SAMPLE_HEROES.map((h) => {
-    const [head, ...body] = describeHero(h, describeName);
+    // 被動、天生技、可進化各一行；天生技不寫「天生技」三個字，直接寫名字。
+    const [head, ...body] = describeHero(h, describeName).map((line) => line.replace(/^天生技 /, ''));
     const evolution = SAMPLE_CARDS.find((c) => c.kind === 'heroEvolution' && c.evolvesFrom === h.id);
-    if (evolution) body.push(`可進化為 ${evolution.name}（${evolution.cost}）`);
+    const evolves = evolution ? `<span class="hp-line hp-evo">可進化為 ${esc(evolution.name)}（${evolution.cost}）</span>` : '';
     const chosen = h.id === app.heroId;
     const locked = !ownsHero(app.profile, db, h.id);
     return `<button class="hero-pick${chosen ? ' chosen' : ''}${locked ? ' locked' : ''}" data-hero="${h.id}" aria-pressed="${chosen}" ${locked ? 'disabled' : ''}>
       <span class="hp-big">${h.hp}</span><span class="hp-unit">♥${h.rarity ? '<b class="hp-ur">UR</b>' : ''}</span>
       <span class="hp-name">${pips(h.colors)}${esc(h.name)}</span>
-      <span class="hp-text">${rich(body.join('　'))}</span>${locked ? '<span class="hp-lock">還沒有：卡包抽到或用 UR 兌換卷換</span>' : ''}
+      <span class="hp-text">${body.map((line) => `<span class="hp-line">${rich(line)}</span>`).join('')}${evolves}</span>${locked ? '<span class="hp-lock">還沒有：卡包抽到或用 UR 兌換卷換</span>' : ''}
       <span class="sr">${esc(head ?? '')}</span></button>`;
   }).join('');
   const custom = app.decks[app.heroId];
@@ -1572,6 +1621,37 @@ function chooseAbility(acts: Action[], selection: Selection): void {
   }
 }
 
+/** 等一下再送上伺服器的牌組（組牌時每點一下都會改，停下來才送）。 */
+const deckTimers = new Map<string, number>();
+
+/** 存一個英雄的牌組：瀏覽器裡留一份，伺服器帳號另外存上伺服器。 */
+function storeDeck(heroId: string): void {
+  saveDecks(app.decks, app.session!.account.id);
+  const backend = app.backend;
+  if (!backend) return;
+  window.clearTimeout(deckTimers.get(heroId));
+  deckTimers.set(
+    heroId,
+    window.setTimeout(() => {
+      deckTimers.delete(heroId);
+      backend.saveDeck(heroId, app.decks[heroId] ?? null).catch(() => {
+        app.toast = '牌組存不上伺服器，先存在這台裝置上，下次改牌組時會再試一次';
+        render();
+      });
+    }, 800),
+  );
+}
+
+/** 登入時的牌組：測試帳號讀瀏覽器；伺服器帳號用伺服器上的，伺服器上還沒有的話把這台裝置上的搬上去。 */
+function decksFor(session: Session, backend: Backend, me: ServerMe | undefined): Record<string, string[]> {
+  const local = loadDecks(db, session.account.id);
+  if (session.kind === 'test' || !me) return local;
+  const remote = cleanDecks(db, me.decks ?? {});
+  if (Object.keys(remote).length > 0) return remote;
+  for (const [heroId, deck] of Object.entries(local)) backend.saveDeck(heroId, deck).catch(() => undefined);
+  return local;
+}
+
 /** 組牌畫面的點擊。處理了就回傳 true。 */
 function builderClick(el: HTMLElement, command: string | undefined): boolean {
   const { add, remove, focus, filter } = el.dataset;
@@ -1579,7 +1659,7 @@ function builderClick(el: HTMLElement, command: string | undefined): boolean {
   const deck = app.decks[heroId] ?? [];
   const edit = (next: string[]) => {
     app.decks = { ...app.decks, [heroId]: next };
-    saveDecks(app.decks, app.session!.account.id);
+    storeDeck(heroId);
   };
   if (add) {
     if (addProblem(db, deck, add, owned()) === null) edit([...deck, add]);
@@ -1600,7 +1680,7 @@ function builderClick(el: HTMLElement, command: string | undefined): boolean {
   } else if (command === 'deck-forget') {
     const { [heroId]: _, ...rest } = app.decks;
     app.decks = rest;
-    saveDecks(app.decks, app.session!.account.id);
+    storeDeck(heroId);
   } else if (command === 'deck-done') {
     app.screen = 'setup';
     window.scrollTo(0, 0);
@@ -1754,6 +1834,9 @@ root.addEventListener('click', (event) => {
   } else if (command === 'music') {
     music.toggle();
     render();
+  } else if (command === 'sfx') {
+    music.toggleSfx();
+    render();
   } else if (command === 'fullscreen') {
     const request = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
     request.catch(() => {
@@ -1837,6 +1920,7 @@ hot?.snapshot?.(() => ({
   log: app.mode === 'bot' ? app.log : [],
   redraw: app.redraw,
   gameDeck: app.gameDeck,
+  botGame: app.mode === 'bot' ? app.botGame : null,
   tally: app.tally,
   reward: app.reward,
 }));

@@ -38,7 +38,7 @@ export const SAMPLE_HEROES: HeroDef[] = [
     passive: { name: '劍士之道', creatures: { attack: 1 }, ownTurn: { attack: 1 }, pierce: true },
   },
   {
-    kind: 'hero', id: 'deep-seer', name: '深海先知', colors: ['blue'], hp: 44,
+    kind: 'hero', id: 'deep-seer', name: '深海先知', colors: ['blue'], hp: 45,
     power: { name: '預見', cost: 3, target: NONE, effects: [{ type: 'draw', count: 1 }] },
   },
   {
@@ -46,7 +46,7 @@ export const SAMPLE_HEROES: HeroDef[] = [
     power: { name: '蝕心', cost: 5, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
   },
   {
-    kind: 'hero', id: 'flame-lord', name: '烈焰領主', colors: ['red'], hp: 45,
+    kind: 'hero', id: 'flame-lord', name: '烈焰領主', colors: ['red'], hp: 43,
     power: hit('燃燼', 2, ANY, 2),
   },
   {
@@ -62,7 +62,7 @@ export const SAMPLE_HEROES: HeroDef[] = [
   },
   {
     // 潮與影輪流：抽牌用完變成棄牌，棄牌用完又變回抽牌。
-    kind: 'hero', id: 'tide-shadow-twins', name: '潮影雙生', rarity: 'UR', colors: ['blue', 'black'], hp: 35,
+    kind: 'hero', id: 'tide-shadow-twins', name: '潮影雙生', rarity: 'UR', colors: ['blue', 'black'], hp: 38,
     power: { name: '潮之面', cost: 4, target: NONE, effects: [{ type: 'draw', count: 1 }] },
     alternatePower: { name: '影之面', cost: 4, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
   },
@@ -264,11 +264,11 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   { kind: 'spell', id: 'inspiration', name: '靈感', rarity: 'R', colors: ['blue'], cost: 3, target: NONE, effects: [{ type: 'draw', count: 2 }] },
   // 看 4 選 2：跟抽 2 一樣多張，但挑得到想要的，比靈感貴 1 費。
   {
-    kind: 'spell', id: 'tide-divination', name: '潮汐占卜', rarity: 'R', colors: ['blue'], cost: 4,
+    kind: 'spell', id: 'tide-divination', name: '潮汐占卜', rarity: 'R', colors: ['blue'], cost: 3,
     target: NONE, effects: [{ type: 'lookPick', look: 4, pick: 2 }],
   },
-  // 抽 1 張約 1.5 能量，抽 3 ≈ 4.5，取 5 費。
-  { kind: 'spell', id: 'torrent-of-knowledge', name: '知識洪流', rarity: 'R', colors: ['blue'], cost: 5, target: NONE, effects: [{ type: 'draw', count: 3 }] },
+  // 抽 1 張約 1.5 能量，抽 3 ≈ 4.5；藍色整體偏弱，取 4 費。
+  { kind: 'spell', id: 'torrent-of-knowledge', name: '知識洪流', rarity: 'R', colors: ['blue'], cost: 4, target: NONE, effects: [{ type: 'draw', count: 3 }] },
   {
     kind: 'spell', id: 'glacial-rift', name: '冰川裂縫', rarity: 'R', colors: ['blue'], cost: 5,
     target: CREATURE, effects: [{ type: 'damage', amount: 7 }],
@@ -608,6 +608,36 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
     triggers: [{ when: 'turnStart', name: '生命之泉', effects: [{ type: 'healAll', amount: 2 }] }],
   },
 
+  // ── 種族相關：同族加成、每當召喚某種族。讓組牌多一個方向（例如野獸牌組、亡靈牌組） ──
+  {
+    kind: 'creature', id: 'pack-alpha', name: '狼群首領', rarity: 'R', colors: ['green'], race: 'beast',
+    stage: 0, cost: 4, attack: 3, hp: 4, skills: [], kin: { race: 'beast', attack: 1 },
+  },
+  {
+    kind: 'creature', id: 'reef-caller', name: '潮汐喚獸師', rarity: 'R', colors: ['blue'], race: 'human',
+    stage: 0, cost: 3, attack: 2, hp: 3, skills: [],
+    triggers: [{ when: 'allySummoned', race: 'beast', name: '呼喚', effects: [{ type: 'draw', count: 1 }] }],
+  },
+  {
+    kind: 'creature', id: 'gravekeeper', name: '守墓人', rarity: 'R', colors: ['black'], race: 'human',
+    stage: 0, cost: 3, attack: 2, hp: 4, skills: [],
+    triggers: [{ when: 'allySummoned', race: 'undead', name: '送葬', effects: [{ type: 'draw', count: 1 }] }],
+  },
+  {
+    kind: 'creature', id: 'legion-banner', name: '軍團旗手', rarity: 'R', colors: ['white'], race: 'human',
+    stage: 0, cost: 3, attack: 2, hp: 3, skills: [],
+    triggers: [{ when: 'allySummoned', race: 'human', name: '集結', effects: [{ type: 'buff', attack: 1, hp: 1, on: 'self' }] }],
+  },
+  {
+    kind: 'creature', id: 'elemental-lord', name: '元素領主', rarity: 'SR', colors: ['red'], race: 'elemental',
+    stage: 0, cost: 5, attack: 4, hp: 5, skills: [], kin: { race: 'elemental', attack: 1 },
+  },
+  {
+    kind: 'creature', id: 'bloom-fairy', name: '花之精靈', rarity: 'R', colors: ['green'], race: 'plant',
+    stage: 0, cost: 2, attack: 1, hp: 3, skills: [],
+    triggers: [{ when: 'allySummoned', race: 'plant', name: '花開', effects: [{ type: 'healHero', amount: 3 }] }],
+  },
+
   // ── 紅綠 ──
   {
     kind: 'creature', id: 'ancient-dragon', name: '遠古巨龍', rarity: 'UR', colors: ['red', 'green'], race: 'dragon',
@@ -647,6 +677,28 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   // ── 英雄進化：每局限一次，費用約 5–7 ──
   // 像爐石的英雄卡：打出時有進場效果（戰吼），天生技變強或多一個被動。
   {
+    // 翠林聖女原本只有被動；進化後多一個天生技。
+    kind: 'heroEvolution', id: 'grove-goddess', name: '翠林女神', rarity: 'UR', colors: ['white', 'green'],
+    cost: 6, evolvesFrom: 'grove-saint', hpBonus: 10,
+    entry: { name: '萬花齊放', target: NONE, effects: [{ type: 'summonToken', token: 'sprout-token', count: 2 }] },
+    power: { name: '花語', cost: 3, target: NONE, effects: [{ type: 'buff', attack: 0, hp: 2, on: 'all' }, { type: 'healHero', amount: 2 }] },
+  },
+  {
+    kind: 'heroEvolution', id: 'sun-grand-marshal', name: '烈陽大元帥', rarity: 'UR', colors: ['white', 'red'],
+    cost: 6, evolvesFrom: 'sun-marshal', hpBonus: 10,
+    entry: { name: '旭日軍團', target: NONE, effects: [{ type: 'summonToken', token: 'sun-rider-token', count: 1 }] },
+    power: {
+      name: '全軍突擊', cost: 4, target: NONE,
+      effects: [{ type: 'summonToken', token: 'sun-rider-token', count: 1 }, { type: 'buff', attack: 1, hp: 0, on: 'all' }],
+    },
+  },
+  {
+    kind: 'heroEvolution', id: 'prism-archsage', name: '虹光大賢者', rarity: 'UR', colors: ['white', 'blue', 'black', 'red', 'green'],
+    cost: 6, evolvesFrom: 'prism-sage', hpBonus: 8,
+    entry: { name: '七彩降臨', target: NONE, effects: [{ type: 'buff', attack: 1, hp: 1, on: 'all' }] },
+    power: { name: '虹光', cost: 4, target: NONE, effects: [{ type: 'buff', attack: 1, hp: 1, on: 'all' }, { type: 'draw', count: 1 }] },
+  },
+  {
     kind: 'heroEvolution', id: 'flame-sovereign', name: '烈焰君王', rarity: 'UR', colors: ['red'],
     cost: 6, evolvesFrom: 'flame-lord', hpBonus: 9,
     entry: { name: '焚城', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] },
@@ -666,7 +718,7 @@ export const SAMPLE_CARDS: DeckCardDef[] = [
   },
   {
     kind: 'heroEvolution', id: 'abyssal-sage', name: '深淵大賢者', rarity: 'UR', colors: ['blue'],
-    cost: 6, evolvesFrom: 'deep-seer', hpBonus: 10,
+    cost: 5, evolvesFrom: 'deep-seer', hpBonus: 10,
     entry: { name: '知識之潮', target: NONE, effects: [{ type: 'draw', count: 2 }] },
     power: { name: '洞見', cost: 2, target: NONE, effects: [{ type: 'draw', count: 1 }] },
   },

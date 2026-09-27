@@ -68,6 +68,7 @@ export const KEYWORDS: Record<string, string> = {
   回合開始: '在場上時，你的每個回合開始時發動（抽牌之後）',
   回合結束: '在場上時，你的每個回合結束時發動',
   每當回復: '在場上時，每當你的英雄回復 ♥ 就發動',
+  每當召喚: '在場上時，每當你召喚後面寫的那種族的生物（衍生物也算，不含牠自己）就發動',
   挑釁: '對手下回合打得到牠的攻擊與單體技能，都必須先打牠',
   中毒: '施放者的每個回合結束時失去 N♥（不算傷害，減傷擋不住；再中一次相加）',
   灼燒: '施放者的每個回合結束時受到 N 傷害（再中一次取大的）',
@@ -220,11 +221,13 @@ export const describeDeath = (death: DeathEffect, names: Names = ids): string =>
   `${keyword('遺言')} ${death.name}：${death.effects.map((effect) => describeEffect(effect, names)).join('，')}`;
 
 /** 持續效果的關鍵字。 */
-const TRIGGER_NAMES: Record<TriggerWhen, string> = { turnStart: '回合開始', turnEnd: '回合結束', heroHealed: '每當回復' };
+const TRIGGER_NAMES: Record<TriggerWhen, string> = { turnStart: '回合開始', turnEnd: '回合結束', heroHealed: '每當回復', allySummoned: '每當召喚' };
 
-/** 持續效果：「**回合結束** 觀星：抽 1 張牌」。 */
+/** 持續效果：「**回合結束** 觀星：抽 1 張牌」「**每當召喚**亡靈 守墓：抽 1 張牌」。 */
 export const describeTrigger = (trigger: TriggeredEffect, names: Names = ids): string =>
-  `${keyword(TRIGGER_NAMES[trigger.when])} ${trigger.name}：${trigger.effects.map((effect) => describeEffect(effect, names)).join('，')}`;
+  `${keyword(TRIGGER_NAMES[trigger.when])}${trigger.race ? RACE_NAMES[trigger.race] : ''} ${trigger.name}：${trigger.effects
+    .map((effect) => describeEffect(effect, names))
+    .join('，')}`;
 
 /** 種族特色與關鍵字放在同一行：「**同袍 2**、**速攻**、**吸血**」。 */
 function describeTraits(card: CreatureDef): string[] {
@@ -287,6 +290,7 @@ export function describeCard(card: DeckCardDef, names: Names = ids): string[] {
       const entry = card.entry ? [describeEntry(card.entry, names)] : [];
       const death = card.death ? [describeDeath(card.death, names)] : [];
       const triggers = (card.triggers ?? []).map((trigger) => describeTrigger(trigger, names));
+      if (card.kin) triggers.unshift(`我方每有另一隻${RACE_NAMES[card.kin.race]}，牠 ⚔ +${card.kin.attack}`);
       const skills = card.skills.map((skill) => describeAbility(skill, names));
       return [
         `${card.name}　${tag}${race}・${stage}｜${cost}｜⚔ ${card.attack}｜♥ ${card.hp}`,

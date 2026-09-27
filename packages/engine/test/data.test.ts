@@ -105,10 +105,11 @@ describe('範例卡池', () => {
     }
   });
 
-  it('技能數照稀有度：N 沒有、R 與 SR 一個、UR 兩個（持續效果算一個技能）', () => {
+  it('技能數照稀有度：N 沒有、R 與 SR 一個、UR 兩個（持續效果、同族加成算一個技能）', () => {
     const expected = { N: 0, R: 1, SR: 1, UR: 2 } as const;
     for (const card of sample.cards.values()) {
-      if (card.kind === 'creature') expect(card.skills.length + (card.triggers?.length ?? 0), card.name).toBe(expected[card.rarity]);
+      if (card.kind !== 'creature') continue;
+      expect(card.skills.length + (card.triggers?.length ?? 0) + (card.kin ? 1 : 0), card.name).toBe(expected[card.rarity]);
     }
   });
 
@@ -117,7 +118,7 @@ describe('範例卡池', () => {
     // 有進場效果、關鍵字、再生、持續效果或遺言的生物，數值本來就扣過，不拿來比。
     const creatures = [...sample.cards.values()].filter(
       (card) =>
-        card.kind === 'creature' && card.stage === 0 && !card.entry && !card.keywords && !card.regenerate && !card.triggers && !card.death,
+        card.kind === 'creature' && card.stage === 0 && !card.entry && !card.keywords && !card.regenerate && !card.triggers && !card.death && !card.kin,
     );
     for (const plain of creatures.filter((card) => card.colors.length === 0)) {
       const rivals = creatures.filter((card) => card.colors.length > 0 && card.cost === plain.cost && card.rarity === plain.rarity);

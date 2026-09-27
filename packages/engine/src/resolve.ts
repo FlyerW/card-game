@@ -232,17 +232,18 @@ export function healHero(ctx: Ctx, player: PlayerId, amount: number): void {
 
 /**
  * 發動 player 場上生物的持續效果（when 這一種），由左到右。沉默中的不發動；
- * 前面的效果打死了後面的生物，牠就不發動。
+ * 前面的效果打死了後面的生物，牠就不發動。summoned：allySummoned 時剛召喚的那隻（牠自己不算）。
  */
-export function fireTriggers(ctx: Ctx, player: PlayerId, when: TriggerWhen): void {
+export function fireTriggers(ctx: Ctx, player: PlayerId, when: TriggerWhen, summoned: Creature | null = null): void {
   const { db, state } = ctx;
   const present = [...state.players[player].zones];
   present.forEach((was, zone) => {
-    if (was === null) return;
+    if (was === null || was.uid === summoned?.uid) return;
     for (const trigger of creatureDef(db, was).triggers ?? []) {
       const creature = state.players[player].zones[zone];
       if (state.phase === 'over' || creature?.uid !== was.uid || isSilenced(state, creature)) return;
       if (trigger.when !== when) continue;
+      if (summoned && trigger.race !== undefined && creatureDef(db, summoned).race !== trigger.race) continue;
       ctx.events.push({ type: 'triggered', player, zone, cardId: currentCardId(creature), name: trigger.name });
       resolveAbility(ctx, trigger, { kind: 'creature', player, zone }, null);
     }
@@ -486,6 +487,7 @@ function applyEffect(
         const uid = state.nextUid++;
         player.zones[zone] = newCreature(uid, me, effect.token, state.turn);
         ctx.events.push({ type: 'summoned', player: me, zone, cardId: effect.token });
+        fireTriggers(ctx, me, 'allySummoned', player.zones[zone]!);
       }
       return;
 

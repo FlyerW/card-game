@@ -12,7 +12,7 @@ import {
   type HeroDef,
   type Rarity,
 } from '@card-game/engine';
-import { ECONOMY, packItems, questDef, type PackCard, type PackItem, type Profile } from '@card-game/economy';
+import { ECONOMY, PACK_BATCH, packItems, questDef, type PackCard, type PackItem, type Profile } from '@card-game/economy';
 import type { Backend } from './account';
 import { cardFace, detailLines, esc, pips } from './ui';
 
@@ -90,7 +90,11 @@ const RARITY_ORDER = (x: Collectible, y: Collectible) =>
 /** 卡面：跟牌桌同一套；UR 英雄沒有費用，寫 HP。 */
 const itemFace = (def: DeckCardDef | HeroDef, attrs: string): string => cardFace(def, { attrs });
 
-function packRow(db: CardDb, profile: Profile, opened: PackCard[], dealing: boolean): string {
+function packRow(db: CardDb, profile: Profile, unsorted: PackCard[], dealing: boolean): string {
+  // 開很多包時照稀有度排（UR 在前），發牌動畫也快一點，上面先寫一行總結。
+  const many = unsorted.length > ECONOMY.packSize;
+  const order = ['UR', 'SR', 'R', 'N'];
+  const opened = many ? [...unsorted].sort((x, y) => order.indexOf(x.rarity) - order.indexOf(y.rarity)) : unsorted;
   const cards = opened
     .map((got, i) => {
       const card = got.hero ? db.heroes.get(got.cardId)! : db.cards.get(got.cardId)!;
@@ -98,12 +102,17 @@ function packRow(db: CardDb, profile: Profile, opened: PackCard[], dealing: bool
       const later = opened.filter((other, j) => j > i && other.cardId === got.cardId && !other.duplicate).length;
       const nth = (profile.collection[got.cardId] ?? 0) - later;
       const label = got.duplicate
-        ? `<span class="p-tag dup">重複 → ${got.rarity} 兌換卷 +1</span>`
+        ? `<span class="p-tag dup">${many ? `${got.rarity} 卷 +1` : `重複 → ${got.rarity} 兌換卷 +1`}</span>`
         : `<span class="p-tag new">${got.hero ? '新英雄' : nth === 1 ? '新卡' : `第 ${nth} 張`}</span>`;
       return `<div class="p-card" style="--i:${i}">${itemFace(card, `data-focus="${card.id}" aria-label="${esc(card.name)}，看說明"`)}${label}</div>`;
     })
     .join('');
-  return `<div class="pack-row${dealing ? ' deal' : ''}" aria-label="剛開的卡包">${cards}</div>`;
+  const summary = many
+    ? `<p class="pack-summary">${opened.length / ECONOMY.packSize} 包、${opened.length} 張：${order
+        .map((rarity) => `${rarity} ${opened.filter((got) => got.rarity === rarity).length}`)
+        .join('、')}；新卡 ${opened.filter((got) => !got.duplicate).length} 張，兌換卷 +${opened.filter((got) => got.duplicate).length}</p>`
+    : '';
+  return `${summary}<div class="pack-row${dealing ? ' deal' : ''}${many ? ' many' : ''}" aria-label="剛開的卡包">${cards}</div>`;
 }
 
 export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: string | null): string {
@@ -157,6 +166,7 @@ export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: stri
   }
 
   const canBuy = profile.gold >= ECONOMY.packPrice;
+  const canBuyBatch = profile.gold >= ECONOMY.packPrice * PACK_BATCH;
   const vouchers = RARITIES.map((r) => `<span class="voucher r-${r}"><span class="rarity">${r}</span> <b>${profile.vouchers[r]}</b></span>`).join('');
   const { UR, SR, R } = ECONOMY.odds;
   const pct = (p: number) => `${Math.round(p * 100)}%`;
@@ -174,7 +184,10 @@ export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: stri
           UR 也可能開到多色的 UR 英雄。已經有 ${DEFAULT_RULES.maxCopies} 張（UR ${DEFAULT_RULES.maxUrCopies} 張、英雄 1 個）的再開到，換成一張同稀有度的兌換卷。</p>
         <p class="vouchers"><span class="w-label">兌換卷</span>${vouchers}</p>
       </div>
-      <button class="primary big" data-do="open-pack" ${canBuy && !shop.busy ? '' : 'disabled'}>${shop.busy ? '開卡包中……' : canBuy ? '開一包' : `金幣不夠（${profile.gold}/${ECONOMY.packPrice}）`}</button>
+      <div class="pack-buttons">
+        <button class="primary big" data-do="open-pack" ${canBuy && !shop.busy ? '' : 'disabled'}>${shop.busy ? '開卡包中……' : canBuy ? '開一包' : `金幣不夠（${profile.gold}/${ECONOMY.packPrice}）`}</button>
+        <button class="ghost big" data-do="open-packs" ${canBuyBatch && !shop.busy ? '' : 'disabled'}>開 ${PACK_BATCH} 包（${ECONOMY.packPrice * PACK_BATCH} 金幣）</button>
+      </div>
     </section>
     ${toast ? `<p class="toast" role="alert">${esc(toast)}</p>` : ''}
     ${shop.notice ? `<p class="notice" role="status">${esc(shop.notice)}</p>` : ''}
@@ -221,14 +234,14 @@ export function shopClick(
     host.shop.color = color as ColorFilter;
   } else if (missing) {
     host.shop.missing = missing === 'true';
-  } else if ((command === 'open-pack' || exchangeId) && !host.shop.busy) {
+  } else if ((command === 'open-pack' || command === 'open-packs' || exchangeId) && !host.shop.busy) {
     host.shop.busy = true;
     const done = () => {
       host.shop.busy = false;
       rerender();
     };
-    if (command === 'open-pack') {
-      void backend.openPack(host.profile).then((opened) => {
+    if (command === 'open-pack' || command === 'open-packs') {
+      void backend.openPack(host.profile, command === 'open-packs' ? PACK_BATCH : 1).then((opened) => {
         if (opened.ok) {
           host.profile = opened.profile;
           host.shop.opened = opened.cards;

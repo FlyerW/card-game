@@ -293,6 +293,30 @@ export function openPack(profile: Profile, db: CardDb, rules: Rules, random: () 
   return { ok: true, profile: next, cards };
 }
 
+/** 一次開好幾包（例如 10 包）：金幣要夠付全部才開，一包一包照同樣的規則抽。 */
+export function openPacks(
+  profile: Profile,
+  db: CardDb,
+  rules: Rules,
+  random: () => number,
+  count: number,
+): EconomyResult<{ profile: Profile; cards: PackCard[] }> {
+  const price = ECONOMY.packPrice * count;
+  if (profile.gold < price) return { ok: false, reason: `金幣不夠：${count} 包 ${price}，目前 ${profile.gold}` };
+  let current = profile;
+  const cards: PackCard[] = [];
+  for (let i = 0; i < count; i++) {
+    const opened = openPack(current, db, rules, random);
+    if (!opened.ok) return opened;
+    current = opened.profile;
+    cards.push(...opened.cards);
+  }
+  return { ok: true, profile: current, cards };
+}
+
+/** 一次最多開幾包。 */
+export const PACK_BATCH = 10;
+
 /** 用 3 張同稀有度的兌換卷換一張卡（或一個 UR 英雄）；已經有滿的不能換。 */
 export function exchange(profile: Profile, db: CardDb, rules: Rules, cardId: string): EconomyResult<{ profile: Profile }> {
   const card = packItems(db, rules).find((each) => each.id === cardId);

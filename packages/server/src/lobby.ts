@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { DEFAULT_RULES, eventsFor, validateDeck, type Engine, type GameEvent, type GameState, type PlayerId } from '@card-game/engine';
 import { emptyTally, gameSummary, tallyEvents, type GameSummary, type GameTally } from '@card-game/economy';
+import { recordFromState, type GameLog } from './gamelog';
 import { CODE_ALPHABET, CODE_LENGTH, type ClientMessage, type RankedReport, type SeatInfo, type ServerMessage } from './protocol';
 
 // 房間與對局。不碰網路：一條連線就是一個能收訊息的 Client，方便測試。
@@ -47,6 +48,9 @@ interface Room {
   idleSince: number | null;
   /** 排位賽：雙方的帳號、邊打邊累計的數字、結果記過了沒。 */
   ranked: { accounts: [string, string]; tallies: [GameTally, GameTally]; reported: boolean } | null;
+  /** 這局什麼時候開始、記進對局紀錄了沒。 */
+  startedAt: number;
+  logged: boolean;
 }
 
 interface QueueEntry {
@@ -82,6 +86,7 @@ export class Lobby {
     private readonly random: () => number = Math.random,
     private readonly now: () => number = Date.now,
     private readonly ranked: RankedHooks | null = null,
+    private readonly log: GameLog | null = null,
   ) {}
 
   get queueSize(): number {
@@ -169,7 +174,7 @@ export class Lobby {
     const seat = this.newSeat(client, message.name, message.heroId, message.deck);
     if (seat === null) return;
     this.leave(client);
-    const room: Room = { code: this.newCode(), seats: [seat, null], state: null, rematch: [false, false], idleSince: null, ranked: null };
+    const room: Room = { code: this.newCode(), seats: [seat, null], state: null, rematch: [false, false], idleSince: null, ranked: null, startedAt: 0, logged: false };
     this.rooms.set(room.code, room);
     this.where.set(client, { room, seat: 0 });
     this.broadcastRoom(room);
@@ -265,16 +270,38 @@ export class Lobby {
     }
     room.state = created.state;
     room.rematch = [false, false];
+    room.startedAt = this.now();
+    room.logged = false;
     this.broadcastRoom(room);
     this.broadcastState(room, []);
   }
 
   private broadcastState(room: Room, events: GameEvent[]): void {
     for (const seat of [0, 1] as const) this.sendState(room, seat, events);
+    if (room.state?.phase === 'over' && !room.logged) this.logGame(room);
     if (room.ranked) {
       room.ranked.tallies = [tallyEvents(room.ranked.tallies[0], events, 0), tallyEvents(room.ranked.tallies[1], events, 1)];
       if (room.state?.phase === 'over' && !room.ranked.reported) void this.reportRanked(room);
     }
+  }
+
+  /** 對局結束：記進對局紀錄（友誼賽與排位賽都記）。 */
+  private logGame(room: Room): void {
+    room.logged = true;
+    const [a, b] = room.seats;
+    if (!this.log || !room.state || !a || !b) return;
+    const accounts = room.ranked?.accounts ?? [null, null];
+    const record = recordFromState(
+      room.state,
+      room.ranked ? 'ranked' : 'friendly',
+      [
+        { heroId: a.heroId, deck: a.deck, account: accounts[0] },
+        { heroId: b.heroId, deck: b.deck, account: accounts[1] },
+      ],
+      (this.now() - room.startedAt) / 1000,
+      new Date(this.now()),
+    );
+    if (record) void this.log.add(record).catch((error: unknown) => console.error('對局紀錄寫不進去', error));
   }
 
   /** 排位賽結束：由伺服器上的對局決定勝負，記進雙方的帳號，再把結果送給雙方。平手不算。 */
@@ -356,6 +383,8 @@ export class Lobby {
       rematch: [false, false],
       idleSince: null,
       ranked: { accounts: [a.accountId, b.accountId], tallies: [emptyTally(), emptyTally()], reported: false },
+      startedAt: 0,
+      logged: false,
     };
     this.rooms.set(room.code, room);
     this.where.set(a.client, { room, seat: 0 });

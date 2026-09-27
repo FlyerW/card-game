@@ -38,6 +38,8 @@ export interface Account {
   seasonReward?: { season: string; best: number; gold: number };
   /** 名字＋密碼帳號的密碼（scrypt 雜湊）；Google 帳號沒有。舊的訪客帳號也沒有，第一次用名字登入時設定。 */
   password?: { salt: string; hash: string };
+  /** 自訂牌組：英雄 id → 卡牌 id。存在伺服器上，換裝置也在。 */
+  decks?: Record<string, string[]>;
   createdAt: string;
 }
 
@@ -303,6 +305,13 @@ export class AccountStore {
 
   async logout(token: string): Promise<void> {
     delete this.data.sessions[hash(token)];
+    await this.save();
+  }
+
+  /** 存一個英雄的自訂牌組；deck 是 null 就刪掉。 */
+  async saveDeck(account: Account, heroId: string, deck: string[] | null): Promise<void> {
+    const { [heroId]: _, ...rest } = account.decks ?? {};
+    account.decks = deck === null ? rest : { ...rest, [heroId]: [...deck] };
     await this.save();
   }
 

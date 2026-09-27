@@ -114,7 +114,9 @@ function checkCard(
       if (card.death) problems.push(...checkAbility({ ...card.death, cost: 0, target: { kind: 'none' } }, `${where}的遺言`, false));
       for (const trigger of card.triggers ?? []) {
         problems.push(...checkAbility({ ...trigger, cost: 0, target: { kind: 'none' } }, `${where}的持續效果`, true));
+        if ((trigger.when === 'allySummoned') !== (trigger.race !== undefined)) problems.push(`${where}「${trigger.name}」：只有「每當召喚」要寫種族`);
       }
+      if (card.kin && (!Number.isInteger(card.kin.attack) || card.kin.attack <= 0)) problems.push(`${where}：同族加成必須是正整數`);
       if ((card.stage as number) > 1) problems.push(`${where}：最多進化一次，stage 只能是 0 或 1`);
       if (card.stage === 0 && card.evolvesFrom !== undefined) {
         problems.push(`${where}：基礎生物不能有進化來源`);

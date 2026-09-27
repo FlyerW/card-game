@@ -2,7 +2,7 @@ import { DEFAULT_RULES, type CardDb } from '@card-game/engine';
 import {
   exchange,
   fullProfile,
-  openPack,
+  openPacks,
   parseProfile,
   recordGame,
   refreshDay,
@@ -45,6 +45,24 @@ export interface ServerMe {
   rank: RankState;
   /** 換季發的獎勵，只會出現一次。 */
   seasonReward?: { season: string; best: number; gold: number } | null;
+  /** 存在伺服器上的自訂牌組。 */
+  decks?: Record<string, string[]>;
+}
+
+/** 跟電腦打的一局，給伺服器的對局紀錄（之後用來調平衡）。 */
+export interface BotGameRecord {
+  hero: string;
+  heroEvolution: string | null;
+  deck: string[];
+  opponentHero: string;
+  opponentHeroEvolution: string | null;
+  opponentDeck: string[];
+  difficulty: 'normal' | 'hard';
+  first: boolean;
+  winner: 'you' | 'bot' | 'draw';
+  reason: string;
+  turns: number;
+  seconds: number;
 }
 
 const TEST_ACCOUNT: AccountInfo = { id: 'test', name: '測試帳號', email: null, picture: null };
@@ -178,9 +196,13 @@ export async function logout(session: Session): Promise<void> {
 // ─── 金幣與卡包：測試帳號在瀏覽器裡算，Google 帳號交給伺服器 ─────────────────
 
 export interface Backend {
-  openPack(profile: Profile): Promise<EconomyResult<{ profile: Profile; cards: PackCard[] }>>;
+  /** 開 count 包（1 或 10）。 */
+  openPack(profile: Profile, count: number): Promise<EconomyResult<{ profile: Profile; cards: PackCard[] }>>;
   exchange(profile: Profile, cardId: string): Promise<EconomyResult<{ profile: Profile }>>;
-  recordGame(profile: Profile, summary: GameSummary): Promise<GameReward>;
+  /** record：跟電腦打的才有，伺服器帳號會記進對局紀錄。 */
+  recordGame(profile: Profile, summary: GameSummary, record?: BotGameRecord): Promise<GameReward>;
+  /** 存一個英雄的自訂牌組（null 是刪掉）。測試帳號存在瀏覽器裡，這裡不用做事。 */
+  saveDeck(heroId: string, deck: string[] | null): Promise<void>;
 }
 
 const failed = (error: unknown): { ok: false; reason: string } => ({
@@ -195,20 +217,21 @@ export function backendFor(session: Session, db: CardDb): Backend {
       return result;
     };
     return {
-      openPack: async (profile) => saved(openPack(refreshDay(profile, today()), db, DEFAULT_RULES, Math.random)),
+      openPack: async (profile, count) => saved(openPacks(refreshDay(profile, today()), db, DEFAULT_RULES, Math.random, count)),
       exchange: async (profile, cardId) => saved(exchange(profile, db, DEFAULT_RULES, cardId)),
       recordGame: async (profile, summary) => {
         const reward = recordGame(profile, summary, today());
         saveTestProfile(reward.profile);
         return reward;
       },
+      saveDeck: async () => undefined,
     };
   }
   const { token } = session;
   return {
-    openPack: async () => {
+    openPack: async (_profile, count) => {
       try {
-        return { ok: true, ...(await api<{ profile: Profile; cards: PackCard[] }>('/api/pack', token, {})) };
+        return { ok: true, ...(await api<{ profile: Profile; cards: PackCard[] }>('/api/pack', token, { count })) };
       } catch (error) {
         return failed(error);
       }
@@ -220,7 +243,10 @@ export function backendFor(session: Session, db: CardDb): Backend {
         return failed(error);
       }
     },
-    recordGame: (_profile, summary) => api<GameReward>('/api/game', token, { summary }),
+    recordGame: (_profile, summary, record) => api<GameReward>('/api/game', token, { summary, record }),
+    saveDeck: async (heroId, deck) => {
+      await api('/api/decks', token, { heroId, deck });
+    },
   };
 }
 

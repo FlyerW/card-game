@@ -22,9 +22,10 @@
 - [ ] 網頁客戶端
 - [x] 排位賽：配對、牌位（銅牌到大師）、賽季與排行榜，結果由伺服器決定
 - [x] 新手教學（11 步的引導對局）、電腦難度（普通／困難）
-- [ ] 牌組存到伺服器（目前存在瀏覽器裡）
+- [x] 牌組存到伺服器（伺服器帳號；測試帳號存在瀏覽器）
+- [x] 對局紀錄：每一局記進 `data/games.jsonl`，`npm run game-stats` 看真人對局的英雄與卡牌勝率
 - [x] 卡牌插圖：AI 畫的試玩用插圖（`python3 packages/web/scripts/art.py`，見 [docs/art.md](docs/art.md)）
-- [x] 背景音樂：瀏覽器即時合成（[`packages/web/src/music.ts`](packages/web/src/music.ts)），選單與對戰各一首，可以關掉
+- [x] 背景音樂與音效：瀏覽器即時合成（[`packages/web/src/music.ts`](packages/web/src/music.ts)），各有開關
 
 範例卡牌見 [docs/cards.md](docs/cards.md)。
 
@@ -39,6 +40,7 @@ npm run typecheck   # 型別檢查
 npm run cards       # 從卡牌資料重新產生 docs/cards.md
 npm run sim         # 平衡模擬，16 個 worker 約 8 分鐘（核心少會久很多）；結果寫到 docs/balance-results.md
 npm run sim -- --games 200   # 快速試跑
+npm run game-stats            # 真人對局的數據（讀 data/games.jsonl）
 BOT=hard npm run sim -- --games 100   # 用困難電腦（比較準，但慢 20 多倍）
 npm run dev         # 網頁試玩版的開發伺服器，改程式碼會即時更新
 npm run build:web   # 打包網頁版；dist/artifact.html 是可以直接發布的單一檔案

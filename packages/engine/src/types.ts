@@ -180,19 +180,23 @@ export interface CreatureDef extends CardBase {
   death?: DeathEffect;
   /** 持續效果：在場上時，每當條件成立就發動。 */
   triggers?: TriggeredEffect[];
+  /** 同族加成：我方場上每有另一隻這個種族的生物，⚔ +attack。沉默中失效。 */
+  kin?: { race: Race; attack: number };
 }
 
 /**
- * 持續效果什麼時候發動：擁有者的回合開始（抽牌、再生之後）、回合結束（中毒與灼燒之前），
- * 或每當擁有者的英雄回復 HP。
+ * 持續效果什麼時候發動：擁有者的回合開始（抽牌、再生之後）、回合結束（中毒與灼燒之前）、
+ * 每當擁有者的英雄回復 HP，或每當擁有者召喚一隻 race 種族的生物（衍生物也算，不含牠自己）。
  */
-export type TriggerWhen = 'turnStart' | 'turnEnd' | 'heroHealed';
+export type TriggerWhen = 'turnStart' | 'turnEnd' | 'heroHealed' | 'allySummoned';
 
 /** 持續效果：不選目標、不花能量；沉默中不發動。 */
 export interface TriggeredEffect {
   when: TriggerWhen;
   name: string;
   effects: Effect[];
+  /** allySummoned 才用：召喚哪個種族時發動。 */
+  race?: Race;
 }
 
 /** 遺言：名字加上不選目標的效果。 */

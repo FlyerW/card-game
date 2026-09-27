@@ -124,9 +124,23 @@ function comradeBonus(db: CardDb, state: GameState, creature: Creature): number 
   return others ? level : 0;
 }
 
-/** 攻擊力加成：攻擊指示物、道具、場地卡、英雄被動與種族特色。 */
+/** 同族加成：我方場上每有另一隻那個種族的生物，⚔ +N。沉默中失效。 */
+function kinBonus(db: CardDb, state: GameState, creature: Creature): number {
+  const kin = creatureDef(db, creature).kin;
+  if (!kin || isSilenced(state, creature)) return 0;
+  const others = state.players[creature.owner].zones.filter(
+    (other) => other !== null && other.uid !== creature.uid && creatureDef(db, other).race === kin.race,
+  ).length;
+  return others * kin.attack;
+}
+
+/** 攻擊力加成：攻擊指示物、道具、場地卡、英雄被動、種族特色與同族加成。 */
 export const attackBonus = (db: CardDb, state: GameState, creature: Creature): number =>
-  creature.attackCounters + (itemDef(db, creature)?.attack ?? 0) + aura(db, state, creature.owner).attack + comradeBonus(db, state, creature);
+  creature.attackCounters +
+  (itemDef(db, creature)?.attack ?? 0) +
+  aura(db, state, creature.owner).attack +
+  comradeBonus(db, state, creature) +
+  kinBonus(db, state, creature);
 
 /** 目前的攻擊力：卡上的攻擊力加上加成。 */
 export const attackPower = (db: CardDb, state: GameState, creature: Creature): number =>
