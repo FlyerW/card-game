@@ -366,6 +366,13 @@ describe('牌組清單', () => {
     expect(putDeck(book, { id: 'onemore', name: 'x', heroId: 'flame-lord', cards: [] })).toBeNull();
     expect(cleanDeck(db, { id: 'abcd1', name: '很'.repeat(50), heroId: 'flame-lord', cards: [] })!.name).toHaveLength(DECK_NAME_LIMIT);
   });
+
+  it('卡背跟著牌組存；格式怪的卡背拿掉（用預設的）', () => {
+    const base = { id: 'abcd1', name: 'x', heroId: 'flame-lord', cards: [] };
+    expect(cleanDeck(db, { ...base, back: 'ember' })!.back).toBe('ember');
+    expect(cleanDeck(db, { ...base, back: '<script>' })!.back).toBeUndefined();
+    expect(cleanDeck(db, base)!).not.toHaveProperty('back');
+  });
 });
 
 describe('卡包系列', () => {

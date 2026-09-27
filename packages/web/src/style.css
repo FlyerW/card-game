@@ -581,6 +581,10 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 }
 @media (max-width: 560px) {
   .hp-art { height: 92px; }
+  /* 手機的牌庫格子窄：只畫卡背，張數疊在卡背下方 */
+  .pile.deck-pile { position: relative; grid-template-columns: auto; padding: 2px 4px 4px 2px; }
+  .deck-pile > span:not(.card-back) { display: none; }
+  .deck-pile > b { position: absolute; left: 0; right: 0; bottom: 1px; text-align: center; font-size: 13px; color: #fff; text-shadow: 0 0 3px #000, 0 1px 2px #000, 0 0 6px #000; }
   .hp-big { font-size: 28px; }
   body { padding-inline: 10px; }
   .board { padding: 8px; gap: 6px; border-radius: 12px; }
@@ -663,3 +667,45 @@ button.deck-item { border: 1px solid var(--mat-edge); }
 .d-kw { margin: 6px 0 0; padding: 6px 0 0; list-style: none; border-top: 1px solid var(--mat-edge); font-size: 12px; line-height: 1.5; opacity: .8; }
 .d-kw li { margin: 2px 0; }
 .d-line b, .d-kw b, .tags b, .hero-info b, .hp-text b, .skill-text b { font-weight: 700; color: var(--ink); }
+
+/* 卡背：底色、菱格紋、雙層金邊、中間徽記；每一種只換顏色（見 card-backs.ts） */
+.card-back {
+  --cb-bg: #182744; --cb-edge: #d4a24c; --cb-line: #d4a24c2e; --cb-glow: #35558f;
+  position: relative; display: block; aspect-ratio: 5 / 7; border-radius: 6px; overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 50%, var(--cb-glow) 0 16%, transparent 52%),
+    repeating-linear-gradient(45deg, var(--cb-line) 0 1px, transparent 1px 9px),
+    repeating-linear-gradient(-45deg, var(--cb-line) 0 1px, transparent 1px 9px),
+    var(--cb-bg);
+  box-shadow: inset 0 0 0 2px var(--cb-edge), inset 0 0 0 4px var(--cb-bg), inset 0 0 0 5px var(--cb-edge), 0 1px 3px #0008;
+}
+.card-back svg { position: absolute; left: 18%; top: 24%; width: 64%; height: 52%; }
+.card-back .cb-ring { fill: none; stroke: var(--cb-edge); stroke-width: 3; opacity: .7; }
+.card-back .cb-mark { fill: var(--cb-edge); fill-opacity: .9; stroke: var(--cb-bg); stroke-width: 2.5; stroke-linejoin: round; }
+.cb-ember { --cb-bg: #3a0f0c; --cb-edge: #f08a3c; --cb-line: #f08a3c26; --cb-glow: #9c3316; }
+.cb-grove { --cb-bg: #12301d; --cb-edge: #9bd38f; --cb-line: #9bd38f24; --cb-glow: #2d6a3a; }
+
+/* 牌庫：直立的卡背疊成一疊，張數寫在旁邊 */
+.pile.deck-pile {
+  grid-template-columns: auto auto; grid-template-rows: auto auto; column-gap: 6px; align-items: center; place-content: center;
+  padding: 3px 6px 5px 4px;
+}
+.deck-pile .card-back {
+  grid-row: 1 / 3; height: 100%; min-height: 26px; max-height: 44px; width: auto; border-radius: 3px;
+  box-shadow: inset 0 0 0 1px var(--cb-edge), 1px 1px 0 #000a, 2px 2px 0 #3a3f4a, 3px 3px 0 #000a, 4px 4px 0 #2e323b;
+}
+.deck-pile .card-back svg { left: 12%; width: 76%; }
+.deck-pile.empty .card-back { opacity: .25; box-shadow: inset 0 0 0 1px var(--cb-edge); }
+
+/* 對手的手牌：一排小卡背 */
+.hi-hand { display: flex; align-items: center; gap: 6px; }
+.hand-backs { display: inline-flex; }
+.hand-backs .card-back { width: 18px; border-radius: 3px; box-shadow: inset 0 0 0 1px var(--cb-edge), 0 1px 2px #0008; }
+.hand-backs .card-back + .card-back { margin-left: -7px; }
+.hand-backs .card-back svg { left: 10%; width: 80%; }
+
+/* 組牌畫面選卡背 */
+.back-picker { display: flex; gap: 10px; flex-wrap: wrap; }
+.back-pick { display: grid; justify-items: center; gap: 4px; padding: 6px; border-radius: 8px; border: 1px solid transparent; background: none; color: var(--ink-soft); font-size: 12px; }
+.back-pick .card-back { width: 44px; }
+.back-pick.on { border-color: var(--hero-edge); color: var(--ink); background: #ffffff0d; }

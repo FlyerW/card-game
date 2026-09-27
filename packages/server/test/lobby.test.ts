@@ -28,6 +28,18 @@ function openRoom(lobby: Lobby) {
   return { host, guest, code };
 }
 
+describe('卡背', () => {
+  it('開房間、加入時帶的卡背，雙方在座位資料上都看得到；格式怪的換成預設', () => {
+    const lobby = new Lobby(engine);
+    const host = fakeClient();
+    const guest = fakeClient();
+    lobby.handle(host.client, { t: 'create', name: '小明', heroId: white, deck: deckFor(white), back: 'ember' });
+    const code = host.last('room')!.code;
+    lobby.handle(guest.client, { t: 'join', code, name: '阿華', heroId: red, deck: deckFor(red, 2), back: '"><img>' });
+    expect(guest.last('room')!.seats.map((seat) => seat!.back)).toEqual(['ember', 'classic']);
+  });
+});
+
 describe('房間', () => {
   it('開房間拿到房號；朋友用房號加入，兩個人都到了就開局', () => {
     const lobby = new Lobby(engine);
@@ -36,6 +48,8 @@ describe('房間', () => {
     expect(host.last('room')).toMatchObject({ seat: 0, seats: [{ name: '小明', connected: true }, { name: '阿華', connected: true }] });
     expect(guest.last('room')).toMatchObject({ seat: 1 });
     expect(host.last('state')!.view.phase).toBe('mulligan');
+    // 沒選卡背的用預設的
+    expect(host.last('room')!.seats.map((seat) => seat!.back)).toEqual(['classic', 'classic']);
     expect(guest.last('state')!.view.phase).toBe('mulligan');
   });
 

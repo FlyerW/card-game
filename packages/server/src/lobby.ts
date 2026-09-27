@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { DEFAULT_RULES, eventsFor, validateDeck, type Engine, type GameEvent, type GameState, type PlayerId } from '@card-game/engine';
-import { emptyTally, gameSummary, tallyEvents, type GameSummary, type GameTally } from '@card-game/economy';
+import { cleanBack, emptyTally, gameSummary, tallyEvents, type GameSummary, type GameTally } from '@card-game/economy';
 import { recordFromState, type GameLog } from './gamelog';
 import { CODE_ALPHABET, CODE_LENGTH, type ClientMessage, type RankedReport, type SeatInfo, type ServerMessage } from './protocol';
 
@@ -34,6 +34,8 @@ interface Seat {
   name: string;
   heroId: string;
   deck: string[];
+  /** 卡背，對手看得到。 */
+  back: string;
   client: Client | null;
   /** 斷線的時間；連著就是 null。排位賽斷線太久算輸。 */
   disconnectedAt: number | null;
@@ -59,6 +61,7 @@ interface QueueEntry {
   name: string;
   heroId: string;
   deck: string[];
+  back: string;
   mmr: number;
   since: number;
 }
@@ -171,7 +174,7 @@ export class Lobby {
   // ─── 各種請求 ───────────────────────────────────────────────────────────────
 
   private create(client: Client, message: Extract<ClientMessage, { t: 'create' }>): void {
-    const seat = this.newSeat(client, message.name, message.heroId, message.deck);
+    const seat = this.newSeat(client, message.name, message.heroId, message.deck, message.back);
     if (seat === null) return;
     this.leave(client);
     const room: Room = { code: this.newCode(), seats: [seat, null], state: null, rematch: [false, false], idleSince: null, ranked: null, startedAt: 0, logged: false };
@@ -184,7 +187,7 @@ export class Lobby {
     const room = this.rooms.get(String(message.code).toUpperCase().trim());
     if (!room) return client.send({ t: 'error', message: '找不到這個房間，確認一下房號', fatal: true });
     if (room.seats[1] !== null) return client.send({ t: 'error', message: '這個房間已經有兩個人了', fatal: true });
-    const seat = this.newSeat(client, message.name, message.heroId, message.deck);
+    const seat = this.newSeat(client, message.name, message.heroId, message.deck, message.back);
     if (seat === null) return;
     this.leave(client);
     room.seats[1] = seat;
@@ -327,14 +330,14 @@ export class Lobby {
     if (!this.ranked) return client.send({ t: 'error', message: '這台伺服器沒有開排位賽' });
     const player = typeof message.token === 'string' ? this.ranked.authenticate(message.token) : null;
     if (!player) return client.send({ t: 'error', message: '要先用伺服器上的帳號登入（名字＋密碼或 Google）才能打排位' });
-    const seat = this.newSeat(client, player.name, message.heroId, message.deck);
+    const seat = this.newSeat(client, player.name, message.heroId, message.deck, message.back);
     if (seat === null) return;
     const problem = player.ownershipProblem(seat.heroId, seat.deck);
     if (problem) return client.send({ t: 'error', message: problem });
     this.leave(client);
     // 同一個帳號在別的分頁排隊的話，換成這一個。
     this.queue = this.queue.filter((entry) => entry.accountId !== player.id && entry.client !== client);
-    this.queue.push({ client, accountId: player.id, name: seat.name, heroId: seat.heroId, deck: seat.deck, mmr: player.mmr, since: this.now() });
+    this.queue.push({ client, accountId: player.id, name: seat.name, heroId: seat.heroId, deck: seat.deck, back: seat.back, mmr: player.mmr, since: this.now() });
     this.announceQueue();
     this.matchQueue();
   }
@@ -375,7 +378,7 @@ export class Lobby {
   }
 
   private startRanked(a: QueueEntry, b: QueueEntry): void {
-    const seat = (entry: QueueEntry): Seat => ({ token: randomUUID(), name: entry.name, heroId: entry.heroId, deck: entry.deck, client: entry.client, disconnectedAt: null });
+    const seat = (entry: QueueEntry): Seat => ({ token: randomUUID(), name: entry.name, heroId: entry.heroId, deck: entry.deck, back: entry.back, client: entry.client, disconnectedAt: null });
     const room: Room = {
       code: this.newCode(),
       seats: [seat(a), seat(b)],
@@ -408,7 +411,7 @@ export class Lobby {
 
   private broadcastRoom(room: Room): void {
     const seats = room.seats.map((seat): SeatInfo | null =>
-      seat === null ? null : { name: seat.name, heroId: seat.heroId, connected: seat.client !== null },
+      seat === null ? null : { name: seat.name, heroId: seat.heroId, connected: seat.client !== null, back: seat.back },
     ) as [SeatInfo | null, SeatInfo | null];
     room.seats.forEach((seat, index) => {
       seat?.client?.send({ t: 'room', code: room.code, seat: index as PlayerId, token: seat.token, seats, rematch: room.rematch, ranked: room.ranked !== null });
@@ -418,7 +421,7 @@ export class Lobby {
   // ─── 小工具 ─────────────────────────────────────────────────────────────────
 
   /** 檢查名字、英雄與牌組；有問題就回報給這位玩家並回傳 null。 */
-  private newSeat(client: Client, name: unknown, heroId: unknown, deck: unknown): Seat | null {
+  private newSeat(client: Client, name: unknown, heroId: unknown, deck: unknown, back?: unknown): Seat | null {
     const cleanName = typeof name === 'string' ? name.trim().slice(0, NAME_LIMIT) : '';
     if (typeof heroId !== 'string' || !this.engine.db.heroes.has(heroId) || this.engine.db.heroes.get(heroId)!.boss) {
       client.send({ t: 'error', message: '找不到這個英雄' });
@@ -433,7 +436,7 @@ export class Lobby {
       client.send({ t: 'error', message: `牌組不合法：${problems[0]}` });
       return null;
     }
-    return { token: randomUUID(), name: cleanName || '玩家', heroId, deck: [...deck], client, disconnectedAt: null };
+    return { token: randomUUID(), name: cleanName || '玩家', heroId, deck: [...deck], back: cleanBack(back) ?? 'classic', client, disconnectedAt: null };
   }
 
   private newCode(): string {

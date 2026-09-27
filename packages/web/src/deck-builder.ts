@@ -1,4 +1,5 @@
 import {
+  CARD_SETS,
   cardNames,
   COLOR_NAMES,
   copyLimit,
@@ -7,6 +8,7 @@ import {
   describeCard,
   describeColors,
   RARITIES,
+  setOf,
   validateDeck,
   type CardDb,
   type Color,
@@ -16,6 +18,7 @@ import {
 } from '@card-game/engine';
 import { cleanBook, DECK_NAME_LIMIT, emptyBook, type DeckBook, type SavedDeck } from '@card-game/economy';
 import { buildDeck } from '@card-game/sim/deck';
+import { CARD_BACKS, backOf, cardBack } from './card-backs';
 import { cardFace, detailLines, esc, pips } from './ui';
 
 // 組牌：照正式規則，30 張、同名最多 2 張、UR 最多 1 張、只能放英雄顏色內的卡與無色卡；
@@ -57,6 +60,8 @@ export interface Builder {
   color: ColorPick;
   cost: CostPick;
   rarity: Rarity | 'all';
+  /** 只看哪幾個系列（可以多選）；空的就是全部。 */
+  sets: string[];
   /** 說明欄正在看的卡。 */
   focus: string | null;
 }
@@ -234,7 +239,14 @@ export function deckScreen(db: CardDb, b: Builder, saved: SavedDeck, owned: Owne
   const code = encodeDeckCode(saved.heroId, deck);
   // 擁有的排前面，沒有的變暗放後面，看得到還能收集什麼。
   const pool = deckPool(db, b.heroId)
-    .filter((card) => matches(card, b.filter) && colorMatches(card, b.color) && costMatches(card, b.cost) && (b.rarity === 'all' || card.rarity === b.rarity))
+    .filter(
+      (card) =>
+        matches(card, b.filter) &&
+        colorMatches(card, b.color) &&
+        costMatches(card, b.cost) &&
+        (b.rarity === 'all' || card.rarity === b.rarity) &&
+        (b.sets.length === 0 || b.sets.includes(setOf(card))),
+    )
     .sort((x, y) => Number(owned(y) > 0) - Number(owned(x) > 0) || byCost(x, y));
   const { problems, tips } = deckIssues(db, b.heroId, deck, owned);
   const focus = b.focus ? db.cards.get(b.focus) : undefined;
@@ -258,6 +270,18 @@ export function deckScreen(db: CardDb, b: Builder, saved: SavedDeck, owned: Owne
   const colorChips = colorOptions.map(([c, label]) => chip('data-color', c, label, b.color === c)).join('');
   const rarityChips = (['all', ...RARITIES] as const).map((r) => chip('data-rarity', r, r === 'all' ? '全部稀有度' : r, b.rarity === r)).join('');
   const costChips = COSTS.map((c) => chip('data-cost', String(c), c === 'all' ? '全部費用' : c === 7 ? '7+' : String(c), b.cost === c)).join('');
+  // 系列：看得到兩個以上的系列（預覽）才顯示；可以多選。
+  const sets = CARD_SETS.filter((set) => deckPool(db, b.heroId).some((card) => setOf(card) === set.id));
+  const setChips =
+    sets.length > 1
+      ? `<div class="chips">${chip('data-deck-set', 'all', '全部系列', b.sets.length === 0)}${sets
+          .map((set) => chip('data-deck-set', set.id, `${esc(set.name)}${set.released ? '' : '（預覽）'}`, b.sets.includes(set.id)))
+          .join('')}</div>`
+      : '';
+  const back = backOf(saved.back).id;
+  const backPicker = `<div class="back-picker" role="group" aria-label="卡背">${CARD_BACKS.map(
+    (each) => `<button class="back-pick${each.id === back ? ' on' : ''}" data-back="${each.id}" aria-pressed="${each.id === back}">${cardBack(each.id)}<span>${esc(each.name)}</span></button>`,
+  ).join('')}</div>`;
 
   return `<main class="builder">
     <header class="b-head">
@@ -271,15 +295,12 @@ export function deckScreen(db: CardDb, b: Builder, saved: SavedDeck, owned: Owne
         <div class="chips">${rarityChips}</div>
         <div class="chips">${colorChips}</div>
         <div class="chips">${costChips}</div>
+        ${setChips}
         <div class="pool">${pool.map((card) => poolCard(db, card, deck, b.focus, owned)).join('')}</div>
       </section>
       ${focus ? '<div class="shop-backdrop" data-do="focus-close"></div>' : ''}
       <aside class="b-side">
-        <div class="detail${focus ? ' has-focus' : ''}">${focusBox}</div>
-        <div class="detail">
-          ${status}${tipList}
-          ${curve(db, deck)}
-          ${deckList(db, deck)}
+        <div class="detail b-tools">
           <div class="b-actions">
             <button class="ghost" data-do="deck-fill" ${deck.length >= deckSize ? 'disabled' : ''}>隨機補滿</button>
             <button class="ghost" data-do="deck-auto">自動組一副</button>
@@ -295,6 +316,14 @@ export function deckScreen(db: CardDb, b: Builder, saved: SavedDeck, owned: Owne
             }
           </div>
           ${b.showCode ? `<label class="deck-code">把代碼傳給朋友，他在開局畫面按「貼上代碼」就能拿到一樣的牌組：<input id="deck-code-out" readonly value="${esc(code)}"></label>` : ''}
+          <p class="dl-head">卡背</p>
+          ${backPicker}
+        </div>
+        <div class="detail${focus ? ' has-focus' : ''}">${focusBox}</div>
+        <div class="detail">
+          ${status}${tipList}
+          ${curve(db, deck)}
+          ${deckList(db, deck)}
         </div>
         <button class="primary big" data-do="deck-done">完成</button>
       </aside>

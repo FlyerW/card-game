@@ -27,6 +27,7 @@
 - [x] 對局紀錄：每一局記進 `data/games.jsonl`，`npm run game-stats` 看真人對局的英雄與卡牌勝率
 - [x] 儲值：綠界 ECPay，NT$30 = 100 金幣（見下面「儲值」）
 - [x] 卡牌插圖：AI 畫的試玩用插圖（`python3 packages/web/scripts/art.py`，見 [docs/art.md](docs/art.md)）
+- [x] 卡背：每副牌組可以選（經典、烈焰、翠林），牌庫與對手手牌會顯示，連線對戰對手也看得到（`packages/web/src/card-backs.ts`）
 - [x] 背景音樂與音效：瀏覽器即時合成（[`packages/web/src/music.ts`](packages/web/src/music.ts)），各有開關
 
 範例卡牌見 [docs/cards.md](docs/cards.md)。

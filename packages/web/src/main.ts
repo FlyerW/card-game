@@ -28,6 +28,8 @@ import {
   type SideView,
   type Target,
   CARD_SETS,
+  deckPool,
+  setOf,
   decodeDeckCode,
   encodeDeckCode,
 } from '@card-game/engine';
@@ -79,6 +81,7 @@ import {
   type ColorPick,
   type KindFilter,
 } from './deck-builder';
+import { CARD_BACKS, cardBack, DEFAULT_BACK } from './card-backs';
 import {
   backendFor,
   fetchLeaderboard,
@@ -166,7 +169,7 @@ interface Saved {
   /** 這局你用的牌組，結算任務（例如用有綠色卡的牌組贏）時看顏色。 */
   gameDeck: string[];
   /** 跟電腦打的這一局：對手的英雄與牌組、開始的時間，給對局紀錄用。 */
-  botGame: { rival: string; rivalDeck: string[]; startedAt: number } | null;
+  botGame: { rival: string; rivalDeck: string[]; startedAt: number; backs?: [string, string] } | null;
   /** 這局邊打邊累計的召喚、抽牌、法術。 */
   tally: GameTally;
   /** 這局的獎勵；null 表示還沒結算。 */
@@ -249,6 +252,7 @@ const app: App = {
     color: 'all',
     cost: 'all',
     rarity: 'all',
+    sets: [],
     focus: null,
   },
   state: null,
@@ -586,7 +590,7 @@ const roomName = (): string => app.playerName.trim() || app.session?.account.nam
 function createRoom(): void {
   const deck = myDeck();
   resetGameRecord(deck);
-  online.send({ t: 'create', name: roomName(), heroId: app.heroId, deck });
+  online.send({ t: 'create', name: roomName(), heroId: app.heroId, deck, back: chosenDeck(app.heroId)?.back ?? DEFAULT_BACK });
 }
 
 function joinRoom(): void {
@@ -598,7 +602,7 @@ function joinRoom(): void {
   }
   const deck = myDeck();
   resetGameRecord(deck);
-  online.send({ t: 'join', code, name: roomName(), heroId: app.heroId, deck });
+  online.send({ t: 'join', code, name: roomName(), heroId: app.heroId, deck, back: chosenDeck(app.heroId)?.back ?? DEFAULT_BACK });
 }
 
 function leaveRoom(): void {
@@ -919,12 +923,21 @@ function startGame(adventure: App['adventure'] = null): void {
   if (!kept.ok) return;
   Object.assign(app, { mode: 'bot', screen: 'play', log: [], redraw: [], selection: null, toast: null, view: null, adventure, story: null, stageReward: null });
   resetGameRecord(deck);
-  app.botGame = { rival, rivalDeck, startedAt: Date.now() };
+  // 卡背：你用牌組選的，電腦隨機一種。
+  const backs: [string, string] = [chosenDeck(app.heroId)?.back ?? DEFAULT_BACK, CARD_BACKS[(seed >>> 3) % CARD_BACKS.length]!.id];
+  app.botGame = { rival, rivalDeck, startedAt: Date.now(), backs };
   localStep(kept.state, []);
 }
 
 /** 收藏決定每張卡最多能放幾張。 */
 const owned = () => ownedOf(app.profile);
+
+/** 這一局某位玩家的卡背：連線對戰看房間裡的座位，跟電腦打看開局時記下的。 */
+function backFor(player: PlayerId): string {
+  if (app.mode === 'online') return online.room?.seats[player]?.back ?? DEFAULT_BACK;
+  if (app.mode === 'bot') return app.botGame?.backs?.[player] ?? DEFAULT_BACK;
+  return player === YOU ? (chosenDeck(app.heroId)?.back ?? DEFAULT_BACK) : DEFAULT_BACK;
+}
 
 /** 你這局要用的牌組：有自訂牌組就用，沒有就用收藏自動組一副。 */
 const myDeck = (): string[] => chosenDeck(app.heroId)?.cards ?? autoDeck(db, app.heroId, (Math.random() * 2 ** 32) >>> 0, owned());
@@ -934,13 +947,15 @@ const chosenDeck = (heroId: string): SavedDeck | null =>
   app.book.decks.find((deck) => deck.id === app.book.selected[heroId] && deck.heroId === heroId) ?? null;
 
 /** 對手英雄右邊：天生技（跟我方一樣的按鈕樣式，點了看說明）、手牌張數、被動。 */
-function heroInfo(side: SideView): string {
+function heroInfo(side: SideView, player: PlayerId): string {
   const h = hero(side.heroId);
   const evolution = side.heroEvolution ? card(side.heroEvolution) : null;
   const lines: string[] = [];
   if (h.passive) lines.push(describePassive(h.passive, describeName));
   if (evolution?.kind === 'heroEvolution' && evolution.passive) lines.push(describePassive(evolution.passive, describeName));
-  return `<div class="hero-side">${powerPill(side, false)}<div class="hero-info"><span class="hi-hand">手牌 ${side.handCount}</span>${lines
+  // 手牌：一排小卡背（最多畫 10 張），旁邊寫張數。
+  const backs = Array.from({ length: Math.min(side.handCount, 10) }, () => cardBack(backFor(player))).join('');
+  return `<div class="hero-side">${powerPill(side, false)}<div class="hero-info"><span class="hi-hand">手牌 ${side.handCount}<span class="hand-backs">${backs}</span></span>${lines
     .map((line) => `<p>${rich(line)}</p>`)
     .join('')}</div></div>`;
 }
@@ -1279,13 +1294,13 @@ function sideRows(side: SideView, player: PlayerId, picks: Map<string, Action>, 
   // 場地區在擁有者的左邊、牌庫與棄牌在右邊；對手那側轉了 180°，左右相反，跟 docs/board.svg 一致。
   const zones = side.zones.map((cv, i) => zone(cv, player, i, picks, view)).join('');
   const discard = `<div class="pile"><span>棄牌</span><b>${side.discard.length}</b></div>`;
-  const deck = `<div class="pile"><span>牌庫</span><b>${side.deckCount}</b></div>`;
+  const deck = `<div class="pile deck-pile${side.deckCount === 0 ? ' empty' : ''}">${cardBack(backFor(player))}<span>牌庫</span><b>${side.deckCount}</b></div>`;
   const mine = player === YOU;
   const creatures = `<div class="row creatures">${mine ? field + zones + discard : discard + zones + field}</div>`;
   const energy = `<div class="row energy-row">${mine ? `<span></span>${energyRow(side)}${deck}` : `${deck}${energyRow(side)}<span></span>`}</div>`;
 
   let heroRow = `<div class="row hero-row">${heroPlate(side, player, picks)}`;
-  heroRow += player === YOU ? powerPill(side, true) : heroInfo(side);
+  heroRow += player === YOU ? powerPill(side, true) : heroInfo(side, player);
   heroRow += '</div>';
   return player === YOU ? creatures + energy + heroRow : heroRow + energy + creatures;
 }
@@ -1663,7 +1678,7 @@ function startQueue(): void {
   const deck = myDeck();
   resetGameRecord(deck);
   Object.assign(app, { screen: 'queue', queue: { since: Date.now(), waiting: 1 }, toast: null, rankedReport: null });
-  online.send({ t: 'queue', token: session.token, heroId: app.heroId, deck });
+  online.send({ t: 'queue', token: session.token, heroId: app.heroId, deck, back: chosenDeck(app.heroId)?.back ?? DEFAULT_BACK });
   render();
 }
 
@@ -1976,7 +1991,7 @@ function bookFor(session: Session, backend: Backend, me: ServerMe | undefined): 
 
 /** 組牌畫面的點擊。處理了就回傳 true。 */
 function builderClick(el: HTMLElement, command: string | undefined): boolean {
-  const { add, remove, focus, filter, color, cost, rarity } = el.dataset;
+  const { add, remove, focus, filter, color, cost, rarity, deckSet, back } = el.dataset;
   const heroId = app.builder.heroId;
   const saved = app.book.decks.find((each) => each.id === app.builder.deckId);
   if (!saved) return false;
@@ -2001,6 +2016,15 @@ function builderClick(el: HTMLElement, command: string | undefined): boolean {
     app.builder.cost = cost === 'all' ? 'all' : Number(cost);
   } else if (rarity) {
     app.builder.rarity = rarity as Builder['rarity'];
+  } else if (deckSet) {
+    // 系列可以多選：點一下加入或拿掉；「全部系列」清掉；全選等於全部。
+    const sets = app.builder.sets;
+    const next = deckSet === 'all' ? [] : sets.includes(deckSet) ? sets.filter((id) => id !== deckSet) : [...sets, deckSet];
+    const all = CARD_SETS.filter((set) => deckPool(db, heroId).some((card) => setOf(card) === set.id)).length;
+    app.builder.sets = next.length >= all ? [] : next;
+  } else if (back) {
+    app.book = { ...app.book, decks: app.book.decks.map((each) => (each.id === saved.id ? { ...each, back } : each)) };
+    persistDeck(saved.id);
   } else if (command === 'focus-close') {
     app.builder.focus = null;
   } else if (command === 'deck-fill') {
@@ -2047,7 +2071,7 @@ function builderClick(el: HTMLElement, command: string | undefined): boolean {
 
 root.addEventListener('click', (event) => {
   const el = (event.target as HTMLElement).closest<HTMLElement>(
-    '[data-do],[data-key],[data-hand],[data-skill],[data-hero],[data-mull],[data-pick],[data-add],[data-remove],[data-focus],[data-filter],[data-rarity],[data-color],[data-cost],[data-kind],[data-pack],[data-stage],[data-series],[data-deck-pick],[data-deck-edit],[data-missing],[data-craft],[data-topup],[data-difficulty]',
+    '[data-do],[data-key],[data-hand],[data-skill],[data-hero],[data-mull],[data-pick],[data-add],[data-remove],[data-focus],[data-filter],[data-rarity],[data-color],[data-cost],[data-kind],[data-pack],[data-stage],[data-series],[data-deck-set],[data-back],[data-deck-pick],[data-deck-edit],[data-missing],[data-craft],[data-topup],[data-difficulty]',
   );
   if (!el) {
     // 點在說明欄裡（正在看卡片資訊、點關鍵字看意思）不取消選取；點其他地方才回到對戰紀錄。

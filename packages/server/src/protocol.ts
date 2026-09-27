@@ -11,13 +11,15 @@ export interface SeatInfo {
   name: string;
   heroId: string;
   connected: boolean;
+  /** 這位玩家牌組的卡背（對手看得到）。 */
+  back: string;
 }
 
 export type ClientMessage =
   /** 開一個新房間，自己坐 0 號座位。牌組照正式規則檢查。 */
-  | { t: 'create'; name: string; heroId: string; deck: string[] }
+  | { t: 'create'; name: string; heroId: string; deck: string[]; back?: string }
   /** 用房號加入別人的房間，坐 1 號座位；兩個人都到了就開局。 */
-  | { t: 'join'; code: string; name: string; heroId: string; deck: string[] }
+  | { t: 'join'; code: string; name: string; heroId: string; deck: string[]; back?: string }
   /** 斷線或重新整理後，用加入時拿到的 token 回到原本的座位。 */
   | { t: 'rejoin'; code: string; token: string }
   /** 在對局裡做一個動作。action.player 必須是自己的座位。 */
@@ -27,7 +29,7 @@ export type ClientMessage =
   /** 離開房間，不再回來。 */
   | { t: 'leave' }
   /** 排位賽排隊：用帳號的 session token 驗證身分，牌組只能放收藏裡有的卡。 */
-  | { t: 'queue'; token: string; heroId: string; deck: string[] }
+  | { t: 'queue'; token: string; heroId: string; deck: string[]; back?: string }
   /** 取消排隊。 */
   | { t: 'unqueue' };
 

@@ -9,6 +9,8 @@ export interface SavedDeck {
   heroId: string;
   /** 卡的 id；可以還沒組滿，開局時才檢查合不合法、收藏夠不夠。 */
   cards: string[];
+  /** 卡背（網頁上的 CARD_BACKS）；沒有就用預設的。 */
+  back?: string;
 }
 
 export interface DeckBook {
@@ -26,6 +28,9 @@ export const emptyBook = (): DeckBook => ({ decks: [], selected: {} });
 /** 新牌組的編號。 */
 export const newDeckId = () => `d${Date.now().toString(36)}${Math.floor(Math.random() * 36 ** 5).toString(36).padStart(5, '0')}`;
 
+/** 卡背的 id：只收簡單的英數字與連字號，認不認得由網頁決定（不認得就畫預設的）。 */
+export const cleanBack = (back: unknown): string | null => (typeof back === 'string' && /^[a-z0-9-]{1,24}$/.test(back) ? back : null);
+
 const cleanName = (name: unknown, fallback: string) =>
   typeof name === 'string' && name.trim() ? name.trim().slice(0, DECK_NAME_LIMIT) : fallback;
 
@@ -42,7 +47,8 @@ export function cleanDeck(db: CardDb, raw: unknown): SavedDeck | null {
       return card !== undefined && !(card.kind === 'creature' && card.token);
     })
     .slice(0, DEFAULT_RULES.deckSize);
-  return { id: d.id, name: cleanName(d.name, `${hero.name}的牌組`), heroId: d.heroId, cards };
+  const back = cleanBack(d.back);
+  return { id: d.id, name: cleanName(d.name, `${hero.name}的牌組`), heroId: d.heroId, cards, ...(back ? { back } : {}) };
 }
 
 /**
