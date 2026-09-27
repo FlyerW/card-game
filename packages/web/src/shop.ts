@@ -32,6 +32,8 @@ export interface Shop {
   color: ColorFilter;
   /** 費用：1–6 各一格、7 是 7 以上；英雄沒有費用，選了費用就不列。 */
   cost: number | 'all';
+  /** 種類：生物、法術、道具・場地・英雄進化、英雄。 */
+  kind: 'all' | 'creature' | 'spell' | 'other' | 'hero';
   /** 只看還沒收齊的卡。 */
   missing: boolean;
   /** 正在前往綠界付款頁（跟開卡包的 busy 分開）。 */
@@ -51,6 +53,7 @@ export const newShop = (): Shop => ({
   rarity: 'all',
   color: 'all',
   cost: 'all',
+  kind: 'all',
   missing: false,
   paying: false,
   focus: null,
@@ -144,13 +147,21 @@ export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: stri
   const shown = all
     .filter((card) => shop.rarity === 'all' || card.rarity === shop.rarity)
     .filter((card) => (shop.color === 'all' ? true : shop.color === 'none' ? card.colors.length === 0 : card.colors.includes(shop.color)))
+    .filter((card) => {
+      const kind = card.def.kind;
+      if (shop.kind === 'all') return true;
+      if (shop.kind === 'creature' || shop.kind === 'spell' || shop.kind === 'hero') return kind === shop.kind;
+      return kind === 'item' || kind === 'field' || kind === 'heroEvolution';
+    })
     .filter((card) => shop.cost === 'all' || (card.def.kind !== 'hero' && (shop.cost === 7 ? card.def.cost >= 7 : card.def.cost === shop.cost)))
     .filter((card) => !shop.missing || !full(card))
     .sort(RARITY_ORDER);
 
   const chip = (attr: string, value: string, label: string, on: boolean) =>
     `<button class="chip${on ? ' on' : ''}" ${attr}="${value}" aria-pressed="${on}">${label}</button>`;
-  const rarityChips = [chip('data-rarity', 'all', '全部', shop.rarity === 'all'), ...RARITIES.map((r) => chip('data-rarity', r, r, shop.rarity === r))].join('');
+  const rarityChips = [chip('data-rarity', 'all', '全部稀有度', shop.rarity === 'all'), ...RARITIES.map((r) => chip('data-rarity', r, r, shop.rarity === r))].join('');
+  const kindOptions: [Shop['kind'], string][] = [['all', '全部種類'], ['creature', '生物'], ['spell', '法術'], ['other', '道具・場地・英雄進化'], ['hero', '英雄']];
+  const kindChips = kindOptions.map(([k, label]) => chip('data-kind', k, label, shop.kind === k)).join('');
   const colors: [ColorFilter, string][] = [['all', '全部顏色'], ...(Object.entries(COLOR_NAMES) as [Color, string][]), ['none', '無色']];
   const colorChips = colors.map(([c, label]) => chip('data-color', c, label, shop.color === c)).join('');
   const costs: (number | 'all')[] = ['all', 1, 2, 3, 4, 5, 6, 7];
@@ -220,6 +231,7 @@ export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: stri
     ${shop.opened ? packRow(db, profile, shop.opened, shop.dealing) : ''}
     <div class="b-body">
       <section class="b-pool" aria-label="收藏">
+        <div class="chips">${kindChips}</div>
         <div class="chips">${rarityChips}</div>
         <div class="chips">${colorChips}</div>
         <div class="chips">${costChips}${chip('data-missing', String(!shop.missing), '只看沒收齊的', shop.missing)}</div>
@@ -250,7 +262,7 @@ export function shopClick(
   command: string | undefined,
   rerender: () => void,
 ): boolean {
-  const { focus, rarity, color, cost, missing, craft: craftId, topup } = el.dataset;
+  const { focus, rarity, color, cost, kind, missing, craft: craftId, topup } = el.dataset;
   host.toast = null;
   host.shop.dealing = false;
   host.shop.notice = null;
@@ -288,6 +300,8 @@ export function shopClick(
     host.shop.color = color as ColorFilter;
   } else if (cost) {
     host.shop.cost = cost === 'all' ? 'all' : Number(cost);
+  } else if (kind) {
+    host.shop.kind = kind as Shop['kind'];
   } else if (missing) {
     host.shop.missing = missing === 'true';
   } else if ((command === 'open-pack' || command === 'open-packs' || craftId) && !host.shop.busy) {

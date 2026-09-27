@@ -11,6 +11,7 @@ import {
   type CardDb,
   type Color,
   type DeckCardDef,
+  type Rarity,
 } from '@card-game/engine';
 import { buildDeck } from '@card-game/sim/deck';
 import { cardFace, detailLines, esc, pips } from './ui';
@@ -45,6 +46,7 @@ export interface Builder {
   filter: KindFilter;
   color: ColorPick;
   cost: CostPick;
+  rarity: Rarity | 'all';
   /** 說明欄正在看的卡。 */
   focus: string | null;
 }
@@ -216,7 +218,7 @@ export function deckScreen(db: CardDb, b: Builder, deck: readonly string[], cust
   const hero = db.heroes.get(b.heroId)!;
   // 擁有的排前面，沒有的變暗放後面，看得到還能收集什麼。
   const pool = deckPool(db, b.heroId)
-    .filter((card) => matches(card, b.filter) && colorMatches(card, b.color) && costMatches(card, b.cost))
+    .filter((card) => matches(card, b.filter) && colorMatches(card, b.color) && costMatches(card, b.cost) && (b.rarity === 'all' || card.rarity === b.rarity))
     .sort((x, y) => Number(owned(y) > 0) - Number(owned(x) > 0) || byCost(x, y));
   const { problems, tips } = deckIssues(db, b.heroId, deck, owned);
   const focus = b.focus ? db.cards.get(b.focus) : undefined;
@@ -238,6 +240,7 @@ export function deckScreen(db: CardDb, b: Builder, deck: readonly string[], cust
   // 顏色只列這個英雄能用的，加上無色。
   const colorOptions: [ColorPick, string][] = [['all', '全部顏色'], ...hero.colors.map((c): [ColorPick, string] => [c, COLOR_NAMES[c]]), ['none', '無色']];
   const colorChips = colorOptions.map(([c, label]) => chip('data-color', c, label, b.color === c)).join('');
+  const rarityChips = (['all', ...RARITIES] as const).map((r) => chip('data-rarity', r, r === 'all' ? '全部稀有度' : r, b.rarity === r)).join('');
   const costChips = COSTS.map((c) => chip('data-cost', String(c), c === 'all' ? '全部費用' : c === 7 ? '7+' : String(c), b.cost === c)).join('');
 
   return `<main class="builder">
@@ -250,6 +253,7 @@ export function deckScreen(db: CardDb, b: Builder, deck: readonly string[], cust
     <div class="b-body">
       <section class="b-pool" aria-label="可以放的卡">
         <div class="chips">${filters}</div>
+        <div class="chips">${rarityChips}</div>
         <div class="chips">${colorChips}</div>
         <div class="chips">${costChips}</div>
         <div class="pool">${pool.map((card) => poolCard(db, card, deck, b.focus, owned)).join('')}</div>
