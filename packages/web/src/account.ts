@@ -125,9 +125,6 @@ export function resetTestProfile(db: CardDb): Profile {
 
 export const saveTestProfile = (profile: Profile) => write(TEST_PROFILE_KEY, profile);
 
-/** 測試帳號登出：金幣、收藏、冒險進度都清掉，下次進來是全新的測試帳號。 */
-export const clearTestProfile = () => write(TEST_PROFILE_KEY, null);
-
 // ─── 伺服器 API ──────────────────────────────────────────────────────────────
 
 export class ApiError extends Error {
