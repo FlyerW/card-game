@@ -1,21 +1,24 @@
-import { explainKeywords, RACE_NAMES, type Color, type DeckCardDef, type HeroDef } from '@card-game/engine';
+import { explainKeyword, RACE_NAMES, type Color, type DeckCardDef, type HeroDef } from '@card-game/engine';
 
 // 牌桌與組牌畫面共用的小工具。
 
 export const esc = (text: string) =>
   text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
-/** 說明文字：跳脫之後把 **關鍵字** 換成粗體。 */
-export const rich = (text: string) => esc(text).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+/**
+ * 說明文字：跳脫之後把 **關鍵字** 換成粗體。關鍵字的意思平常不寫出來，
+ * 滑鼠移上去或點一下（手機）才跳出來。
+ */
+export const rich = (text: string) =>
+  esc(text).replace(/\*\*(.+?)\*\*/g, (_, word: string) => {
+    const tip = explainKeyword(word);
+    return tip ? `<b class="kw" tabindex="0" data-tip="${esc(tip)}">${word}</b>` : `<b>${word}</b>`;
+  });
 
-/** 卡牌說明：第一行是標題，其餘是效果，最後用小字解釋用到的關鍵字（also：別處寫出來的文字，例如技能按鈕，關鍵字也一起解釋）。 */
-export function detailLines(texts: readonly string[], also: readonly string[] = []): string {
+/** 卡牌說明：第一行是標題，其餘是效果。 */
+export function detailLines(texts: readonly string[]): string {
   const [head, ...body] = texts;
-  const glossary = explainKeywords([...body, ...also]);
-  return (
-    `<p class="d-head">${rich(head ?? '')}</p>${body.map((text) => `<p class="d-line">${rich(text)}</p>`).join('')}` +
-    (glossary.length > 0 ? `<ul class="d-kw">${glossary.map((text) => `<li>${rich(text)}</li>`).join('')}</ul>` : '')
-  );
+  return `<p class="d-head">${rich(head ?? '')}</p>${body.map((text) => `<p class="d-line">${rich(text)}</p>`).join('')}`;
 }
 
 export function pips(colors: Color[]): string {

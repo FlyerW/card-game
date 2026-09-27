@@ -1,8 +1,9 @@
 import { randomInt } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { DEFAULT_RULES, type CardDb } from '@card-game/engine';
-import { craft, openPacks, PACK_BATCH, parseSummary, recordGame } from '@card-game/economy';
+import { craft, openPacks, PACK_BATCH, parseSummary, recordGame, TOPUPS } from '@card-game/economy';
 import { AccountError, accountInfo, serverDay, type Account, type AccountStore } from './accounts';
+import { checkoutFields, checkoutUrl, newTradeNo, readNotice, type EcpayConfig } from './ecpay';
 import { parseBotRecord, type GameLog } from './gamelog';
 import { TokenError, type GoogleIdentity } from './google';
 
@@ -20,6 +21,10 @@ export interface ApiOptions {
   verify: ((credential: string) => Promise<GoogleIdentity>) | null;
   /** 對局紀錄；null 就不記。 */
   log?: GameLog | null;
+  /** 綠界金流；null 就不開放儲值。 */
+  ecpay?: EcpayConfig | null;
+  /** 對外的網址（綠界付款完成後通知與返回用）；沒設定就用瀏覽器頁面的來源。 */
+  publicUrl?: string | null;
 }
 
 class HttpError extends Error {
@@ -35,7 +40,7 @@ function send(response: ServerResponse, status: number, body: unknown): void {
   response.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }).end(JSON.stringify(body));
 }
 
-async function readJson(request: IncomingMessage): Promise<Record<string, unknown>> {
+async function readBody(request: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of request) {
@@ -43,14 +48,27 @@ async function readJson(request: IncomingMessage): Promise<Record<string, unknow
     if (size > MAX_BODY_BYTES) throw new HttpError(413, '資料太大');
     chunks.push(chunk as Buffer);
   }
-  if (size === 0) return {};
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+async function readJson(request: IncomingMessage): Promise<Record<string, unknown>> {
+  const text = await readBody(request);
+  if (text === '') return {};
   try {
-    const value: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    const value: unknown = JSON.parse(text);
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) return value as Record<string, unknown>;
   } catch {
     // 落到下面
   }
   throw new HttpError(400, '資料格式不對');
+}
+
+/** 對外的網址：有設定就用設定的，不然用瀏覽器頁面的來源（Origin），再不然用 Host。 */
+function publicBase(request: IncomingMessage, configured: string | null | undefined): string {
+  if (configured) return configured.replace(/\/$/, '');
+  const origin = request.headers.origin;
+  if (typeof origin === 'string' && /^https?:\/\/[^/\s]+$/.test(origin)) return origin;
+  return `https://${request.headers.host ?? 'localhost'}`;
 }
 
 const bearer = (request: IncomingMessage) => /^Bearer ([0-9a-f]{64})$/.exec(request.headers.authorization ?? '')?.[1] ?? null;
@@ -70,7 +88,51 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
 
     switch (route) {
       case 'GET /api/config':
-        return send(response, 200, { googleClientId: options.googleClientId }), true;
+        return send(response, 200, { googleClientId: options.googleClientId, topup: Boolean(options.ecpay) }), true;
+
+      case 'POST /api/topup': {
+        // 儲值：建立訂單，回傳要送去綠界付款頁的表單。付款成功要等綠界通知（/api/ecpay/notify）才加金幣。
+        const { account } = authed();
+        if (!options.ecpay) throw new HttpError(503, '這台伺服器還沒開放儲值');
+        const { topup: topupId } = await readJson(request);
+        const topup = TOPUPS.find((each) => each.id === topupId);
+        if (!topup) throw new HttpError(400, '沒有這個儲值方案');
+        const base = publicBase(request, options.publicUrl);
+        const order = await store.createOrder(account, topup, newTradeNo());
+        const fields = checkoutFields(options.ecpay, {
+          tradeNo: order.tradeNo,
+          amount: order.amount,
+          itemName: `遊戲金幣 ${order.gold} 枚`,
+          returnUrl: `${base}/api/ecpay/notify`,
+          clientBackUrl: `${base}/?topup=${order.tradeNo}`,
+        });
+        return send(response, 200, { action: checkoutUrl(options.ecpay), fields, tradeNo: order.tradeNo }), true;
+      }
+
+      case 'POST /api/topup/status': {
+        const { account } = authed();
+        const { tradeNo } = await readJson(request);
+        const order = typeof tradeNo === 'string' ? store.order(tradeNo) : null;
+        if (!order || order.accountId !== account.id) throw new HttpError(404, '找不到這筆儲值');
+        return send(response, 200, { status: order.status, gold: order.gold, profile: account.profile }), true;
+      }
+
+      case 'POST /api/ecpay/notify': {
+        // 綠界的付款結果通知（從綠界的伺服器送來，表單格式）。檢查碼對才處理；處理完回 1|OK，綠界才不會一直重送。
+        if (!options.ecpay) throw new HttpError(404, '沒有開放儲值');
+        const fields = Object.fromEntries(new URLSearchParams(await readBody(request)));
+        const { valid, paid } = readNotice(options.ecpay, fields);
+        if (!valid) {
+          response.writeHead(400, { 'content-type': 'text/plain' }).end('0|CheckMacValue error');
+          return true;
+        }
+        if (paid) {
+          const result = await store.payOrder(paid);
+          if (result === 'mismatch' || result === 'unknown') console.error('綠界通知對不上訂單', result, paid);
+        }
+        response.writeHead(200, { 'content-type': 'text/plain' }).end('1|OK');
+        return true;
+      }
 
       case 'POST /api/login/google': {
         if (!options.verify) throw new HttpError(503, '這台伺服器還沒設定 Google 登入');

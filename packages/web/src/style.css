@@ -161,8 +161,8 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .f-name { font: 700 12px/1.25 var(--display); color: #cde6b3; word-break: break-all; }
 
 .zone {
-  /* 第一列費用，第二列左邊名字、右邊 HP，最下面狀態標籤 */
-  position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto 1fr auto;
+  /* 跟手牌的卡面一樣：左上費用、上面中間名字、右上顏色；中間露出插圖、狀態標籤貼在下面；左下稀有度、右下攻擊與 HP */
+  position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto 1fr auto;
   gap: 2px 4px; text-align: left;
   aspect-ratio: 3 / 3.4; min-width: 0; max-width: 100%; padding: 6px 7px;
   background: var(--zone); border: 1.5px solid var(--zone-edge); border-radius: var(--radius);
@@ -174,15 +174,15 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 }
 .zone.empty { grid-template-columns: 1fr; grid-template-rows: 1fr; }
 .zone-num { color: var(--ink-faint); font-size: 20px; }
-.z-top { grid-column: 1 / -1; display: flex; align-items: center; gap: 5px; }
-.z-top .pips { margin-left: auto; }
-.z-cost {
+.zone > .pips { align-self: start; }
+.z-cost { align-self: start;
   font: 700 13px/1 var(--num); color: #0c2530; background: var(--energy); border-radius: 4px;
   padding: 2px 5px; font-variant-numeric: tabular-nums; letter-spacing: .02em;
 }
-.z-name { align-self: start; font: 700 14px/1.2 var(--display); word-break: break-all; }
-/* 名字右邊：攻擊力與 HP。HP 滿的是綠色、受過傷的是紅色；攻擊力有加成時是金色。 */
-.z-stats { align-self: start; display: flex; align-items: baseline; gap: 6px; white-space: nowrap; font-family: var(--num); }
+.z-name { align-self: start; text-align: center; font: 700 14px/1.2 var(--display); word-break: break-all; }
+/* 最下面一列：左邊稀有度、右邊攻擊力與 HP。HP 滿的是綠色、受過傷的是紅色；攻擊力有加成時是金色。 */
+.z-foot { grid-column: 1 / -1; display: flex; align-items: flex-end; justify-content: space-between; gap: 4px; min-width: 0; }
+.z-stats { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; font-family: var(--num); }
 .z-atk { color: var(--ink-soft); font-size: 13px; }
 .z-atk b { font-size: 23px; font-weight: 700; line-height: 1; color: #ffd08a; margin-left: 1px; }
 .z-atk.up b { color: var(--r-ur); }
@@ -197,7 +197,7 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .z-hp i, .h-hp i, .c-heart { font-style: normal; color: #ff8a8a; }
 .z-hp i { font-size: 13px; margin-right: 1px; }
 .h-hp i { font-size: 16px; margin-right: 2px; }
-.badges { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 3px; min-height: 0; }
+.badges { grid-column: 1 / -1; align-self: end; display: flex; flex-wrap: wrap; gap: 3px; min-height: 0; }
 .badge { font-style: normal; font-size: 10.5px; line-height: 1.4; padding: 0 5px; border-radius: 3px; background: #0004; color: var(--ink-soft); }
 .badge.poison { color: #c9a0ff; } .badge.burn { color: #ff9a7a; } .badge.para { color: #ffe27a; } .badge.silence { color: #9fc3ff; }
 .badge.weak { color: #a8d8a0; } .badge.death { color: #d9d2c5; }
@@ -436,6 +436,13 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .vouchers { margin: 2px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 13px; }
 .vouchers .dust { font: 700 18px/1 var(--display); color: #d9c8ff; }
 .shop-backdrop { display: none; }
+.topup-bar { display: grid; grid-template-columns: 1fr auto; gap: 12px 20px; align-items: center; margin-top: 14px; padding: 14px 18px;
+  background: var(--mat); border: 1px solid var(--mat-edge); border-radius: var(--radius); }
+.topups { display: flex; flex-wrap: wrap; gap: 8px; }
+.topup { display: grid; justify-items: center; gap: 2px; min-width: 92px; padding: 8px 12px; }
+.topup b { font: 700 18px/1 var(--display); color: #ffd98a; }
+.topup small { color: var(--ink-soft); }
+@media (max-width: 700px) { .topup-bar { grid-template-columns: 1fr; } }
 .focus-close { justify-self: start; }
 .voucher { display: inline-flex; align-items: baseline; gap: 4px; padding: 2px 8px; border: 1px solid var(--mat-edge); border-radius: 4px; }
 .voucher b { font: 700 16px var(--num); color: var(--ink); }
@@ -567,13 +574,14 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
   body { padding-inline: 10px; }
   .board { padding: 8px; gap: 6px; border-radius: 12px; }
   .row { grid-template-columns: 36px repeat(5, minmax(0, 1fr)) 36px; gap: 4px; }
-  /* 手機的格子太窄，HP 放回名字下面，不然名字會被擠成直的 */
+  /* 手機的格子窄：費用獨佔一行、名字在下面置中；顏色與 HP 上限藏起來 */
   .zone { padding: 4px; aspect-ratio: 3 / 4.2; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto 1fr auto; }
-  .z-stats { align-self: end; gap: 4px; }
+  .z-cost { justify-self: start; font-size: 11px; padding: 1px 3px; }
   .z-name { font-size: 11.5px; }
-  .z-hp b, .z-atk b { font-size: 17px; } .z-hp small { font-size: 11px; }
-  .z-top .pips, .badge.item, .zone .rarity { display: none; }
-  .z-cost { font-size: 11px; padding: 1px 3px; }
+  .z-stats { gap: 3px; }
+  .z-hp b, .z-atk b { font-size: 16px; } .z-hp small, .z-atk { font-size: 10px; }
+  .z-hp small, .zone > .pips, .badge.item { display: none; }
+  .zone .rarity { font-size: 9px; }
   .f-label { display: none; } .f-name { font-size: 10px; }
   .pile { font-size: 9px; } .pile b { font-size: 14px; }
   .hero { min-width: 0; padding: 5px 12px; } .h-hand { position: static; translate: none; grid-column: 1 / -1; }
@@ -593,9 +601,21 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 
 /* 卡牌說明下面的關鍵字解釋 */
 .detail:empty { display: none; }
+/* 起手：每張牌的說明依序列在牌的下面 */
+.mull-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; }
+.mull-card { background: #0003; border: 1px solid var(--mat-edge); border-radius: 8px; padding: 8px 10px; display: grid; gap: 3px; align-content: start; }
+.mull-card .d-head { font-size: 13.5px; }
+.mull-card .d-line { font-size: 12.5px; }
 .play-howto { margin-top: 12px; }
 .play-howto summary { cursor: pointer; font: 700 15px/1.4 var(--display); }
 .play-howto ul { margin: 10px 0 0; }
+/* 關鍵字：滑鼠移上去或點一下（手機）才跳出完整說明 */
+.kw { position: relative; cursor: help; text-decoration: underline dotted #fff6; text-underline-offset: 3px; outline: none; }
+.kw:hover::after, .kw:focus::after {
+  content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 4px); z-index: 60; width: max-content; max-width: min(280px, 80vw);
+  padding: 7px 10px; border-radius: 8px; background: #0b1319; border: 1px solid var(--mat-edge); box-shadow: 0 6px 20px #000a;
+  font: 400 12.5px/1.5 var(--body, inherit); color: var(--ink); white-space: normal; text-decoration: none; pointer-events: none;
+}
 .d-kw { margin: 6px 0 0; padding: 6px 0 0; list-style: none; border-top: 1px solid var(--mat-edge); font-size: 12px; line-height: 1.5; opacity: .8; }
 .d-kw li { margin: 2px 0; }
 .d-line b, .d-kw b, .tags b, .hero-info b, .hp-text b, .skill-text b { font-weight: 700; color: var(--ink); }

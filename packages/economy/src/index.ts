@@ -323,6 +323,16 @@ export function openPacks(
 /** 一次最多開幾包。 */
 export const PACK_BATCH = 10;
 
+/** 儲值方案：新台幣 30 元 100 金幣（大約 1 美金 100 金幣），其他照比例。 */
+export const TOPUPS = [
+  { id: 'gold-100', price: 30, gold: 100 },
+  { id: 'gold-500', price: 150, gold: 500 },
+  { id: 'gold-1000', price: 300, gold: 1000 },
+  { id: 'gold-3000', price: 900, gold: 3000 },
+] as const;
+
+export type Topup = (typeof TOPUPS)[number];
+
 /** 用粉塵合成一張卡（或一個 UR 英雄）：N 30、R 100、SR 300、UR 1000。已經有滿的不能合成。 */
 export function craft(profile: Profile, db: CardDb, rules: Rules, cardId: string): EconomyResult<{ profile: Profile }> {
   const card = packItems(db, rules).find((each) => each.id === cardId);

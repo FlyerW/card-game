@@ -24,6 +24,7 @@
 - [x] 新手教學（11 步的引導對局）、電腦難度（普通／困難）
 - [x] 牌組存到伺服器（伺服器帳號；測試帳號存在瀏覽器）
 - [x] 對局紀錄：每一局記進 `data/games.jsonl`，`npm run game-stats` 看真人對局的英雄與卡牌勝率
+- [x] 儲值：綠界 ECPay，NT$30 = 100 金幣（見下面「儲值」）
 - [x] 卡牌插圖：AI 畫的試玩用插圖（`python3 packages/web/scripts/art.py`，見 [docs/art.md](docs/art.md)）
 - [x] 背景音樂與音效：瀏覽器即時合成（[`packages/web/src/music.ts`](packages/web/src/music.ts)），各有開關
 
@@ -85,6 +86,25 @@ tmux kill-session -t card-game   # 停掉
 - 帳號資料在 `data/accounts.json`，重開也還在。伺服器與通道的紀錄在 `logs/`，網址在 `logs/url.txt`。
 - 這台機器重開機之後要再跑一次 `scripts/deploy.sh`。
 - 要固定網址（Google 登入需要），得用自己的網域或 Cloudflare 帳號建「具名通道」，網址固定後把它加進 Google 的「已授權的 JavaScript 來源」。
+
+## 儲值（綠界 ECPay）
+
+```bash
+ECPAY_TEST=1 scripts/deploy.sh   # 綠界的測試環境：公開的測試商店，不會扣真的錢
+```
+
+- 正式收款：到[綠界](https://www.ecpay.com.tw/)申請商店，拿到 MerchantID、HashKey、HashIV，寫進 `data/secrets.env`（不會進 git）：
+
+```bash
+ECPAY_MERCHANT_ID=你的商店代號
+ECPAY_HASH_KEY=...
+ECPAY_HASH_IV=...
+PUBLIC_URL=https://你的固定網址   # 綠界付款完成後要通知這個網址
+```
+
+- 綠界付款完成後會從他們的伺服器通知 `PUBLIC_URL/api/ecpay/notify`，所以一定要用固定、對外的網址；臨時通道重開網址就變了。
+- 測試環境付款可以用綠界文件上的測試信用卡號（例如 4311-9522-2222-2222，安全碼 222，有效期限填未來的日期）。
+- 儲值紀錄（訂單）存在 `data/accounts.json`。細節見 [docs/design.md 的「儲值」](docs/design.md#儲值綠界)。
 
 ## Google 登入
 

@@ -111,7 +111,7 @@ describe('帳號 API', () => {
   };
 
   it('告訴網頁能不能用 Google 登入', async () => {
-    expect((await call('/api/config')).json).toEqual({ googleClientId: CLIENT });
+    expect((await call('/api/config')).json).toEqual({ googleClientId: CLIENT, topup: false });
   });
 
   it('登入 → 看自己的資料 → 開卡包 → 回報對局 → 登出', async () => {

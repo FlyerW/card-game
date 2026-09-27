@@ -195,6 +195,20 @@ export async function logout(session: Session): Promise<void> {
 
 // ─── 金幣與卡包：測試帳號在瀏覽器裡算，Google 帳號交給伺服器 ─────────────────
 
+/** 伺服器開放儲值（綠界）；claude.ai 上的試玩版與沒設定的伺服器沒有。 */
+export const TOPUP_AVAILABLE = (window as { CARD_GAME_TOPUP?: boolean }).CARD_GAME_TOPUP === true;
+
+/** 送去綠界付款頁的表單。 */
+export interface TopupCheckout {
+  action: string;
+  fields: Record<string, string>;
+  tradeNo: string;
+}
+
+/** 付款回來後查這筆儲值：綠界通知到了就是 paid。 */
+export const topupStatus = (session: ServerSession, tradeNo: string) =>
+  api<{ status: 'pending' | 'paid'; gold: number; profile: Profile }>('/api/topup/status', session.token, { tradeNo });
+
 export interface Backend {
   /** 開 count 包（1 或 10）。 */
   openPack(profile: Profile, count: number): Promise<EconomyResult<{ profile: Profile; cards: PackCard[] }>>;
@@ -203,6 +217,8 @@ export interface Backend {
   recordGame(profile: Profile, summary: GameSummary, record?: BotGameRecord): Promise<GameReward>;
   /** 存一個英雄的自訂牌組（null 是刪掉）。測試帳號存在瀏覽器裡，這裡不用做事。 */
   saveDeck(heroId: string, deck: string[] | null): Promise<void>;
+  /** 儲值：伺服器帳號而且伺服器開放儲值才有。 */
+  topup: ((topupId: string) => Promise<TopupCheckout>) | null;
 }
 
 const failed = (error: unknown): { ok: false; reason: string } => ({
@@ -225,6 +241,7 @@ export function backendFor(session: Session, db: CardDb): Backend {
         return reward;
       },
       saveDeck: async () => undefined,
+      topup: null,
     };
   }
   const { token } = session;
@@ -247,6 +264,7 @@ export function backendFor(session: Session, db: CardDb): Backend {
     saveDeck: async (heroId, deck) => {
       await api('/api/decks', token, { heroId, deck });
     },
+    topup: TOPUP_AVAILABLE ? (topupId) => api<TopupCheckout>('/api/topup', token, { topup: topupId }) : null,
   };
 }
 

@@ -12,7 +12,7 @@ import {
   type HeroDef,
   type Rarity,
 } from '@card-game/engine';
-import { ECONOMY, PACK_BATCH, packItems, questDef, type PackCard, type PackItem, type Profile } from '@card-game/economy';
+import { ECONOMY, PACK_BATCH, packItems, questDef, TOPUPS, type PackCard, type PackItem, type Profile } from '@card-game/economy';
 import type { Backend } from './account';
 import { cardFace, detailLines, esc, pips } from './ui';
 
@@ -115,7 +115,19 @@ function packRow(db: CardDb, profile: Profile, unsorted: PackCard[], dealing: bo
   return `${summary}<div class="pack-row${dealing ? ' deal' : ''}${many ? ' many' : ''}" aria-label="剛開的卡包">${cards}</div>`;
 }
 
-export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: string | null): string {
+/** 儲值：跳到綠界付款頁，付完按「返回商店」回來。 */
+function topupBar(canTopup: boolean, busy: boolean): string {
+  if (!canTopup) return '';
+  const buttons = TOPUPS.map(
+    (topup) => `<button class="ghost topup" data-topup="${topup.id}" ${busy ? 'disabled' : ''}><b>${topup.gold}</b> 金幣<small>NT$${topup.price}</small></button>`,
+  ).join('');
+  return `<section class="topup-bar">
+      <div><p class="d-head">儲值金幣</p><p class="d-line">NT$30 = 100 金幣。付款由綠界科技處理，可以用信用卡、ATM 或超商代碼；付款完成後金幣會自動入帳。</p></div>
+      <div class="topups">${buttons}</div>
+    </section>`;
+}
+
+export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: string | null, canTopup = false): string {
   const all = collectibles(db);
   const owned = (item: { id: string }) => profile.collection[item.id] ?? 0;
   const full = (item: Collectible) => owned(item) >= item.limit;
@@ -184,13 +196,14 @@ export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: stri
         <p class="d-line">一包 ${ECONOMY.packSize} 張，每張 R ${pct(R)}、SR ${pct(SR)}、UR ${pct(UR)}，其餘 N；每包至少一張 R 以上。
           UR 也可能開到多色的 UR 英雄。已經有 ${DEFAULT_RULES.maxCopies} 張（UR ${DEFAULT_RULES.maxUrCopies} 張、英雄 1 個）的再開到，換成粉塵
           （N ${ECONOMY.dustValue.N}、R ${ECONOMY.dustValue.R}、SR ${ECONOMY.dustValue.SR}、UR ${ECONOMY.dustValue.UR}），粉塵可以合成任意一張卡。</p>
-        <p class="vouchers"><span class="w-label">粉塵</span><b class="dust">${profile.dust}</b></p>
+        <p class="vouchers"><span class="dust">粉塵 ${profile.dust}</span></p>
       </div>
       <div class="pack-buttons">
         <button class="primary big" data-do="open-pack" ${canBuy && !shop.busy ? '' : 'disabled'}>${shop.busy ? '開卡包中……' : canBuy ? '開一包' : `金幣不夠（${profile.gold}/${ECONOMY.packPrice}）`}</button>
         <button class="ghost big" data-do="open-packs" ${canBuyBatch && !shop.busy ? '' : 'disabled'}>開 ${PACK_BATCH} 包（${ECONOMY.packPrice * PACK_BATCH} 金幣）</button>
       </div>
     </section>
+    ${topupBar(canTopup, shop.busy)}
     ${toast ? `<p class="toast" role="alert">${esc(toast)}</p>` : ''}
     ${shop.notice ? `<p class="notice" role="status">${esc(shop.notice)}</p>` : ''}
     ${shop.opened ? packRow(db, profile, shop.opened, shop.dealing) : ''}
@@ -225,7 +238,7 @@ export function shopClick(
   command: string | undefined,
   rerender: () => void,
 ): boolean {
-  const { focus, rarity, color, missing, craft: craftId } = el.dataset;
+  const { focus, rarity, color, missing, craft: craftId, topup } = el.dataset;
   host.toast = null;
   host.shop.dealing = false;
   host.shop.notice = null;
@@ -233,6 +246,30 @@ export function shopClick(
     host.shop.focus = host.shop.focus === focus ? null : focus;
   } else if (command === 'focus-close') {
     host.shop.focus = null;
+  } else if (topup && backend.topup && !host.shop.busy) {
+    // 建立訂單後，用表單把頁面送去綠界付款。
+    host.shop.busy = true;
+    backend.topup(topup).then(
+      (checkout) => {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = checkout.action;
+        for (const [name, value] of Object.entries(checkout.fields)) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = name;
+          input.value = value;
+          form.appendChild(input);
+        }
+        document.body.appendChild(form);
+        form.submit();
+      },
+      (error: unknown) => {
+        host.shop.busy = false;
+        host.toast = error instanceof Error ? error.message : '儲值失敗';
+        rerender();
+      },
+    );
   } else if (rarity) {
     host.shop.rarity = rarity as Shop['rarity'];
   } else if (color) {

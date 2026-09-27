@@ -75,8 +75,10 @@ import {
   today,
   type Backend,
   type LeaderboardRow,
+  topupStatus,
   type BotGameRecord,
   type ServerMe,
+  type ServerSession,
   type Session,
 } from './account';
 import { music, type Sound } from './music';
@@ -230,6 +232,34 @@ const app: App = {
   guestPassword: '',
 };
 
+/**
+ * 從綠界付款頁回來（網址帶 ?topup=訂單編號）：等綠界的付款通知到伺服器，入帳了就更新金幣。
+ * 信用卡通常幾秒內就到；ATM、超商代碼要等玩家真的去付款。
+ */
+async function checkTopupReturn(session: ServerSession): Promise<void> {
+  const params = new URLSearchParams(location.search);
+  const tradeNo = params.get('topup');
+  if (!tradeNo) return;
+  params.delete('topup');
+  const rest = params.toString();
+  history.replaceState(null, '', `${location.pathname}${rest ? `?${rest}` : ''}${location.hash}`);
+  for (let attempt = 0; attempt < 10; attempt++) {
+    try {
+      const result = await topupStatus(session, tradeNo);
+      if (result.status === 'paid') {
+        Object.assign(app, { profile: result.profile, toast: `儲值成功：金幣 +${result.gold}` });
+        render();
+        return;
+      }
+    } catch {
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+  app.toast = '還沒收到付款結果。用 ATM 或超商代碼的話，付款後金幣會自動入帳。';
+  render();
+}
+
 /** 登入成功：記住帳號、換成這個帳號的資料與牌組。伺服器帳號另外帶牌位。 */
 function signIn(session: Session, profile: Profile, me?: ServerMe): void {
   saveSession(session);
@@ -244,6 +274,7 @@ function signIn(session: Session, profile: Profile, me?: ServerMe): void {
     toast: null,
     shop: newShop(),
   });
+  if (session.kind !== 'test') void checkTopupReturn(session);
   // 換到沒有這個 UR 英雄的帳號：改選第一個基礎英雄。
   if (!ownsHero(profile, db, app.heroId)) app.heroId = SAMPLE_HEROES.find((hero) => hero.rarity === undefined)!.id;
   if (app.screen === 'login') app.screen = 'setup';
@@ -918,25 +949,35 @@ function attackReason(cv: CreatureView): string {
 
 const lines = detailLines;
 
+/**
+ * 卡面旁邊的說明：標題只寫名字、稀有度、顏色、種類（費用、攻擊、HP 卡面或標籤上已經有，不重複）；
+ * skip：已經畫成技能按鈕的那幾行，不再寫一次。場上生物與起手的牌用。
+ */
+function boardLines(def: DeckCardDef, skip: readonly string[]): string {
+  const [head = '', ...body] = describeCard(def, describeName);
+  return lines([head.split('｜')[0]!, ...body.filter((line) => !skip.includes(line))]);
+}
+
 /** 現在輪到你做決定。 */
 const myMove = (view: PlayerView) => view.phase === 'main' && view.activePlayer === YOU && !app.busy && !app.pending;
 
 function creatureStatus(cv: CreatureView): string {
   const tags: string[] = [`⚔ ${cv.attack}${cv.attackBonus ? `（含加成 +${cv.attackBonus}）` : ''}`, `♥ ${cv.hp} / ${cv.maxHp}`];
   const def = card(cv.cardId);
+  // 種族特色寫在上面的說明裡；這裡只標目前的狀態（不死用過了、沉默中失效）。
   const trait = def.kind === 'creature' ? describeTrait(def) : null;
-  if (def.kind === 'creature' && def.race && trait) {
-    const used = def.race === 'undead' && cv.undyingUsed ? '（已經用過）' : '';
-    tags.push(`${RACE_NAMES[def.race]}・${trait}${used}${cv.silenced ? '（沉默中失效）' : ''}`);
+  if (def.kind === 'creature' && trait) {
+    if (def.race === 'undead' && cv.undyingUsed) tags.push(`${trait} 已經用過`);
+    if (cv.silenced) tags.push(`${trait} 沉默中失效`);
   }
   if (cv.damageReduction) tags.push(`受到傷害 −${cv.damageReduction}`);
   if (cv.item) tags.push(`道具：${nameOf(cv.item)}`);
-  if (cv.taunting) tags.push('挑釁中');
-  if (cv.poison) tags.push(`中毒 ${cv.poison}：施放者的回合結束時失去 ${cv.poison}♥`);
-  if (cv.burn) tags.push(`灼燒 ${cv.burn}：施放者的回合結束時受到 ${cv.burn} 傷害`);
-  if (cv.paralyzed) tags.push('麻痺：不能攻擊、不能發動技能');
-  if (cv.silenced) tags.push('沉默：不能發動技能，吸血與再生失效');
-  if (cv.weakened) tags.push('虛弱：不能攻擊，也不會反擊');
+  if (cv.taunting) tags.push('**挑釁**中');
+  if (cv.poison) tags.push(`**中毒 ${cv.poison}**`);
+  if (cv.burn) tags.push(`**灼燒 ${cv.burn}**`);
+  if (cv.paralyzed) tags.push('**麻痺**');
+  if (cv.silenced) tags.push('**沉默**');
+  if (cv.weakened) tags.push('**虛弱**');
   if (cv.evolutionChain.length > 1) tags.push(`進化：${cv.evolutionChain.map(nameOf).join(' → ')}`);
   return `<ul class="tags">${tags.map((t) => `<li>${rich(t)}</li>`).join('')}</ul>`;
 }
@@ -987,7 +1028,7 @@ function detail(view: PlayerView): string {
     const cv = side.zones[sel.zone];
     if (!cv) return toast;
     const def = card(cv.cardId);
-    if (sel.player !== YOU || def.kind !== 'creature') return toast + lines(describeCard(def, describeName)) + creatureStatus(cv) + cancel;
+    if (sel.player !== YOU || def.kind !== 'creature') return toast + boardLines(def, []) + creatureStatus(cv) + cancel;
     // 我方的生物：技能按鈕放最上面，卡片說明就不再寫一次同樣的技能。
     const skills = skillsOf(cv);
     const skillLines = skills.map((skill) => describeAbility(skill, describeName));
@@ -1004,7 +1045,7 @@ function detail(view: PlayerView): string {
         ${reason ? `<span class="skill-why">${esc(reason)}</span>` : ''}</button>`;
     });
     body += '</div>';
-    body += lines(describeCard(def, describeName).filter((line) => !skillLines.includes(line)), skillLines) + creatureStatus(cv);
+    body += boardLines(def, skillLines) + creatureStatus(cv);
     const orSkill = skills.length > 0 ? '技能另外算，每回合也可以發動一次（花能量，不會被反擊）。' : '';
     body +=
       attacks.length > 0
@@ -1065,13 +1106,11 @@ function zone(cv: CreatureView | null, player: PlayerId, index: number, picks: M
   }
   const def = card(cv.cardId);
   const myTurn = myMove(view);
-  if (player === YOU && myTurn && (actsForAttack(index).length > 0 || skillsOf(cv).some((_, i) => actsForSkill(index, i).length > 0))) {
-    classes.push('ready');
+  // 輪到你時：還能攻擊或發動技能的發亮；什麼都不能做了（剛召喚、攻擊過而技能用過或能量不夠）就變淡。
+  if (player === YOU && myTurn) {
+    const ready = actsForAttack(index).length > 0 || skillsOf(cv).some((_, i) => actsForSkill(index, i).length > 0);
+    classes.push(ready ? 'ready' : 'spent');
   }
-  // 這回合什麼都不能做了（剛召喚，或攻擊與技能都用過）就變淡。
-  const sick = cv.summonedThisTurn && actReason(cv) !== null;
-  const done = sick || (cv.attackedThisTurn && (cv.skillUsedThisTurn || skillsOf(cv).length === 0));
-  if (player === YOU && done && view.activePlayer === YOU) classes.push('spent');
   if (cv.taunting) classes.push('taunt');
   const badges: string[] = [];
 
@@ -1094,10 +1133,9 @@ function zone(cv: CreatureView | null, player: PlayerId, index: number, picks: M
   // 背景是這隻生物目前那張卡的插圖，上下加深，字才看得清楚。
   classes.push('has-art');
   return `<button class="${classes.join(' ')} r-${def.rarity}" data-key="${key}" style="--art:url('${artUrl(def.id)}')" aria-label="${esc(def.name)}，費用 ${invested}，攻擊 ${cv.attack}，血量 ${cv.hp}">
-    <span class="z-top"><span class="z-cost">${invested}</span><span class="rarity">${def.rarity}</span>${pips(def.colors)}</span>
-    <span class="z-name">${esc(def.name)}</span>
-    <span class="z-stats"><span class="z-atk${buffed}" title="攻擊">⚔<b>${cv.attack}</b></span><span class="z-hp${hurt}" title="血量"><i aria-hidden="true">♥</i><b>${cv.hp}</b><small>/${cv.maxHp}</small></span></span>
+    <span class="z-cost">${invested}</span><span class="z-name">${esc(def.name)}</span>${pips(def.colors)}
     <span class="badges">${badges.join('')}</span>
+    <span class="z-foot"><span class="rarity">${def.rarity}</span><span class="z-stats"><span class="z-atk${buffed}" title="攻擊">⚔<b>${cv.attack}</b></span><span class="z-hp${hurt}" title="血量"><i aria-hidden="true">♥</i><b>${cv.hp}</b><small>/${cv.maxHp}</small></span></span></span>
   </button>`;
 }
 
@@ -1211,6 +1249,7 @@ function overlay(view: PlayerView): string {
       <div class="versus">${plate(view.you.heroId, '你')}${plate(view.opponent.heroId, '對手')}</div>
       <p class="d-line">點選要洗回牌庫重抽的牌，可以選任意張，只能重抽一次。</p>
       <div class="mull-hand">${cards}</div>
+      <div class="mull-info">${view.you.hand.map((held) => `<div class="mull-card">${boardLines(card(held.cardId), [])}</div>`).join('')}</div>
       <button class="primary" data-do="mulligan">${app.redraw.length ? `重抽 ${app.redraw.length} 張` : '保留這手牌'}</button>
     </div></div>`;
   }
@@ -1566,7 +1605,7 @@ function render(): void {
       : app.screen === 'deck'
         ? deckScreen(db, app.builder, custom ?? [], custom !== undefined, owned())
         : app.screen === 'shop'
-          ? shopScreen(db, app.profile, app.shop, app.toast)
+          ? shopScreen(db, app.profile, app.shop, app.toast, Boolean(app.backend?.topup))
           : app.screen === 'queue'
             ? queueScreen()
           : app.screen === 'lobby'
@@ -1695,9 +1734,11 @@ function builderClick(el: HTMLElement, command: string | undefined): boolean {
 
 root.addEventListener('click', (event) => {
   const el = (event.target as HTMLElement).closest<HTMLElement>(
-    '[data-do],[data-key],[data-hand],[data-skill],[data-hero],[data-mull],[data-pick],[data-add],[data-remove],[data-focus],[data-filter],[data-rarity],[data-color],[data-missing],[data-craft],[data-difficulty]',
+    '[data-do],[data-key],[data-hand],[data-skill],[data-hero],[data-mull],[data-pick],[data-add],[data-remove],[data-focus],[data-filter],[data-rarity],[data-color],[data-missing],[data-craft],[data-topup],[data-difficulty]',
   );
   if (!el) {
+    // 點在說明欄裡（正在看卡片資訊、點關鍵字看意思）不取消選取；點其他地方才回到對戰紀錄。
+    if ((event.target as HTMLElement).closest('.detail, .dialog')) return;
     if (app.selection) {
       app.selection = null;
       render();

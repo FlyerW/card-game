@@ -16,6 +16,7 @@ import {
   type GameSummary,
   type Profile,
   type RankState,
+  type Topup,
 } from '@card-game/economy';
 import type { GoogleIdentity } from './google';
 import type { RankedReport } from './protocol';
@@ -65,6 +66,25 @@ interface Data {
   accounts: Record<string, Account>;
   /** session token 的 SHA-256 → 哪個帳號、什麼時候過期（毫秒）。 */
   sessions: Record<string, { accountId: string; expires: number }>;
+  /** 儲值訂單：訂單編號 → 訂單。 */
+  orders: Record<string, Order>;
+}
+
+/** 一筆儲值訂單。付款成功的通知來了才加金幣，同一筆只加一次。 */
+export interface Order {
+  tradeNo: string;
+  accountId: string;
+  topup: string;
+  /** 新台幣。 */
+  amount: number;
+  gold: number;
+  status: 'pending' | 'paid';
+  createdAt: string;
+  paidAt?: string;
+  /** 綠界的交易編號。 */
+  ecpayTradeNo?: string;
+  /** 綠界測試環境後台的「模擬付款」。 */
+  simulated?: boolean;
 }
 
 const hash = (token: string) => createHash('sha256').update(token).digest('hex');
@@ -108,7 +128,7 @@ export const accountInfo = (account: Account): AccountInfo => ({
 });
 
 export class AccountStore {
-  private data: Data = { accounts: {}, sessions: {} };
+  private data: Data = { accounts: {}, sessions: {}, orders: {} };
   private writing: Promise<void> = Promise.resolve();
 
   private constructor(
@@ -131,6 +151,7 @@ export class AccountStore {
           store.data.accounts[id] = rank ? { ...rest, profile, rank } : { ...rest, profile };
         }
         store.data.sessions = raw.sessions ?? {};
+        store.data.orders = raw.orders ?? {};
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
       }
@@ -306,6 +327,46 @@ export class AccountStore {
   async logout(token: string): Promise<void> {
     delete this.data.sessions[hash(token)];
     await this.save();
+  }
+
+  /** 建立一筆儲值訂單（還沒付款）。 */
+  async createOrder(account: Account, topup: Topup, tradeNo: string, now = Date.now()): Promise<Order> {
+    const order: Order = {
+      tradeNo,
+      accountId: account.id,
+      topup: topup.id,
+      amount: topup.price,
+      gold: topup.gold,
+      status: 'pending',
+      createdAt: new Date(now).toISOString(),
+    };
+    this.data.orders[tradeNo] = order;
+    await this.save();
+    return order;
+  }
+
+  order(tradeNo: string): Order | null {
+    return this.data.orders[tradeNo] ?? null;
+  }
+
+  /**
+   * 付款成功：加金幣。同一筆訂單只加一次（綠界可能重送通知）；金額跟訂單不合就不加。
+   * 回傳 credited（這次加了）、already（之前加過）、unknown（沒有這筆）、mismatch（金額不合）。
+   */
+  async payOrder(
+    notice: { tradeNo: string; amount: number; ecpayTradeNo: string; simulated: boolean },
+    now = Date.now(),
+  ): Promise<'credited' | 'already' | 'unknown' | 'mismatch'> {
+    const order = this.data.orders[notice.tradeNo];
+    if (!order) return 'unknown';
+    if (order.status === 'paid') return 'already';
+    if (order.amount !== notice.amount) return 'mismatch';
+    const account = this.data.accounts[order.accountId];
+    if (!account) return 'unknown';
+    account.profile = { ...account.profile, gold: account.profile.gold + order.gold };
+    Object.assign(order, { status: 'paid', paidAt: new Date(now).toISOString(), ecpayTradeNo: notice.ecpayTradeNo, simulated: notice.simulated });
+    await this.save();
+    return 'credited';
   }
 
   /** 存一個英雄的自訂牌組；deck 是 null 就刪掉。 */
