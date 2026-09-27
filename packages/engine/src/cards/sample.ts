@@ -9,11 +9,11 @@ import { isReleased, setOf } from './sets';
 // 生物的基準照總費用 C（進化生物是基礎加進化的費用）：攻擊 C、HP C + 1，跟爐石的白板一樣。
 //
 // 稀有度：N 沒有技能，數值照基準；R 照基準、一個技能；SR 多 2 點 HP、一個技能；UR 多 3 點數值、兩個技能。
-// 原本是二階進化、後來改成基礎生物的卡（熾天使、深海水母皇、死亡騎士、九尾天狐、古樹熊神），技能是照二階的預算做的，
+// 原本是二階進化、後來改成基礎生物的卡（熾天使、深海水母皇、死亡騎士、九尾天狐），技能是照二階的預算做的，
 // 所以數值照 R（不拿 SR/UR 的額外數值），技能貴 1 費、效果略減。
 // 無色卡比有顏色的卡少 1 點數值。進場效果、速攻、吸血、再生扣 1 點左右；9 費以上的進場效果不扣。
 // 單體傷害（技能與法術共用）：任意目標 = 費用 + 1，剛好解掉同費用的生物；只打英雄、只打生物、位置 = 費用 + 2。
-// 附帶其他效果的扣 1–2。範圍傷害約費用的一半；天生技約是同費用技能的一半。
+// 附帶其他效果的扣 1–2。範圍傷害：法術約費用的一半；技能 3 費全體 2、4 費全體 3（元素之力另外加）。天生技約是同費用技能的一半。
 // 回復約是 v0.8 的 1/2，增益、道具、中毒灼燒約是縮模時的 2 倍。
 
 const ANY: TargetSpec = { kind: 'enemy', allow: 'any' };
@@ -104,7 +104,7 @@ const CORE_CARDS: DeckCardDef[] = [
   {
     kind: 'creature', id: 'siege-colossus', name: '攻城巨像', rarity: 'R', colors: [], race: 'machine', trait: 2,
     stage: 0, cost: 9, attack: 9, hp: 9,
-    skills: [{ name: '踐踏', cost: 5, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }],
+    skills: [{ name: '踐踏', cost: 4, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }],
   },
   {
     kind: 'creature', id: 'astral-dragon', name: '星界巨龍', rarity: 'SR', colors: [], race: 'dragon',
@@ -390,7 +390,7 @@ const CORE_CARDS: DeckCardDef[] = [
     kind: 'creature', id: 'nine-tailed-fox', name: '九尾天狐', rarity: 'SR', colors: ['red'], race: 'beast',
     stage: 0, cost: 7, attack: 7, hp: 7,
     entry: { name: '九焰', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 1 }] },
-    skills: [{ name: '燎天', cost: 5, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }, { type: 'buff', attack: 1, hp: 1, on: 'self' }] }],
+    skills: [{ name: '燎天', cost: 4, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }, { type: 'buff', attack: 1, hp: 1, on: 'self' }] }],
   },
   {
     kind: 'creature', id: 'flame-imp', name: '炎之小鬼', rarity: 'R', colors: ['red'], race: 'elemental',
@@ -447,12 +447,12 @@ const CORE_CARDS: DeckCardDef[] = [
     skills: [{ name: '巨力', cost: 4, target: NONE, effects: [{ type: 'buff', attack: 3, hp: 5, on: 'self' }] }],
   },
   {
-    // 原本是二階進化；改成最多進化一次之後，技能留著、變成單獨的基礎生物（見開頭：數值照 R、技能貴 1 費）。
+    // 原本是二階進化、技能要 7 費；改成便宜的技能，每回合都用得到（兩個技能每回合還是只能發動一個）。
     kind: 'creature', id: 'ancient-bear-god', name: '古樹熊神', rarity: 'UR', colors: ['green'], race: 'beast',
     stage: 0, cost: 8, attack: 6, hp: 9, regenerate: 2,
     skills: [
-      { name: '森之怒', cost: 7, target: CREATURE, effects: [{ type: 'damage', amount: 5 }] },
-      { name: '大地震', cost: 7, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] },
+      { name: '森之怒', cost: 2, target: CREATURE, effects: [{ type: 'damage', amount: 3 }] },
+      { name: '大地震', cost: 3, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] },
     ],
   },
   {
@@ -496,13 +496,13 @@ const CORE_CARDS: DeckCardDef[] = [
     kind: 'creature', id: 'mountain-giant', name: '山嶺巨人', rarity: 'SR', colors: ['green'], race: 'elemental',
     stage: 0, cost: 10, attack: 10, hp: 13,
     entry: { name: '大地之息', target: NONE, effects: [{ type: 'healAll', amount: 5 }] },
-    skills: [{ name: '山崩', cost: 6, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] }],
+    skills: [{ name: '山崩', cost: 4, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }],
   },
   {
     kind: 'creature', id: 'earth-titan', name: '大地泰坦', rarity: 'UR', colors: ['green'], race: 'elemental',
     stage: 0, cost: 12, attack: 13, hp: 14,
     entry: { name: '震地', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 1 }] },
-    skills: [hit('泰坦之拳', 5, CREATURE, 7), { name: '地裂', cost: 6, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] }],
+    skills: [hit('泰坦之拳', 5, CREATURE, 7), { name: '地裂', cost: 4, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }],
   },
   {
     kind: 'spell', id: 'giant-growth', name: '巨化術', rarity: 'R', colors: ['green'], cost: 2,
@@ -756,9 +756,9 @@ const AWAKENING: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'dawn-dragon', name: '晨曦巨龍', rarity: 'SR', colors: ['white'], race: 'dragon',
-    stage: 0, cost: 7, attack: 6, hp: 7,
+    stage: 0, cost: 7, attack: 5, hp: 7,
     entry: { name: '聖息', target: NONE, effects: [{ type: 'healHero', amount: 3 }], awaken: [{ type: 'buff', attack: 1, hp: 1, on: 'all' }] },
-    skills: [{ name: '光鱗', cost: 3, target: ALLY_CREATURE, effects: [{ type: 'buff', attack: 2, hp: 2, on: 'target' }] }],
+    skills: [{ name: '光鱗', cost: 3, target: ALLY_CREATURE, effects: [{ type: 'buff', attack: 1, hp: 1, on: 'target' }] }],
   },
   {
     kind: 'spell', id: 'dragon-blessing', name: '龍之祝福', rarity: 'R', colors: ['white'], cost: 2,
@@ -768,7 +768,7 @@ const AWAKENING: DeckCardDef[] = [
   // 藍：抽牌、麻痺
   {
     kind: 'creature', id: 'mist-wyrmling', name: '霧海幼龍', rarity: 'N', colors: ['blue'], race: 'dragon',
-    stage: 0, cost: 3, attack: 2, hp: 4, skills: [], entry: { name: '霧息', target: NONE, effects: [{ type: 'draw', count: 1 }] },
+    stage: 0, cost: 3, attack: 3, hp: 4, skills: [], entry: { name: '霧息', target: NONE, effects: [{ type: 'draw', count: 1 }] },
   },
   {
     kind: 'creature', id: 'dragon-speaker', name: '龍語者', rarity: 'R', colors: ['blue'], race: 'human',
@@ -782,7 +782,7 @@ const AWAKENING: DeckCardDef[] = [
     skills: [hit('冰槍', 2, CREATURE, 4)],
   },
   {
-    kind: 'spell', id: 'dragon-lore', name: '龍脈學識', rarity: 'R', colors: ['blue'], cost: 3,
+    kind: 'spell', id: 'dragon-lore', name: '龍脈學識', rarity: 'R', colors: ['blue'], cost: 2,
     target: NONE, effects: [{ type: 'draw', count: 2 }], awaken: [{ type: 'draw', count: 1 }],
   },
   // 黑：消滅、遺言
@@ -825,7 +825,7 @@ const AWAKENING: DeckCardDef[] = [
     kind: 'creature', id: 'magma-dragon', name: '熔岩巨龍', rarity: 'UR', colors: ['red'], race: 'dragon',
     stage: 0, cost: 10, attack: 11, hp: 12,
     entry: { name: '熔岩吐息', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] },
-    skills: [hit('龍怒', 4, ANY, 5), { name: '焚天', cost: 6, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }],
+    skills: [hit('龍怒', 4, ANY, 5), { name: '焚天', cost: 4, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }],
   },
   {
     kind: 'spell', id: 'dragonfire-burst', name: '龍焰爆發', rarity: 'R', colors: ['red'], cost: 3,
@@ -845,7 +845,7 @@ const AWAKENING: DeckCardDef[] = [
   },
   {
     kind: 'spell', id: 'awakening-seed', name: '覺醒之種', rarity: 'R', colors: ['green'], cost: 2,
-    target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }], awaken: [{ type: 'draw', count: 2 }],
+    target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }], awaken: [{ type: 'draw', count: 1 }],
   },
   {
     kind: 'creature', id: 'dragon-egg', name: '巨龍之卵', rarity: 'N', colors: ['green'], race: 'dragon',

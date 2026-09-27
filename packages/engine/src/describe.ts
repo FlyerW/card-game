@@ -147,14 +147,21 @@ export function cardNames(db: CardDb): Names {
   };
 }
 
-export function describeEffect(effect: Effect, names: Names = ids): string {
+/** 傷害的數字；有加成（元素之力）時寫成「7 (+1)」。 */
+const amountWith = (amount: number, bonus: number) => (bonus > 0 ? `${amount} (+${bonus})` : `${amount}`);
+
+/** 生物的技能、進場、遺言與持續效果多造成的傷害：元素之力 N。 */
+export const damageBonus = (card: CreatureDef): number => (card.race === 'elemental' ? traitOf(card) : 0);
+
+/** bonus：這個效果的傷害加成（元素之力），寫在數字後面的括號裡。 */
+export function describeEffect(effect: Effect, names: Names = ids, bonus = 0): string {
   switch (effect.type) {
     case 'summonToken':
       return `召喚 ${effect.count} 隻${names(effect.token)}`;
     case 'damage':
-      return `造成 ${effect.amount} 傷害`;
+      return `造成 ${amountWith(effect.amount, bonus)} 傷害`;
     case 'damageEnemyCreatures':
-      return `對手每隻生物各受 ${effect.amount} 傷害`;
+      return `對手每隻生物各受 ${amountWith(effect.amount, bonus)} 傷害`;
     case 'draw':
       return `抽 ${effect.count} 張牌`;
     case 'opponentDiscardRandom':
@@ -205,41 +212,41 @@ export function describeEffect(effect: Effect, names: Names = ids): string {
 }
 
 /** 目標與效果：「〔任意目標〕造成 7 傷害」。 */
-export function describeEffects(ability: Omit<Ability, 'cost'>, names: Names = ids): string {
+export function describeEffects(ability: Omit<Ability, 'cost'>, names: Names = ids, bonus = 0): string {
   const target = describeTarget(ability.target);
-  return `${target === null ? '' : `〔${target}〕`}${ability.effects.map((effect) => describeEffect(effect, names)).join('，')}`;
+  return `${target === null ? '' : `〔${target}〕`}${ability.effects.map((effect) => describeEffect(effect, names, bonus)).join('，')}`;
 }
 
 /** 技能與天生技：「火花（能量 2）：〔斜對角〕造成 7 傷害」。 */
-export function describeAbility(ability: Ability, names: Names = ids): string {
+export function describeAbility(ability: Ability, names: Names = ids, bonus = 0): string {
   // 費用：能量（只付能量上限、或休息技能不花能量時不寫）、能量上限 −N、休息、每局次數。
   const parts: string[] = [];
   if (ability.cost > 0 || (!ability.rest && !ability.maxEnergyCost)) parts.push(`能量 ${ability.cost}`);
   if (ability.maxEnergyCost) parts.push(`能量上限 −${ability.maxEnergyCost}`);
   if (ability.rest) parts.push(keyword('休息'));
   if (ability.uses) parts.push(`每局 ${ability.uses} 次`);
-  return `${ability.name}（${parts.join('，')}）：${describeEffects(ability, names)}`;
+  return `${ability.name}（${parts.join('，')}）：${describeEffects(ability, names, bonus)}`;
 }
 
 /** 進場效果：「**進場** 火星：〔任意目標〕造成 2 傷害」。 */
-export const describeEntry = (entry: EntryEffect, names: Names = ids): string =>
-  `${keyword('進場')} ${entry.name}：${describeEffects(entry, names)}${describeAwaken(entry.awaken, names)}`;
+export const describeEntry = (entry: EntryEffect, names: Names = ids, bonus = 0): string =>
+  `${keyword('進場')} ${entry.name}：${describeEffects(entry, names, bonus)}${describeAwaken(entry.awaken, names, bonus)}`;
 
 /** 覺醒的那一段：「；**覺醒**：再造成 3 傷害」。 */
-const describeAwaken = (awaken: readonly Effect[] | undefined, names: Names) =>
-  awaken?.length ? `；${keyword('覺醒')}：${awaken.map((effect) => describeEffect(effect, names)).join('，')}` : '';
+const describeAwaken = (awaken: readonly Effect[] | undefined, names: Names, bonus = 0) =>
+  awaken?.length ? `；${keyword('覺醒')}：${awaken.map((effect) => describeEffect(effect, names, bonus)).join('，')}` : '';
 
 /** 遺言：「**遺言** 傳承：召喚 1 隻士兵（2/2）」。 */
-export const describeDeath = (death: DeathEffect, names: Names = ids): string =>
-  `${keyword('遺言')} ${death.name}：${death.effects.map((effect) => describeEffect(effect, names)).join('，')}`;
+export const describeDeath = (death: DeathEffect, names: Names = ids, bonus = 0): string =>
+  `${keyword('遺言')} ${death.name}：${death.effects.map((effect) => describeEffect(effect, names, bonus)).join('，')}`;
 
 /** 持續效果的關鍵字。 */
 const TRIGGER_NAMES: Record<TriggerWhen, string> = { turnStart: '回合開始', turnEnd: '回合結束', heroHealed: '每當回復', allySummoned: '每當召喚' };
 
 /** 持續效果：「**回合結束** 觀星：抽 1 張牌」「**每當召喚**亡靈 守墓：抽 1 張牌」。 */
-export const describeTrigger = (trigger: TriggeredEffect, names: Names = ids): string =>
+export const describeTrigger = (trigger: TriggeredEffect, names: Names = ids, bonus = 0): string =>
   `${keyword(TRIGGER_NAMES[trigger.when])}${trigger.race ? RACE_NAMES[trigger.race] : ''} ${trigger.name}：${trigger.effects
-    .map((effect) => describeEffect(effect, names))
+    .map((effect) => describeEffect(effect, names, bonus))
     .join('，')}`;
 
 /** 種族特色與關鍵字放在同一行：「**同袍 2**、**速攻**、**吸血**」。 */
@@ -300,11 +307,12 @@ export function describeCard(card: DeckCardDef, names: Names = ids): string[] {
       const race = card.race ? `・${RACE_NAMES[card.race]}` : '';
       if (card.token) return [`${card.name}　${tag}${race}・衍生物｜⚔ ${card.attack}｜♥ ${card.hp}`, ...describeTraits(card), keyword('衍生物')];
       const stage = card.evolvesFrom === undefined ? '基礎' : `由${names(card.evolvesFrom)}進化`;
-      const entry = card.entry ? [describeEntry(card.entry, names)] : [];
-      const death = card.death ? [describeDeath(card.death, names)] : [];
-      const triggers = (card.triggers ?? []).map((trigger) => describeTrigger(trigger, names));
+      const bonus = damageBonus(card);
+      const entry = card.entry ? [describeEntry(card.entry, names, bonus)] : [];
+      const death = card.death ? [describeDeath(card.death, names, bonus)] : [];
+      const triggers = (card.triggers ?? []).map((trigger) => describeTrigger(trigger, names, bonus));
       if (card.kin) triggers.unshift(`我方每有另一隻${RACE_NAMES[card.kin.race]}，牠 ⚔ +${card.kin.attack}`);
-      const skills = card.skills.map((skill) => describeAbility(skill, names));
+      const skills = card.skills.map((skill) => describeAbility(skill, names, bonus));
       return [
         `${card.name}　${tag}${race}・${stage}｜${cost}｜⚔ ${card.attack}｜♥ ${card.hp}`,
         ...describeTraits(card),

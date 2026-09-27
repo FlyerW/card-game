@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { describeCard } from '../src/describe';
 import { attackPower, currentHp } from '../src/queries';
-import { act, at, creatureAt, endTurn, engine, give, hero, place, reject, start } from './helpers';
+import type { DeckCardDef } from '../src/types';
+import { act, at, creatureAt, db, endTurn, engine, give, hero, place, reject, start } from './helpers';
 
 // 種族特色：每個種族一個，沉默時跟卡上其他效果一樣失效。
 
@@ -73,6 +75,12 @@ describe('元素：元素之力', () => {
     expect(state.players[b].heroDamage).toBe(3);
     state = act(state, { type: 'attack', player: a, zone: 0, target: hero(b) });
     expect(state.players[b].heroDamage).toBe(3 + 2);
+  });
+
+  it('卡面上的傷害寫成「2 (+1)」：寫原本的數字，加成放在括號裡', () => {
+    const sprite = db.cards.get('sprite')!;
+    expect(describeCard(sprite as DeckCardDef).join('\n')).toContain('造成 2 (+1) 傷害');
+    expect(describeCard(db.cards.get('brute')! as DeckCardDef).join('\n')).not.toContain('(+');
   });
 });
 

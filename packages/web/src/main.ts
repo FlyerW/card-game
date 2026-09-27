@@ -1,6 +1,7 @@
 import {
   createEngine,
   DEFAULT_RULES,
+  damageBonus,
   describeAbility,
   describeCard,
   describeColors,
@@ -1035,6 +1036,12 @@ function boardLines(def: DeckCardDef, skip: readonly string[]): string {
 /** 現在輪到你做決定。 */
 const myMove = (view: PlayerView) => view.phase === 'main' && view.activePlayer === YOU && !app.busy && !app.pending;
 
+/** 場上生物的技能傷害加成（元素之力）；沉默時沒有。 */
+function skillBonus(cv: CreatureView): number {
+  const def = card(cv.cardId);
+  return def.kind === 'creature' && !cv.silenced ? damageBonus(def) : 0;
+}
+
 function creatureStatus(cv: CreatureView): string {
   const def = card(cv.cardId);
   // HP 上限的加成（增益、道具、場地、英雄被動）：跟攻擊力一樣寫在括號裡。
@@ -1110,7 +1117,9 @@ function detail(view: PlayerView): string {
     if (sel.player !== YOU || def.kind !== 'creature') return toast + boardLines(def, []) + creatureStatus(cv) + cancel;
     // 我方的生物：技能按鈕放最上面，卡片說明就不再寫一次同樣的技能。
     const skills = skillsOf(cv);
-    const skillLines = skills.map((skill) => describeAbility(skill, describeName));
+    const bonus = skillBonus(cv);
+    // 卡片說明照卡上的加成寫（沉默時也一樣），跳過的時候要用同樣的寫法比對。
+    const skillLines = skills.map((skill) => describeAbility(skill, describeName, damageBonus(def)));
     const attacks = actsForAttack(sel.zone);
     const attackBlocked = myTurn && attacks.length === 0 ? attackReason(cv) : '';
     let body = '<div class="skills">';
@@ -1120,7 +1129,7 @@ function detail(view: PlayerView): string {
       // 跟下面攻擊的原因一樣（例如「召喚當回合不能攻擊、不能發動技能」）就只寫一次。
       const reason = why === attackBlocked ? '' : why;
       body += `<button class="skill" data-skill="${sel.zone}:${index}" ${acts.length === 0 ? 'disabled' : ''}>
-        ${costBadge(skill)}<span class="skill-text">${rich(`${skill.name}：${describeEffects(skill, describeName)}`)}</span>
+        ${costBadge(skill)}<span class="skill-text">${rich(`${skill.name}：${describeEffects(skill, describeName, bonus)}`)}</span>
         ${reason ? `<span class="skill-why">${esc(reason)}</span>` : ''}</button>`;
     });
     body += '</div>';
@@ -1151,14 +1160,15 @@ function detail(view: PlayerView): string {
     return (
       toast +
       `<p class="d-head">選擇進場效果的目標</p><p class="d-line">${esc(def!.name)} 放在 ${ZONE[sel.zone]}</p>
-       <p class="d-line">${rich(describeEntry(entry, describeName))}</p><p class="hint">發光的就是可以選的目標。</p>` +
+       <p class="d-line">${rich(describeEntry(entry, describeName, def?.kind === 'creature' ? damageBonus(def) : 0))}</p><p class="hint">發光的就是可以選的目標。</p>` +
       cancel
     );
   }
 
   if (sel.kind === 'skill' || sel.kind === 'heroPower') {
     const ability = sel.kind === 'skill' ? skillsOf(view.you.zones[sel.zone]!)[sel.skill]! : powerOf(view.you)!.power;
-    return toast + `<p class="d-head">選擇目標</p><p class="d-line">${rich(describeAbility(ability, describeName))}</p><p class="hint">發光的就是可以選的目標。</p>` + cancel;
+    const bonus = sel.kind === 'skill' ? skillBonus(view.you.zones[sel.zone]!) : 0;
+    return toast + `<p class="d-head">選擇目標</p><p class="d-line">${rich(describeAbility(ability, describeName, bonus))}</p><p class="hint">發光的就是可以選的目標。</p>` + cancel;
   }
 
   if (sel.kind === 'hero') {
@@ -1512,7 +1522,8 @@ function setupScreen(): string {
     const chosen = h.id === app.heroId;
     const locked = !ownsHero(app.profile, db, h.id);
     return `<button class="hero-pick${chosen ? ' chosen' : ''}${locked ? ' locked' : ''}" data-hero="${h.id}" aria-pressed="${chosen}" ${locked ? 'disabled' : ''}>
-      <span class="hp-big">${h.hp}</span><span class="hp-unit">♥${h.rarity ? '<b class="hp-ur">UR</b>' : ''}</span>
+      <span class="hp-art" style="--art:url('${artUrl(h.id)}')" aria-hidden="true">
+        <span class="hp-hp"><b class="hp-big">${h.hp}</b><span class="hp-unit">♥</span></span>${h.rarity ? '<b class="hp-ur">UR</b>' : ''}</span>
       <span class="hp-name">${pips(h.colors)}${esc(h.name)}</span>
       <span class="hp-text">${body.map((line) => `<span class="hp-line">${rich(line)}</span>`).join('')}${evolves}</span>${locked ? '<span class="hp-lock">還沒有：卡包抽到或用 1000 粉塵合成</span>' : ''}
       <span class="sr">${esc(head ?? '')}</span></button>`;
