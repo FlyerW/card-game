@@ -102,6 +102,52 @@ describe('帳號資料', () => {
     }
   });
 
+  it('超級帳號看得到還沒發布的卡包：開得到第二彈、牌組放得進第二彈的卡；一般帳號不行', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'card-game-'));
+    try {
+      const store = await AccountStore.open(dir, sampleDb());
+      const admin = await store.login({ sub: 'admin', email: null, name: '管理員', picture: null });
+      const normal = await store.login({ sub: 'normal', email: null, name: '路人', picture: null });
+      const file = join(dir, 'accounts.json');
+      const data = JSON.parse(await readFile(file, 'utf8'));
+      data.accounts['google:admin'].unlimited = true;
+      await writeFile(file, JSON.stringify(data));
+
+      const running = await startServer({ port: 0, host: '127.0.0.1', dataDir: dir });
+      try {
+        const call = async (token: string, path: string, body?: unknown) => {
+          const response = await fetch(`http://127.0.0.1:${running.port}${path}`, {
+            method: body === undefined ? 'GET' : 'POST',
+            headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+            ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+          });
+          return { status: response.status, json: (await response.json()) as Record<string, any> };
+        };
+        const me = await call(admin.token, '/api/me');
+        expect(me.json.account.preview).toBe(true);
+        expect(me.json.profile.collection['white-wyrmling']).toBeGreaterThan(0); // 全卡也包括第二彈
+        expect((await call(normal.token, '/api/me')).json.account.preview).toBeUndefined();
+
+        const pack = (token: string) => call(token, '/api/pack', { count: 1, set: 'awakening' });
+        expect((await pack(admin.token)).status).toBe(200);
+        expect((await pack(normal.token)).status).toBe(400);
+
+        const deck = { id: 'dragons', name: '龍', heroId: 'nameless-swordsman', cards: ['white-wyrmling', 'squire'] };
+        await call(admin.token, '/api/decks/save', { deck });
+        await call(normal.token, '/api/decks/save', { deck });
+        expect((await call(admin.token, '/api/me')).json.deckBook.decks[0].cards).toEqual(['white-wyrmling', 'squire']);
+        expect((await call(normal.token, '/api/me')).json.deckBook.decks[0].cards).toEqual(['squire']);
+      } finally {
+        await running.close();
+      }
+      // 重開伺服器：超級帳號牌組裡的第二彈卡還在
+      const reopened = await AccountStore.open(dir, sampleDb(), sampleDb(true));
+      expect(reopened.byToken(admin.token)!.deckBook!.decks[0]!.cards).toContain('white-wyrmling');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('session 過期就找不到', async () => {
     const store = await AccountStore.open(null, sampleDb());
     const { token } = await store.login({ sub: '1', email: null, name: null, picture: null }, 0);

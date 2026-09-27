@@ -35,6 +35,8 @@ export interface AccountInfo {
   name: string;
   email: string | null;
   picture: string | null;
+  /** 超級帳號：伺服器讓它看得到還沒發布的卡包，網頁要切到預覽模式。 */
+  preview?: boolean;
 }
 
 /** 測試帳號存在瀏覽器；Google 帳號與訪客帳號存在遊戲伺服器上，用 token 驗證。 */

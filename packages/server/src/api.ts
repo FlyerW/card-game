@@ -16,6 +16,8 @@ const MAX_BODY_BYTES = 16 * 1024;
 export interface ApiOptions {
   store: AccountStore;
   db: CardDb;
+  /** 包含還沒發布的卡包系列：超級帳號開包、合成、存牌組用。沒給就跟 db 一樣。 */
+  previewDb?: CardDb;
   /** Google 登入用的 OAuth client id；沒設定就不能用 Google 登入。 */
   googleClientId: string | null;
   verify: ((credential: string) => Promise<GoogleIdentity>) | null;
@@ -77,6 +79,8 @@ const bearer = (request: IncomingMessage) => /^Bearer ([0-9a-f]{64})$/.exec(requ
 export async function handleApi(request: IncomingMessage, response: ServerResponse, path: string, options: ApiOptions): Promise<boolean> {
   if (!path.startsWith('/api/')) return false;
   const { store, db } = options;
+  /** 超級帳號看得到還沒發布的卡包；其他帳號只有已發布的。 */
+  const dbFor = (account: Account): CardDb => (account.unlimited && options.previewDb ? options.previewDb : db);
   const route = `${request.method} ${path}`;
   try {
     const authed = (): { account: Account; token: string } => {
@@ -181,8 +185,9 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
         const { account } = authed();
         const { count = 1, set = 'core' } = await readJson(request);
         if (count !== 1 && count !== PACK_BATCH) throw new HttpError(400, `一次只能開 1 包或 ${PACK_BATCH} 包`);
-        if (typeof set !== 'string' || !packSets(db).some((each) => each.id === set)) throw new HttpError(400, '沒有這種卡包');
-        const opened = openPacks(account.profile, db, DEFAULT_RULES, () => randomInt(2 ** 32) / 2 ** 32, count, set);
+        const cards = dbFor(account);
+        if (typeof set !== 'string' || !packSets(cards).some((each) => each.id === set)) throw new HttpError(400, '沒有這種卡包');
+        const opened = openPacks(account.profile, cards, DEFAULT_RULES, () => randomInt(2 ** 32) / 2 ** 32, count, set);
         if (!opened.ok) throw new HttpError(400, opened.reason);
         await store.update(account, opened.profile);
         // 回傳存進去的資料（超級帳號會補滿金幣）。
@@ -193,7 +198,7 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
         const { account } = authed();
         const { cardId } = await readJson(request);
         if (typeof cardId !== 'string') throw new HttpError(400, '缺少要合成的卡');
-        const crafted = craft(account.profile, db, DEFAULT_RULES, cardId);
+        const crafted = craft(account.profile, dbFor(account), DEFAULT_RULES, cardId);
         if (!crafted.ok) throw new HttpError(400, crafted.reason);
         await store.update(account, crafted.profile);
         return send(response, 200, { profile: account.profile }), true;
@@ -214,7 +219,7 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
       case 'POST /api/decks/save': {
         // 存一副牌組（新的或改過的）：可以還沒組滿；卡要存在、不能是衍生物。收藏夠不夠在開局時才檢查。
         const { account } = authed();
-        const deck = cleanDeck(db, (await readJson(request)).deck);
+        const deck = cleanDeck(dbFor(account), (await readJson(request)).deck);
         if (!deck) throw new HttpError(400, '牌組格式不對');
         const book = putDeck(account.deckBook ?? emptyBook(), deck);
         if (!book) throw new HttpError(400, `牌組最多存 ${DECK_LIMIT} 副`);
@@ -245,7 +250,7 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
         const summary = parseSummary(body.summary);
         if (!summary) throw new HttpError(400, '對局資料格式不對');
         // 跟電腦打的對局紀錄：格式不對就不記，不影響領獎。
-        const record = options.log ? parseBotRecord(body.record, db, account.id) : null;
+        const record = options.log ? parseBotRecord(body.record, dbFor(account), account.id) : null;
         if (record) void options.log!.add(record).catch((error: unknown) => console.error('對局紀錄寫不進去', error));
         const reward = recordGame(account.profile, summary, serverDay());
         await store.update(account, reward.profile);

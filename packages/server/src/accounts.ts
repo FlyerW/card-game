@@ -65,6 +65,8 @@ export interface AccountInfo {
   name: string;
   email: string | null;
   picture: string | null;
+  /** 超級帳號：網頁切到預覽模式，看得到還沒發布的卡包。 */
+  preview?: boolean;
 }
 
 interface Data {
@@ -130,6 +132,7 @@ export const accountInfo = (account: Account): AccountInfo => ({
   name: account.name,
   email: account.email,
   picture: account.picture,
+  ...(account.unlimited ? { preview: true } : {}),
 });
 
 export class AccountStore {
@@ -139,11 +142,15 @@ export class AccountStore {
   private constructor(
     private readonly file: string | null,
     private readonly db: CardDb,
+    private readonly previewDb: CardDb,
   ) {}
 
-  /** 從資料夾讀出帳號；dir 是 null 就只放在記憶體（測試用）。 */
-  static async open(dir: string | null, db: CardDb): Promise<AccountStore> {
-    const store = new AccountStore(dir === null ? null : join(dir, 'accounts.json'), db);
+  /**
+   * 從資料夾讀出帳號；dir 是 null 就只放在記憶體（測試用）。
+   * previewDb：包含還沒發布的卡包系列，超級帳號的全卡與牌組用它（沒給就跟 db 一樣）。
+   */
+  static async open(dir: string | null, db: CardDb, previewDb: CardDb = db): Promise<AccountStore> {
+    const store = new AccountStore(dir === null ? null : join(dir, 'accounts.json'), db, previewDb);
     if (dir !== null) {
       await mkdir(dir, { recursive: true });
       try {
@@ -154,7 +161,8 @@ export class AccountStore {
           // 舊存檔的牌組是「英雄 id → 卡片清單」（每個英雄一副），轉成牌組清單。
           const { rank: savedRank, decks: oldDecks, deckBook: savedBook, ...rest } = account as Account & { decks?: unknown };
           const rank = savedRank === undefined ? null : parseRank(savedRank);
-          const book = savedBook !== undefined ? cleanBook(db, savedBook) : oldDecks !== undefined ? cleanBook(db, oldDecks) : null;
+          // 用包含未發布卡的資料讀牌組：超級帳號的牌組裡可能有預覽的卡（一般帳號存不進去）。
+          const book = savedBook !== undefined ? cleanBook(previewDb, savedBook) : oldDecks !== undefined ? cleanBook(previewDb, oldDecks) : null;
           store.data.accounts[id] = { ...rest, profile, ...(rank ? { rank } : {}), ...(book ? { deckBook: book } : {}) };
           store.refill(store.data.accounts[id]!);
         }
@@ -335,7 +343,7 @@ export class AccountStore {
 
   /** 超級帳號：把金幣補滿、缺的卡補齊（只改記憶體，下次存檔時一起寫進去）。 */
   private refill(account: Account): void {
-    if (account.unlimited) account.profile = unlimitedProfile(account.profile, this.db, DEFAULT_RULES);
+    if (account.unlimited) account.profile = unlimitedProfile(account.profile, this.previewDb, DEFAULT_RULES);
   }
 
   async logout(token: string): Promise<void> {

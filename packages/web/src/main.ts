@@ -110,10 +110,13 @@ import { artUrl, cardFace, detailLines, esc, pips, rich } from './ui';
 import './style.css';
 
 /**
- * 預覽還沒發布的卡包系列：網址加 ?preview，或伺服器用 CARD_PREVIEW=1 開。
- * 伺服器沒開預覽時，伺服器帳號的牌組存不進還沒發布的卡，所以預覽建議用測試帳號。
+ * 預覽還沒發布的卡包系列：網址加 ?preview，或伺服器用 CARD_PREVIEW=1 開（整個網頁都預覽）；
+ * 或是用超級帳號登入（只有這個帳號預覽，記在存下來的登入資料裡，登入、登出時切換要重新載入網頁）。
+ * 伺服器沒開預覽時，一般伺服器帳號的牌組存不進還沒發布的卡，所以預覽建議用測試帳號或超級帳號。
  */
-const PREVIEW = new URLSearchParams(location.search).has('preview') || (window as { CARD_GAME_PREVIEW?: boolean }).CARD_GAME_PREVIEW === true;
+const PAGE_PREVIEW = new URLSearchParams(location.search).has('preview') || (window as { CARD_GAME_PREVIEW?: boolean }).CARD_GAME_PREVIEW === true;
+const ACCOUNT_PREVIEW = !PAGE_PREVIEW && loadSession()?.account.preview === true;
+const PREVIEW = PAGE_PREVIEW || ACCOUNT_PREVIEW;
 const db = sampleDb(PREVIEW);
 const engine = createEngine(db);
 /** 你的座位。跟電腦打時是 0；連線對戰時由伺服器決定。 */
@@ -313,6 +316,11 @@ async function checkTopupReturn(session: ServerSession): Promise<void> {
 /** 登入成功：記住帳號、換成這個帳號的資料與牌組。伺服器帳號另外帶牌位。 */
 function signIn(session: Session, profile: Profile, me?: ServerMe): void {
   saveSession(session);
+  // 超級帳號要用包含未發布卡包的卡牌資料：跟現在的不一樣就重新載入（存下來的登入資料已經記好了）。
+  if (!PAGE_PREVIEW && (session.account.preview === true) !== ACCOUNT_PREVIEW) {
+    location.reload();
+    return;
+  }
   const backend = backendFor(session, db);
   Object.assign(app, {
     session,
@@ -372,6 +380,11 @@ function onPasswordLogin(create: boolean): void {
 
 async function signOut(): Promise<void> {
   if (app.session) await logout(app.session);
+  // 超級帳號登出：回到一般的卡牌資料。
+  if (ACCOUNT_PREVIEW) {
+    location.reload();
+    return;
+  }
   Object.assign(app, { session: null, backend: null, screen: 'login', book: emptyBook(), state: null, view: null, toast: null });
   render();
 }
@@ -1561,7 +1574,7 @@ function setupScreen(): string {
         ${musicButton()}<button class="ghost small" data-do="logout">登出</button></div>` : ''}
     </header>
     ${walletBar(app.profile)}
-    ${PREVIEW ? `<p class="notice" role="status">預覽模式：看得到還沒發布的卡包（${esc(CARD_SETS.filter((set) => !set.released).map((set) => set.name).join('、'))}）。預覽建議用測試帳號。</p>` : ''}
+    ${PREVIEW ? `<p class="notice" role="status">${ACCOUNT_PREVIEW ? '超級帳號' : '預覽模式'}：看得到還沒發布的卡包（${esc(CARD_SETS.filter((set) => !set.released).map((set) => set.name).join('、'))}），可以開包、組牌、跟電腦打。${ACCOUNT_PREVIEW ? '連線對戰只能用已發布的卡。' : '預覽建議用測試帳號。'}</p>` : ''}
     <div class="heroes">${heroes}</div>
     <section class="deck-bar">
       <div class="deck-head"><div><p class="d-head">牌組・${esc(hero(app.heroId).name)}</p><p class="d-line${problems.length ? ' warn' : ''}">${esc(deckText)}</p></div>

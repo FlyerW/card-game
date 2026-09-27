@@ -132,7 +132,7 @@ GOOGLE_CLIENT_ID=123456-xxxx.apps.googleusercontent.com npm run server
 
 ```bash
 npm run admin -- list                  # 列出所有帳號：金幣、粉塵、收藏、儲值總額（伺服器開著也可以看）
-npm run admin -- unlimited Flyer       # 設成超級帳號：金幣用不完（花掉會補回 999,999）、全卡，之後的新卡包也自動補上
+npm run admin -- unlimited Flyer       # 設成超級帳號：金幣用不完（花掉會補回 999,999）、全卡，而且看得到還沒發布的卡包（可以開包、組牌、跟電腦打）
 npm run admin -- unlimited Flyer off   # 取消（已經有的金幣和卡保留）
 ```
 

@@ -61,8 +61,10 @@ export interface ServerOptions {
 export async function startServer(options: ServerOptions): Promise<Running> {
   const dist = options.dist ?? DIST;
   const db = sampleDb(options.preview ?? false);
+  // 超級帳號用：包含還沒發布的卡包系列。
+  const previewDb = sampleDb(true);
   const googleClientId = options.googleClientId ?? null;
-  const store = await AccountStore.open(options.dataDir ?? null, db);
+  const store = await AccountStore.open(options.dataDir ?? null, db, previewDb);
   const log = new GameLog(options.dataDir ? join(options.dataDir, 'games.jsonl') : null);
   // 排位賽：用帳號的 session 驗證身分、檢查收藏，結果記進帳號。
   const lobby = new Lobby(createEngine(db), Math.random, Date.now, {
@@ -85,6 +87,7 @@ export async function startServer(options: ServerOptions): Promise<Running> {
   const api = {
     store,
     db,
+    previewDb,
     googleClientId,
     verify: options.verify ?? (googleClientId ? googleVerifier(googleClientId) : null),
     log,
