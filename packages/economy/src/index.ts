@@ -404,3 +404,4 @@ export function seededRandom(seed: number): () => number {
   };
 }
 export * from './rank';
+export * from './decks';

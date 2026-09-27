@@ -336,7 +336,7 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 
 /* ─── 開局的牌組列 ─── */
 .deck-bar {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  display: grid; gap: 10px;
   background: var(--mat); border: 1px solid var(--mat-edge); border-radius: var(--radius); padding: 12px 16px;
 }
 .deck-bar .d-line.warn { color: #ffc9c2; }
@@ -601,6 +601,23 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 
 /* 卡牌說明下面的關鍵字解釋 */
 .detail:empty { display: none; }
+/* 開局畫面的牌組清單：點一副選來開局用，旁邊「編輯」進組牌畫面 */
+.deck-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; }
+.deck-actions { display: flex; gap: 8px; }
+.deck-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.deck-item { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--mat-edge); border-radius: 10px; background: #0002; padding: 4px 6px 4px 4px; }
+button.deck-item, .deck-pick { display: grid; justify-items: start; gap: 1px; padding: 6px 10px; border: 0; background: none; color: var(--ink); text-align: left; cursor: pointer; }
+button.deck-item { border: 1px solid var(--mat-edge); }
+.deck-item b { font-size: 14px; }
+.deck-item small { color: var(--ink-soft); font-size: 12px; }
+.deck-item.on { border-color: var(--pick); box-shadow: 0 0 0 1px var(--pick) inset; background: #f0b35a14; }
+.deck-item.bad small { color: var(--damage); }
+/* 組牌畫面：牌組名字直接在標題上改；代碼可以手動複製 */
+.deck-title input { font: inherit; color: inherit; background: #0003; border: 1px solid var(--mat-edge); border-radius: 8px; padding: 0 8px; width: min(12em, 60vw); }
+.deck-code { display: grid; gap: 4px; font-size: 12.5px; color: var(--ink-soft); }
+.deck-code input { width: 100%; font: 12px/1.4 var(--num, monospace); color: var(--ink); background: #0003; border: 1px solid var(--mat-edge); border-radius: 6px; padding: 6px 8px; }
+#deck-code-in { width: 100%; box-sizing: border-box; font: 13px/1.4 monospace; color: var(--ink); background: #0003; border: 1px solid var(--mat-edge); border-radius: 8px; padding: 8px; resize: vertical; }
+.danger { background: var(--damage) !important; color: #200 !important; }
 /* 起手：每張牌的說明依序列在牌的下面 */
 .mull-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; }
 .mull-card { background: #0003; border: 1px solid var(--mat-edge); border-radius: 8px; padding: 8px 10px; display: grid; gap: 3px; align-content: start; }

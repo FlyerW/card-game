@@ -11,6 +11,7 @@ import {
   type GameSummary,
   type PackCard,
   type Profile,
+  type SavedDeck,
   type RankState,
 } from '@card-game/economy';
 
@@ -45,8 +46,8 @@ export interface ServerMe {
   rank: RankState;
   /** 換季發的獎勵，只會出現一次。 */
   seasonReward?: { season: string; best: number; gold: number } | null;
-  /** 存在伺服器上的自訂牌組。 */
-  decks?: Record<string, string[]>;
+  /** 存在伺服器上的牌組清單。 */
+  deckBook?: unknown;
 }
 
 /** 跟電腦打的一局，給伺服器的對局紀錄（之後用來調平衡）。 */
@@ -215,8 +216,10 @@ export interface Backend {
   craft(profile: Profile, cardId: string): Promise<EconomyResult<{ profile: Profile }>>;
   /** record：跟電腦打的才有，伺服器帳號會記進對局紀錄。 */
   recordGame(profile: Profile, summary: GameSummary, record?: BotGameRecord): Promise<GameReward>;
-  /** 存一個英雄的自訂牌組（null 是刪掉）。測試帳號存在瀏覽器裡，這裡不用做事。 */
-  saveDeck(heroId: string, deck: string[] | null): Promise<void>;
+  /** 牌組存上伺服器：存一副、刪一副、選英雄開局用哪一副。測試帳號存在瀏覽器裡，這些不用做事。 */
+  saveDeck(deck: SavedDeck): Promise<void>;
+  deleteDeck(id: string): Promise<void>;
+  selectDeck(heroId: string, id: string | null): Promise<void>;
   /** 儲值：伺服器帳號而且伺服器開放儲值才有。 */
   topup: ((topupId: string) => Promise<TopupCheckout>) | null;
 }
@@ -241,6 +244,8 @@ export function backendFor(session: Session, db: CardDb): Backend {
         return reward;
       },
       saveDeck: async () => undefined,
+      deleteDeck: async () => undefined,
+      selectDeck: async () => undefined,
       topup: null,
     };
   }
@@ -261,8 +266,14 @@ export function backendFor(session: Session, db: CardDb): Backend {
       }
     },
     recordGame: (_profile, summary, record) => api<GameReward>('/api/game', token, { summary, record }),
-    saveDeck: async (heroId, deck) => {
-      await api('/api/decks', token, { heroId, deck });
+    saveDeck: async (deck) => {
+      await api('/api/decks/save', token, { deck });
+    },
+    deleteDeck: async (id) => {
+      await api('/api/decks/delete', token, { id });
+    },
+    selectDeck: async (heroId, id) => {
+      await api('/api/decks/select', token, { heroId, id });
     },
     topup: TOPUP_AVAILABLE ? (topupId) => api<TopupCheckout>('/api/topup', token, { topup: topupId }) : null,
   };

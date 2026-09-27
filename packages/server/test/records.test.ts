@@ -40,16 +40,25 @@ describe('伺服器上的牌組、卡包與對局紀錄', () => {
   };
   const signUp = async (name: string) => (await call('/api/login/password', { body: { name, password: 'secret-123', create: true } })).json.token as string;
 
-  it('牌組存在帳號上：/api/me 帶回來，可以刪掉；不存在的卡或太多張不收', async () => {
+  it('牌組清單存在帳號上：同一個英雄存很多副、選開局用哪一副、刪掉；/api/me 帶回來', async () => {
     const token = await signUp('組牌的人');
-    const deck = deckFor(white);
-    expect((await call('/api/decks', { token, body: { heroId: white, deck } })).status).toBe(200);
-    expect((await call('/api/me', { token })).json.decks).toEqual({ [white]: deck });
-    expect((await call('/api/decks', { token, body: { heroId: white, deck: ['no-such-card'] } })).status).toBe(400);
-    expect((await call('/api/decks', { token, body: { heroId: white, deck: [...deck, ...deck] } })).status).toBe(400);
-    expect((await call('/api/decks', { token, body: { heroId: 'nobody', deck } })).status).toBe(400);
-    await call('/api/decks', { token, body: { heroId: white, deck: null } });
-    expect((await call('/api/me', { token })).json.decks).toEqual({});
+    const cards = deckFor(white);
+    const save = (deck: unknown) => call('/api/decks/save', { token, body: { deck } });
+    expect((await save({ id: 'aggro1', name: '快攻', heroId: white, cards })).status).toBe(200);
+    expect((await save({ id: 'ctrl1', name: '控場', heroId: white, cards: cards.slice(0, 10) })).status).toBe(200);
+    expect((await call('/api/decks/select', { token, body: { heroId: white, id: 'ctrl1' } })).status).toBe(200);
+    let book = (await call('/api/me', { token })).json.deckBook;
+    expect(book.decks.map((deck: { name: string }) => deck.name)).toEqual(['快攻', '控場']);
+    expect(book.selected).toEqual({ [white]: 'ctrl1' });
+    // 不存在的英雄、格式不對的不收；不存在的卡直接拿掉
+    expect((await save({ id: 'bad1', name: 'x', heroId: 'nobody', cards })).status).toBe(400);
+    expect((await save({ id: 'bad 1', name: 'x', heroId: white, cards })).status).toBe(400);
+    await save({ id: 'aggro1', name: '快攻', heroId: white, cards: ['no-such-card', ...cards.slice(0, 5)] });
+    await call('/api/decks/delete', { token, body: { id: 'ctrl1' } });
+    book = (await call('/api/me', { token })).json.deckBook;
+    expect(book.decks).toHaveLength(1);
+    expect(book.decks[0].cards).toEqual(cards.slice(0, 5));
+    expect(book.selected).toEqual({});
   });
 
   it('一次開 10 包要 1000 金幣；只能開 1 包或 10 包', async () => {
@@ -94,5 +103,25 @@ describe('連線對戰的對局紀錄', () => {
     expect(records).toHaveLength(1);
     expect(records[0]).toMatchObject({ mode: 'friendly', winner: 0, reason: 'concede', seconds: 90 });
     expect(records[0]!.players.map((player) => player.hero)).toEqual([white, blue]);
+  });
+});
+
+describe('舊的牌組存檔', () => {
+  it('每個英雄一副的舊格式，讀進來轉成牌組清單', async () => {
+    const { writeFile } = await import('node:fs/promises');
+    const { AccountStore } = await import('../src/accounts');
+    const { newProfile } = await import('@card-game/economy');
+    const dir = await mkdtemp(join(tmpdir(), 'card-game-olddecks-'));
+    const account = {
+      id: 'guest:old', name: '老玩家', email: null, picture: null, createdAt: '2026-09-01T00:00:00.000Z',
+      profile: newProfile('2026-09-27', []), decks: { [white]: deckFor(white) },
+    };
+    await writeFile(join(dir, 'accounts.json'), JSON.stringify({ accounts: { [account.id]: account }, sessions: {} }));
+    const store = await AccountStore.open(dir, db);
+    const book = store.byId('guest:old')!.deckBook!;
+    expect(book.decks).toHaveLength(1);
+    expect(book.decks[0]).toMatchObject({ heroId: white, cards: deckFor(white) });
+    expect(book.selected[white]).toBe(book.decks[0]!.id);
+    await rm(dir, { recursive: true, force: true });
   });
 });

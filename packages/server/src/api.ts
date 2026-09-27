@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { DEFAULT_RULES, type CardDb } from '@card-game/engine';
-import { craft, openPacks, PACK_BATCH, parseSummary, recordGame, TOPUPS } from '@card-game/economy';
+import { cleanDeck, craft, DECK_LIMIT, emptyBook, openPacks, PACK_BATCH, parseSummary, putDeck, recordGame, removeDeck, selectDeck, TOPUPS } from '@card-game/economy';
 import { AccountError, accountInfo, serverDay, type Account, type AccountStore } from './accounts';
 import { checkoutFields, checkoutUrl, newTradeNo, readNotice, type EcpayConfig } from './ecpay';
 import { parseBotRecord, type GameLog } from './gamelog';
@@ -145,7 +145,7 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
           throw new HttpError(401, error instanceof TokenError ? error.message : 'Google 登入驗證失敗');
         }
         const { token, account } = await store.login(identity);
-        return send(response, 200, { token, account: accountInfo(account), profile: account.profile, decks: account.decks ?? {} }), true;
+        return send(response, 200, { token, account: accountInfo(account), profile: account.profile, deckBook: account.deckBook ?? emptyBook() }), true;
       }
 
       case 'GET /api/me': {
@@ -153,7 +153,7 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
         const rank = store.rankOf(account);
         const seasonReward = account.seasonReward ?? null;
         if (seasonReward) await store.clearSeasonReward(account);
-        return send(response, 200, { account: accountInfo(account), profile: account.profile, rank, seasonReward, decks: account.decks ?? {} }), true;
+        return send(response, 200, { account: accountInfo(account), profile: account.profile, rank, seasonReward, deckBook: account.deckBook ?? emptyBook() }), true;
       }
 
       case 'POST /api/login/password': {
@@ -161,7 +161,7 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
         if (typeof name !== 'string' || typeof password !== 'string' || password.length > 200) throw new HttpError(400, '名字或密碼格式不對');
         try {
           const { token, account } = await store.loginWithPassword(name, password, create === true);
-          return send(response, 200, { token, account: accountInfo(account), profile: account.profile, rank: store.rankOf(account), decks: account.decks ?? {} }), true;
+          return send(response, 200, { token, account: accountInfo(account), profile: account.profile, rank: store.rankOf(account), deckBook: account.deckBook ?? emptyBook() }), true;
         } catch (error) {
           if (error instanceof AccountError) throw new HttpError(error.status, error.message);
           throw error;
@@ -197,19 +197,31 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
         return send(response, 200, { profile: crafted.profile }), true;
       }
 
-      case 'POST /api/decks': {
-        // 自訂牌組：可以是還沒組完的（最多 30 張）；卡要存在、不能是衍生物。收藏夠不夠在開局時才檢查。
+      case 'POST /api/decks/save': {
+        // 存一副牌組（新的或改過的）：可以還沒組滿；卡要存在、不能是衍生物。收藏夠不夠在開局時才檢查。
         const { account } = authed();
-        const { heroId, deck } = await readJson(request);
-        if (typeof heroId !== 'string' || !db.heroes.has(heroId)) throw new HttpError(400, '沒有這個英雄');
-        const valid = (id: unknown) => {
-          const card = typeof id === 'string' ? db.cards.get(id) : undefined;
-          return card !== undefined && !(card.kind === 'creature' && card.token);
-        };
-        if (deck !== null && (!Array.isArray(deck) || deck.length > DEFAULT_RULES.deckSize || !deck.every(valid))) {
-          throw new HttpError(400, '牌組格式不對');
-        }
-        await store.saveDeck(account, heroId, deck as string[] | null);
+        const deck = cleanDeck(db, (await readJson(request)).deck);
+        if (!deck) throw new HttpError(400, '牌組格式不對');
+        const book = putDeck(account.deckBook ?? emptyBook(), deck);
+        if (!book) throw new HttpError(400, `牌組最多存 ${DECK_LIMIT} 副`);
+        await store.saveDeckBook(account, book);
+        return send(response, 200, {}), true;
+      }
+
+      case 'POST /api/decks/delete': {
+        const { account } = authed();
+        const { id } = await readJson(request);
+        if (typeof id !== 'string') throw new HttpError(400, '缺少牌組');
+        await store.saveDeckBook(account, removeDeck(account.deckBook ?? emptyBook(), id));
+        return send(response, 200, {}), true;
+      }
+
+      case 'POST /api/decks/select': {
+        // 選一個英雄開局要用的牌組；id 是 null 就用收藏自動組一副。
+        const { account } = authed();
+        const { heroId, id } = await readJson(request);
+        if (typeof heroId !== 'string' || !db.heroes.has(heroId) || (id !== null && typeof id !== 'string')) throw new HttpError(400, '格式不對');
+        await store.saveDeckBook(account, selectDeck(account.deckBook ?? emptyBook(), heroId, id as string | null));
         return send(response, 200, {}), true;
       }
 

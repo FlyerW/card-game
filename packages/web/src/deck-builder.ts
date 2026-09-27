@@ -12,7 +12,9 @@ import {
   type Color,
   type DeckCardDef,
   type Rarity,
+  encodeDeckCode,
 } from '@card-game/engine';
+import { cleanBook, DECK_NAME_LIMIT, emptyBook, type DeckBook, type SavedDeck } from '@card-game/economy';
 import { buildDeck } from '@card-game/sim/deck';
 import { cardFace, detailLines, esc, pips } from './ui';
 
@@ -25,7 +27,9 @@ export type Owned = (card: DeckCardDef) => number;
 
 const { deckSize, maxCopies, maxUrCopies } = DEFAULT_RULES;
 /** 牌組規則從 40 張改成 30 張時換了 key，舊的 40 張牌組就不讀了。 */
-const STORAGE_KEY = 'card-game.decks.v2';
+const STORAGE_KEY = 'card-game.decks.v3';
+/** 舊版（每個英雄一副）的存檔，第一次讀的時候轉成牌組清單。 */
+const OLD_STORAGE_KEY = 'card-game.decks.v2';
 
 export type KindFilter = 'all' | 'creature' | 'spell' | 'other';
 const FILTERS: [KindFilter, string][] = [
@@ -43,6 +47,12 @@ const COSTS: CostPick[] = ['all', 1, 2, 3, 4, 5, 6, 7];
 
 export interface Builder {
   heroId: string;
+  /** 正在編輯的牌組。 */
+  deckId: string;
+  /** 顯示牌組代碼（可以手動複製）。 */
+  showCode: boolean;
+  /** 按了「刪除這副」，等確認。 */
+  confirmDelete: boolean;
   filter: KindFilter;
   color: ColorPick;
   cost: CostPick;
@@ -52,33 +62,37 @@ export interface Builder {
 }
 
 /** 每個帳號的牌組分開存，測試帳號的全卡牌組不會跑到 Google 帳號上。 */
-const keyFor = (accountId: string) => `${STORAGE_KEY}:${accountId}`;
+const keyFor = (accountId: string, key = STORAGE_KEY) => `${key}:${accountId}`;
 
-/** 讀出這個帳號存著的牌組。讀不到（隱私模式、被清掉）就當作沒有；不認得的卡直接拿掉。 */
-export function loadDecks(db: CardDb, accountId: string): Record<string, string[]> {
+/** 讀出這個帳號存在瀏覽器裡的牌組清單。讀不到（隱私模式、被清掉）就當作沒有；舊版的存檔轉成新的。 */
+export function loadBook(db: CardDb, accountId: string): DeckBook {
   try {
-    return cleanDecks(db, JSON.parse(localStorage.getItem(keyFor(accountId)) ?? '{}'));
+    const saved = localStorage.getItem(keyFor(accountId));
+    if (saved !== null) return cleanBook(db, JSON.parse(saved));
+    return cleanBook(db, JSON.parse(localStorage.getItem(keyFor(accountId, OLD_STORAGE_KEY)) ?? '{}'));
   } catch {
-    return {};
+    return emptyBook();
   }
 }
 
-/** 讀回的牌組：拿掉不存在的英雄與卡（卡牌資料改過之後可能有）。 */
-export function cleanDecks(db: CardDb, raw: unknown): Record<string, string[]> {
-  if (typeof raw !== 'object' || raw === null) return {};
-  const decks: Record<string, string[]> = {};
-  for (const [heroId, deck] of Object.entries(raw)) {
-    if (db.heroes.has(heroId) && Array.isArray(deck)) decks[heroId] = deck.filter((id) => typeof id === 'string' && db.cards.has(id));
-  }
-  return decks;
-}
-
-export function saveDecks(decks: Record<string, string[]>, accountId: string): void {
+export function saveBook(book: DeckBook, accountId: string): void {
   try {
-    localStorage.setItem(keyFor(accountId), JSON.stringify(decks));
+    localStorage.setItem(keyFor(accountId), JSON.stringify(book));
   } catch {
     // 存不了就只留在這次開著的頁面裡。
   }
+}
+
+/** 一副牌組的狀態：可以用、還差幾張、缺卡或不合法。 */
+export function deckStatus(db: CardDb, deck: SavedDeck, owned: Owned): { ok: boolean; text: string } {
+  if (deck.cards.length < deckSize) return { ok: false, text: `還差 ${deckSize - deck.cards.length} 張` };
+  const missing = [...new Set(deck.cards)].reduce((sum, id) => {
+    const card = db.cards.get(id);
+    return sum + (card ? Math.max(0, count(deck.cards, id) - owned(card)) : 0);
+  }, 0);
+  if (missing > 0) return { ok: false, text: `缺 ${missing} 張卡` };
+  const problems = deckIssues(db, deck.heroId, deck.cards, owned).problems;
+  return problems.length > 0 ? { ok: false, text: '不合法' } : { ok: true, text: '可以用' };
 }
 
 const count = (deck: readonly string[], id: string) => deck.filter((each) => each === id).length;
@@ -214,8 +228,10 @@ const colorMatches = (card: DeckCardDef, color: ColorPick) =>
   color === 'all' || (color === 'none' ? card.colors.length === 0 : card.colors.includes(color));
 const costMatches = (card: DeckCardDef, cost: CostPick) => cost === 'all' || (cost === 7 ? card.cost >= 7 : card.cost === cost);
 
-export function deckScreen(db: CardDb, b: Builder, deck: readonly string[], custom: boolean, owned: Owned): string {
+export function deckScreen(db: CardDb, b: Builder, saved: SavedDeck, owned: Owned): string {
   const hero = db.heroes.get(b.heroId)!;
+  const deck = saved.cards;
+  const code = encodeDeckCode(saved.heroId, deck);
   // 擁有的排前面，沒有的變暗放後面，看得到還能收集什麼。
   const pool = deckPool(db, b.heroId)
     .filter((card) => matches(card, b.filter) && colorMatches(card, b.color) && costMatches(card, b.cost) && (b.rarity === 'all' || card.rarity === b.rarity))
@@ -245,9 +261,8 @@ export function deckScreen(db: CardDb, b: Builder, deck: readonly string[], cust
 
   return `<main class="builder">
     <header class="b-head">
-      <div><h1>組牌・${esc(hero.name)}</h1>
-        <p>${pips(hero.colors)} ${describeColors(hero.colors)}的卡加上無色卡；${deckSize} 張，同名最多 ${maxCopies} 張，UR 最多 ${maxUrCopies} 張，只能放收藏裡有的卡。
-        ${custom ? '牌組會自動存起來。' : '還沒有自訂牌組，開始對戰時會用收藏自動組一副。'}</p></div>
+      <div><h1 class="deck-title">組牌・${esc(hero.name)}・<input id="deck-name" maxlength="${DECK_NAME_LIMIT}" value="${esc(saved.name)}" aria-label="牌組名字"></h1>
+        <p>${pips(hero.colors)} ${describeColors(hero.colors)}的卡加上無色卡；${deckSize} 張，同名最多 ${maxCopies} 張，UR 最多 ${maxUrCopies} 張，只能放收藏裡有的卡。牌組會自動存起來。</p></div>
       <div class="b-count${deck.length === deckSize ? ' full' : ''}"><b>${deck.length}</b>/${deckSize}</div>
     </header>
     <div class="b-body">
@@ -269,8 +284,17 @@ export function deckScreen(db: CardDb, b: Builder, deck: readonly string[], cust
             <button class="ghost" data-do="deck-fill" ${deck.length >= deckSize ? 'disabled' : ''}>隨機補滿</button>
             <button class="ghost" data-do="deck-auto">自動組一副</button>
             <button class="ghost" data-do="deck-clear" ${deck.length === 0 ? 'disabled' : ''}>清空</button>
-            ${custom ? '<button class="ghost" data-do="deck-forget">不用自訂牌組</button>' : ''}
           </div>
+          <div class="b-actions">
+            <button class="ghost" data-do="deck-code">複製牌組代碼</button>
+            <button class="ghost" data-do="deck-copy">另存一副</button>
+            ${
+              b.confirmDelete
+                ? '<button class="primary danger" data-do="deck-delete-confirm">確定刪除</button><button class="ghost" data-do="deck-delete-cancel">留著</button>'
+                : '<button class="ghost" data-do="deck-delete">刪除這副</button>'
+            }
+          </div>
+          ${b.showCode ? `<label class="deck-code">把代碼傳給朋友，他在開局畫面按「貼上代碼」就能拿到一樣的牌組：<input id="deck-code-out" readonly value="${esc(code)}"></label>` : ''}
         </div>
         <button class="primary big" data-do="deck-done">完成</button>
       </aside>

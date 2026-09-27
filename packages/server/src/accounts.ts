@@ -17,6 +17,8 @@ import {
   type Profile,
   type RankState,
   type Topup,
+  cleanBook,
+  type DeckBook,
 } from '@card-game/economy';
 import type { GoogleIdentity } from './google';
 import type { RankedReport } from './protocol';
@@ -39,8 +41,8 @@ export interface Account {
   seasonReward?: { season: string; best: number; gold: number };
   /** 名字＋密碼帳號的密碼（scrypt 雜湊）；Google 帳號沒有。舊的訪客帳號也沒有，第一次用名字登入時設定。 */
   password?: { salt: string; hash: string };
-  /** 自訂牌組：英雄 id → 卡牌 id。存在伺服器上，換裝置也在。 */
-  decks?: Record<string, string[]>;
+  /** 牌組清單：同一個英雄可以有很多副，記住每個英雄開局用哪一副。存在伺服器上，換裝置也在。 */
+  deckBook?: DeckBook;
   createdAt: string;
 }
 
@@ -146,9 +148,11 @@ export class AccountStore {
         for (const [id, account] of Object.entries(raw.accounts ?? {})) {
           const profile = parseProfile(account.profile);
           if (!profile) continue;
-          const { rank: savedRank, ...rest } = account;
+          // 舊存檔的牌組是「英雄 id → 卡片清單」（每個英雄一副），轉成牌組清單。
+          const { rank: savedRank, decks: oldDecks, deckBook: savedBook, ...rest } = account as Account & { decks?: unknown };
           const rank = savedRank === undefined ? null : parseRank(savedRank);
-          store.data.accounts[id] = rank ? { ...rest, profile, rank } : { ...rest, profile };
+          const book = savedBook !== undefined ? cleanBook(db, savedBook) : oldDecks !== undefined ? cleanBook(db, oldDecks) : null;
+          store.data.accounts[id] = { ...rest, profile, ...(rank ? { rank } : {}), ...(book ? { deckBook: book } : {}) };
         }
         store.data.sessions = raw.sessions ?? {};
         store.data.orders = raw.orders ?? {};
@@ -369,10 +373,9 @@ export class AccountStore {
     return 'credited';
   }
 
-  /** 存一個英雄的自訂牌組；deck 是 null 就刪掉。 */
-  async saveDeck(account: Account, heroId: string, deck: string[] | null): Promise<void> {
-    const { [heroId]: _, ...rest } = account.decks ?? {};
-    account.decks = deck === null ? rest : { ...rest, [heroId]: [...deck] };
+  /** 換掉整份牌組清單並存檔。 */
+  async saveDeckBook(account: Account, book: DeckBook): Promise<void> {
+    account.deckBook = book;
     await this.save();
   }
 

@@ -3,7 +3,16 @@ import { copyLimit, DEFAULT_RULES, SAMPLE_HEROES, sampleDb, validateDeck, type G
 import {
   ECONOMY,
   emptyTally,
+  cleanBook,
+  cleanDeck,
   craft,
+  DECK_LIMIT,
+  DECK_NAME_LIMIT,
+  emptyBook,
+  newDeckId,
+  putDeck,
+  removeDeck,
+  selectDeck,
   fullProfile,
   newProfile,
   openPack,
@@ -318,5 +327,34 @@ describe('測試帳號與伺服器', () => {
     });
     expect(parseSummary({ won: 'yes', conceded: false, deckColors: [], summoned: 1, drew: 1, spells: 1 })).toBeNull();
     expect(parseSummary(null)).toBeNull();
+  });
+});
+
+describe('牌組清單', () => {
+  it('舊格式（每個英雄一副）轉成牌組清單，並設成那個英雄開局用的', () => {
+    const book = cleanBook(db, { 'nameless-swordsman': ['squire', 'no-such-card'], nobody: ['squire'] });
+    expect(book.decks).toHaveLength(1);
+    expect(book.decks[0]).toMatchObject({ name: '無名劍士的牌組', heroId: 'nameless-swordsman', cards: ['squire'] });
+    expect(book.selected['nameless-swordsman']).toBe(book.decks[0]!.id);
+  });
+
+  it('同一個英雄可以存很多副；刪掉開局用的那副，就改回自動組牌', () => {
+    let book = emptyBook();
+    for (const name of ['快攻', '控場']) book = putDeck(book, { id: newDeckId(), name, heroId: 'flame-lord', cards: [] })!;
+    expect(book.decks.map((deck) => deck.name)).toEqual(['快攻', '控場']);
+    const id = book.decks[1]!.id;
+    book = selectDeck(book, 'flame-lord', id);
+    expect(book.selected['flame-lord']).toBe(id);
+    expect(selectDeck(book, 'deep-seer', id).selected['deep-seer']).toBeUndefined(); // 別的英雄的牌組不能選
+    book = removeDeck(book, id);
+    expect(book.decks).toHaveLength(1);
+    expect(book.selected['flame-lord']).toBeUndefined();
+  });
+
+  it('最多存 DECK_LIMIT 副；名字太長會截掉', () => {
+    let book = emptyBook();
+    for (let i = 0; i < DECK_LIMIT; i++) book = putDeck(book, { id: `deck${i}x`, name: `#${i}`, heroId: 'flame-lord', cards: [] })!;
+    expect(putDeck(book, { id: 'onemore', name: 'x', heroId: 'flame-lord', cards: [] })).toBeNull();
+    expect(cleanDeck(db, { id: 'abcd1', name: '很'.repeat(50), heroId: 'flame-lord', cards: [] })!.name).toHaveLength(DECK_NAME_LIMIT);
   });
 });
