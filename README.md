@@ -126,6 +126,21 @@ GOOGLE_CLIENT_ID=123456-xxxx.apps.googleusercontent.com npm run server
 - 伺服器只信任自己驗證過的 Google ID token：檢查簽章、發給誰、誰發的、有沒有過期。瀏覽器拿到的是 30 天的 session token，檔案裡只存它的雜湊。
 - 跟電腦打的勝負是瀏覽器回報的，還防不了作弊，見 docs/design.md 的「經濟系統」。
 
+## 管理帳號
+
+帳號資料在 `data/accounts.json`（伺服器帳號才有；測試帳號存在各自的瀏覽器裡，看不到）。
+
+```bash
+npm run admin -- list                  # 列出所有帳號：金幣、粉塵、收藏、儲值總額（伺服器開著也可以看）
+npm run admin -- unlimited Flyer       # 設成超級帳號：金幣用不完（花掉會補回 999,999）、全卡，之後的新卡包也自動補上
+npm run admin -- unlimited Flyer off   # 取消（已經有的金幣和卡保留）
+```
+
+- **改帳號要先停掉伺服器**（tmux 的 server 視窗按 Ctrl+C）：伺服器開著時帳號都在記憶體裡，每次有變動就整個寫回檔案，
+  開著改會被蓋掉。管理指令發現伺服器開著會拒絕修改。
+- 每次修改前會自動備份成 `data/accounts.backup-日期-時間-admin.json`。
+- 不建議直接手改 JSON：格式錯了（例如金幣寫成文字），伺服器啟動時會略過那個帳號，下次存檔時它就從檔案裡消失。
+
 ## 新增或修改卡牌
 
 卡牌是資料，不寫死在程式裡。改 [`packages/engine/src/cards/sample.ts`](packages/engine/src/cards/sample.ts) 之後：

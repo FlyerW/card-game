@@ -6,6 +6,8 @@ import {
   clearedOn,
   clearStage,
   stageUnlocked,
+  UNLIMITED_GOLD,
+  unlimitedProfile,
   ECONOMY,
   emptyTally,
   cleanBook,
@@ -431,5 +433,16 @@ describe('冒險模式', () => {
   it('通關紀錄跟著存檔一起讀回來', () => {
     const cleared = clearStage(fresh(), first.id, 'normal')!.profile;
     expect(clearedOn(parseProfile(JSON.parse(JSON.stringify(cleared)))!, first.id)).toEqual(['normal']);
+  });
+});
+
+describe('超級帳號', () => {
+  it('全卡（含 UR 英雄）、金幣補滿；粉塵、任務與冒險進度照舊；金幣本來就更多就不動', () => {
+    const start = { ...fresh(), dust: 120, adventure: { 'mist-forest': ['normal' as const] } };
+    const full = unlimitedProfile(start, db, DEFAULT_RULES);
+    for (const item of packItems(db, DEFAULT_RULES)) expect(full.collection[item.id]).toBe(item.limit);
+    expect(full.gold).toBe(UNLIMITED_GOLD);
+    expect([full.dust, full.quest, full.adventure]).toEqual([start.dust, start.quest, start.adventure]);
+    expect(unlimitedProfile({ ...start, gold: UNLIMITED_GOLD + 5 }, db, DEFAULT_RULES).gold).toBe(UNLIMITED_GOLD + 5);
   });
 });

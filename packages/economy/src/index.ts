@@ -152,6 +152,19 @@ export function fullProfile(db: CardDb, rules: Rules, day: string, gold = 10000)
   return { ...newProfile(day, []), gold, collection };
 }
 
+/** 超級帳號的金幣：花掉之後會補回這個數字。 */
+export const UNLIMITED_GOLD = 999_999;
+
+/**
+ * 超級帳號（管理員自己測試用）：全卡（每張放到牌組上限、英雄各 1，之後發布的卡包也算），金幣補到 UNLIMITED_GOLD。
+ * 其他（粉塵、任務、冒險進度）照舊。
+ */
+export function unlimitedProfile(profile: Profile, db: CardDb, rules: Rules): Profile {
+  const collection = { ...profile.collection };
+  for (const item of packItems(db, rules)) collection[item.id] = Math.max(collection[item.id] ?? 0, item.limit);
+  return { ...profile, gold: Math.max(profile.gold, UNLIMITED_GOLD), collection };
+}
+
 /** 換日：贏場金幣重新算，換成今天的任務。同一天呼叫不會改變任何東西。 */
 export function refreshDay(profile: Profile, day: string): Profile {
   if (profile.day === day) return profile;

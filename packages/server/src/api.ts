@@ -185,7 +185,8 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
         const opened = openPacks(account.profile, db, DEFAULT_RULES, () => randomInt(2 ** 32) / 2 ** 32, count, set);
         if (!opened.ok) throw new HttpError(400, opened.reason);
         await store.update(account, opened.profile);
-        return send(response, 200, { profile: opened.profile, cards: opened.cards }), true;
+        // 回傳存進去的資料（超級帳號會補滿金幣）。
+        return send(response, 200, { profile: account.profile, cards: opened.cards }), true;
       }
 
       case 'POST /api/craft': {
@@ -195,7 +196,7 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
         const crafted = craft(account.profile, db, DEFAULT_RULES, cardId);
         if (!crafted.ok) throw new HttpError(400, crafted.reason);
         await store.update(account, crafted.profile);
-        return send(response, 200, { profile: crafted.profile }), true;
+        return send(response, 200, { profile: account.profile }), true;
       }
 
       case 'POST /api/adventure/clear': {
@@ -207,7 +208,7 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
           : null;
         if (!cleared) throw new HttpError(400, '沒有這一關，或還沒解鎖');
         await store.update(account, cleared.profile);
-        return send(response, 200, cleared), true;
+        return send(response, 200, { ...cleared, profile: account.profile }), true;
       }
 
       case 'POST /api/decks/save': {
@@ -248,7 +249,7 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
         if (record) void options.log!.add(record).catch((error: unknown) => console.error('對局紀錄寫不進去', error));
         const reward = recordGame(account.profile, summary, serverDay());
         await store.update(account, reward.profile);
-        return send(response, 200, reward), true;
+        return send(response, 200, { ...reward, profile: account.profile }), true;
       }
 
       default:

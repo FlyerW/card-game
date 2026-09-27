@@ -13,7 +13,8 @@
     "dev": "npm run dev -w @card-game/web",
     "build:web": "npm run build -w @card-game/web",
     "server": "npm run build:web && tsx packages/server/src/main.ts",
-    "game-stats": "tsx packages/server/scripts/game-stats.ts"
+    "game-stats": "tsx packages/server/scripts/game-stats.ts",
+    "admin": "tsx packages/server/scripts/admin.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.4",

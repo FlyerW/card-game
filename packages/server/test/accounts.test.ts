@@ -1,10 +1,10 @@
 import { createSign, generateKeyPairSync } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { sampleDb } from '@card-game/engine';
-import { ECONOMY } from '@card-game/economy';
+import { DEFAULT_RULES, sampleDb } from '@card-game/engine';
+import { ECONOMY, packItems, UNLIMITED_GOLD } from '@card-game/economy';
 import { AccountStore } from '../src/accounts';
 import { googleVerifier, TokenError, verifyIdToken, type Jwk } from '../src/google';
 import { startServer, type Running } from '../src/server';
@@ -70,6 +70,33 @@ describe('帳號資料', () => {
       await reopened.logout(first.token);
       expect(reopened.byToken(first.token)).toBeNull();
       expect(reopened.byToken(again.token)?.id).toBe('google:1');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('超級帳號（帳號檔裡 unlimited: true）：讀進來就全卡、金幣補滿，花掉會再補回來', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'card-game-'));
+    try {
+      const db = sampleDb();
+      const store = await AccountStore.open(dir, db);
+      const { token, account } = await store.login({ sub: '9', email: null, name: '管理員', picture: null });
+      await store.update(account, { ...account.profile, gold: 0 });
+      // 管理指令只改帳號檔：模擬它把旗標寫進去
+      const file = join(dir, 'accounts.json');
+      const data = JSON.parse(await readFile(file, 'utf8'));
+      data.accounts['google:9'].unlimited = true;
+      await writeFile(file, JSON.stringify(data));
+
+      const reopened = await AccountStore.open(dir, db);
+      const hero = reopened.byToken(token)!;
+      expect(hero.profile.gold).toBe(UNLIMITED_GOLD);
+      for (const item of packItems(db, DEFAULT_RULES)) expect(hero.profile.collection[item.id]).toBe(item.limit);
+      await reopened.update(hero, { ...hero.profile, gold: hero.profile.gold - 100 });
+      expect(reopened.byToken(token)!.profile.gold).toBe(UNLIMITED_GOLD);
+      // 一般帳號不受影響
+      const normal = await reopened.login({ sub: '10', email: null, name: '路人', picture: null });
+      expect(normal.account.profile.gold).toBe(ECONOMY.startingGold);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

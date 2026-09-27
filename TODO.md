@@ -73,11 +73,13 @@ Google 登入、Play 商店的 App、綠界的付款通知都要固定的 https 
 
 ## 4. 管理工具（客服用）
 
-現在要看或改玩家的帳號，只能直接編輯 `data/accounts.json`，而且要**先停掉伺服器**。
+帳號資料在 `data/accounts.json`，用法見 README 的「管理帳號」。
 
-- [ ] 🤖 `npm run admin -- list`：列出所有帳號（名字、金幣、粉塵、收藏數、牌位、儲值總額）
+- [x] `npm run admin -- list`：列出所有帳號（名字、金幣、粉塵、收藏數、儲值總額）
+- [x] `npm run admin -- unlimited <名字>`：超級帳號（金幣用不完、全卡），Flyer 已經設好
 - [ ] 🤖 `npm run admin -- show <名字>`：看一個帳號的詳細資料與儲值紀錄
-- [ ] 🤖 `npm run admin -- gold <名字> +500`：補發金幣／粉塵（自動先備份、檢查格式；伺服器開著也能用）
+- [ ] 🤖 `npm run admin -- gold <名字> +500`：補發金幣／粉塵
+- [ ] 🤖 改成透過伺服器的管理 API 修改，伺服器開著也能改（現在要先停伺服器）
 
 ## 5. 遊戲內容
 

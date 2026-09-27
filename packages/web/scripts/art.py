@@ -2,6 +2,7 @@
 """用 AI 繪圖服務（pollinations.ai）產生卡圖，存成 packages/web/public/art/<id>.webp。
 
 用法：python3 packages/web/scripts/art.py [id ...]   不給 id 就產生所有還沒有圖的卡
+　　　python3 packages/web/scripts/art.py --trim      把已經有的圖邊緣的亮邊、黑邊切掉（不用重新產圖）
 風格與每個顏色的色調照 docs/art.md；每張卡的畫面描述在 packages/web/art/subjects.json。
 同一張卡用固定的 seed，重跑會得到同一張圖；想換一張就把舊的 webp 刪掉、改 subjects.json 的描述。
 這個服務的圖會在右下角加浮水印，裁切時會切掉。正式上線前請改用有商業授權的繪圖服務。
@@ -37,6 +38,51 @@ NEUTRAL = 'grey-brown and metallic palette, neutral light'
 WIDTH, HEIGHT = 320, 240  # 卡面的插圖框是 4:3
 
 
+def edge_lines(gray, side, limit):
+    """圖的某一邊有幾排是邊框（跟往內幾排的亮度差很多）：AI 產的圖常在邊緣留 1–3 排白邊或黑邊。"""
+    w, h = gray.size
+
+    def mean(i):
+        if side in ('left', 'right'):
+            x = i if side == 'left' else w - 1 - i
+            return sum(gray.getpixel((x, y)) for y in range(0, h, 3)) / len(range(0, h, 3))
+        y = i if side == 'top' else h - 1 - i
+        return sum(gray.getpixel((x, y)) for x in range(0, w, 3)) / len(range(0, w, 3))
+
+    inner = mean(limit + 2)
+    count = 0
+    while count < limit and abs(mean(count) - inner) > 25:
+        count += 1
+    return count + 1 if count else 0
+
+
+def trim_frame(image, limit):
+    """切掉四邊的邊框，再從中間取 4:3 縮成卡圖的大小。"""
+    gray = image.convert('L')
+    w, h = image.size
+    left, right = edge_lines(gray, 'left', limit), edge_lines(gray, 'right', limit)
+    top, bottom = edge_lines(gray, 'top', limit), edge_lines(gray, 'bottom', limit)
+    box_w, box_h = w - left - right, h - top - bottom
+    if box_w * 3 > box_h * 4:
+        extra = box_w - box_h * 4 // 3
+        left, box_w = left + extra // 2, box_w - extra
+    else:
+        extra = box_h - box_w * 3 // 4
+        top, box_h = top + extra // 2, box_h - extra
+    return image.crop((left, top, left + box_w, top + box_h)).resize((WIDTH, HEIGHT), Image.LANCZOS)
+
+
+def trim_existing():
+    """已經有的圖：有邊框的才重存。"""
+    for path in sorted(OUT.glob('*.webp')):
+        image = Image.open(path).convert('RGB')
+        gray = image.convert('L')
+        if not any(edge_lines(gray, side, 6) for side in ('left', 'right', 'top', 'bottom')):
+            continue
+        trim_frame(image, 6).save(path, 'WEBP', quality=82, method=6)
+        print('切掉邊框', path.name, flush=True)
+
+
 def manifest():
     out = subprocess.run(['npx', 'tsx', 'packages/web/scripts/art-manifest.ts'], cwd=ROOT, capture_output=True, text=True, check=True)
     return json.loads(out.stdout.strip().splitlines()[-1])
@@ -66,7 +112,7 @@ def fetch(card_id, card):
             crop_h = crop_w * 3 // 4
             left = (w - crop_w) // 2
             top = int(h * 0.1)
-            image = image.crop((left, top, left + crop_w, top + crop_h)).resize((WIDTH, HEIGHT), Image.LANCZOS)
+            image = trim_frame(image.crop((left, top, left + crop_w, top + crop_h)), 10)
             image.save(OUT / f'{card_id}.webp', 'WEBP', quality=78, method=6)
             return card_id, None
         except Exception as error:  # 服務偶爾會失敗或太忙（429），等一下再試
@@ -93,4 +139,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    trim_existing() if sys.argv[1:] == ['--trim'] else main()

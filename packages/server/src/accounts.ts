@@ -13,6 +13,7 @@ import {
   rolloverSeason,
   seasonOf,
   starterDecks,
+  unlimitedProfile,
   type GameSummary,
   type Profile,
   type RankState,
@@ -43,6 +44,8 @@ export interface Account {
   password?: { salt: string; hash: string };
   /** 牌組清單：同一個英雄可以有很多副，記住每個英雄開局用哪一副。存在伺服器上，換裝置也在。 */
   deckBook?: DeckBook;
+  /** 超級帳號：金幣用不完、全卡。只能用管理指令開（npm run admin -- unlimited 名字），網頁改不了。 */
+  unlimited?: boolean;
   createdAt: string;
 }
 
@@ -153,6 +156,7 @@ export class AccountStore {
           const rank = savedRank === undefined ? null : parseRank(savedRank);
           const book = savedBook !== undefined ? cleanBook(db, savedBook) : oldDecks !== undefined ? cleanBook(db, oldDecks) : null;
           store.data.accounts[id] = { ...rest, profile, ...(rank ? { rank } : {}), ...(book ? { deckBook: book } : {}) };
+          store.refill(store.data.accounts[id]!);
         }
         store.data.sessions = raw.sessions ?? {};
         store.data.orders = raw.orders ?? {};
@@ -325,7 +329,13 @@ export class AccountStore {
     const account = this.data.accounts[session.accountId];
     if (!account) return null;
     account.profile = refreshDay(account.profile, serverDay(new Date(now)));
+    this.refill(account);
     return account;
+  }
+
+  /** 超級帳號：把金幣補滿、缺的卡補齊（只改記憶體，下次存檔時一起寫進去）。 */
+  private refill(account: Account): void {
+    if (account.unlimited) account.profile = unlimitedProfile(account.profile, this.db, DEFAULT_RULES);
   }
 
   async logout(token: string): Promise<void> {
@@ -382,6 +392,7 @@ export class AccountStore {
   /** 改一個帳號的玩家資料並存檔。 */
   async update(account: Account, profile: Profile): Promise<void> {
     account.profile = profile;
+    this.refill(account);
     await this.save();
   }
 
