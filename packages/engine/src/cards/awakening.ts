@@ -33,7 +33,7 @@ const HEROES: HeroDef[] = [
   {
     kind: 'hero', id: 'sky-envoy', name: '天穹龍使', rarity: 'UR', colors: ['white', 'blue'], hp: 37,
     passive: { name: '天穹庇護', opponentTurn: { hp: 1 } },
-    power: { name: '聖諭', cost: 3, target: NONE, effects: [{ type: 'draw', count: 1 }, { type: 'healHero', amount: 2 }] },
+    power: { name: '聖諭', cost: 4, target: NONE, effects: [{ type: 'draw', count: 1 }, { type: 'healHero', amount: 2 }] },
   },
   {
     kind: 'hero', id: 'dusk-judge', name: '晨昏審判者', rarity: 'UR', colors: ['white', 'black'], hp: 37,
@@ -108,7 +108,7 @@ const CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'shadow-dragon-queen', name: '暗影龍后', rarity: 'UR', colors: ['black'], race: 'dragon',
-    stage: 0, cost: 9, attack: 8, hp: 10,
+    stage: 0, cost: 9, attack: 7, hp: 9,
     entry: { name: '吞噬', target: CREATURE, effects: [{ type: 'destroyCreature' }] },
     skills: [
       { name: '龍威', cost: 6, target: NONE, effects: [{ type: 'halveHp', all: true }] },
@@ -134,7 +134,7 @@ const CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'magma-dragon', name: '熔岩巨龍', rarity: 'UR', colors: ['red'], race: 'dragon',
-    stage: 0, cost: 10, attack: 10, hp: 11,
+    stage: 0, cost: 10, attack: 9, hp: 11,
     entry: { name: '熔岩吐息', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] },
     skills: [hit('龍怒', 4, ANY, 5), { name: '焚天', cost: 4, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }],
   },
@@ -221,13 +221,13 @@ const CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'sky-sacred-dragon', name: '天穹聖龍', rarity: 'UR', colors: ['white'], race: 'dragon',
-    stage: 0, cost: 8, attack: 8, hp: 9,
+    stage: 0, cost: 8, attack: 7, hp: 9,
     skills: [hit('聖炎', 3, ANY, 4), { name: '天穹守護', cost: 4, target: NONE, effects: [{ type: 'buff', attack: 0, hp: 2, on: 'all' }] }],
     entry: { name: '聖光降臨', target: NONE, effects: [{ type: 'healAll', amount: 3 }] },
   },
   // 藍：抽牌、麻痺
   {
-    kind: 'creature', id: 'tide-hatchling', name: '潮汐雛龍', rarity: 'N', colors: ['blue'], race: 'dragon', stage: 0, cost: 1, attack: 1, hp: 2, skills: [],
+    kind: 'creature', id: 'tide-hatchling', name: '潮汐雛龍', rarity: 'N', colors: ['blue'], race: 'dragon', stage: 0, cost: 1, attack: 1, hp: 3, skills: [],
   },
   {
     kind: 'creature', id: 'mist-adept', name: '霧隱術士', rarity: 'N', colors: ['blue'], race: 'human', stage: 0, cost: 2, attack: 2, hp: 3, skills: [],
@@ -268,7 +268,7 @@ const CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'void-dragon', name: '虛空龍', rarity: 'UR', colors: ['blue'], race: 'dragon',
-    stage: 0, cost: 9, attack: 9, hp: 11,
+    stage: 0, cost: 9, attack: 8, hp: 10,
     skills: [
       { name: '虛空凝視', cost: 2, target: CREATURE, effects: [{ type: 'paralyze' }, { type: 'draw', count: 1 }] },
       { name: '虛空吐息', cost: 4, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] },
@@ -292,7 +292,7 @@ const CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'venomfang-drake', name: '毒牙龍', rarity: 'R', colors: ['black'], race: 'dragon',
-    stage: 0, cost: 3, attack: 3, hp: 4, skills: [{ name: '毒牙', cost: 1, target: CREATURE, effects: [{ type: 'poison', amount: 2 }] }],
+    stage: 0, cost: 3, attack: 3, hp: 4, skills: [{ name: '毒牙', cost: 1, target: CREATURE, effects: [{ type: 'poison', amount: 3 }] }],
   },
   {
     kind: 'creature', id: 'shadow-priest', name: '暗影祭司', rarity: 'R', colors: ['black'], race: 'human',
