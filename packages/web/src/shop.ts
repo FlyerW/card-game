@@ -148,8 +148,11 @@ export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: stri
   const all = collectibles(db);
   const owned = (item: { id: string }) => profile.collection[item.id] ?? 0;
   const full = (item: Collectible) => owned(item) >= item.limit;
-  const kinds = all.filter((item) => owned(item) > 0).length;
-  const copies = all.reduce((sum, item) => sum + owned(item), 0);
+  // 收藏進度：選了某個系列就只算那個系列。
+  const inSeries = all.filter((item) => shop.series === 'all' || item.set === shop.series);
+  const seriesName = shop.series === 'all' ? '' : (packSets(db).find((set) => set.id === shop.series)?.name ?? '');
+  const kinds = inSeries.filter((item) => owned(item) > 0).length;
+  const copies = inSeries.reduce((sum, item) => sum + owned(item), 0);
   const shown = all
     .filter((card) => shop.rarity === 'all' || card.rarity === shop.rarity)
     .filter((card) => (shop.color === 'all' ? true : shop.color === 'none' ? card.colors.length === 0 : card.colors.includes(shop.color)))
@@ -225,7 +228,7 @@ export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: stri
   return `<main class="builder shop">
     <header class="b-head">
       <div><h1>卡包與收藏</h1>
-        <p>收藏 ${kinds}/${all.length} 種，共 ${copies} 張。贏一場 ${ECONOMY.winGold} 金幣（每天最多 ${ECONOMY.dailyWinGoldCap}），完成每日任務 ${ECONOMY.questReward} 金幣。</p></div>
+        <p>收藏${seriesName ? `「${esc(seriesName)}」` : ''} ${kinds}/${inSeries.length} 種，共 ${copies} 張。贏一場 ${ECONOMY.winGold} 金幣（每天最多 ${ECONOMY.dailyWinGoldCap}），完成每日任務 ${ECONOMY.questReward} 金幣。</p></div>
       <div class="w-gold"><span class="coin" aria-hidden="true"></span><b>${profile.gold}</b><span>金幣</span></div>
     </header>
     ${packTabs}
@@ -321,7 +324,9 @@ export function shopClick(
   } else if (kind) {
     host.shop.kind = kind as Shop['kind'];
   } else if (pack) {
+    // 換卡包分頁時，下面的收藏也切到那個系列。
     host.shop.pack = pack;
+    host.shop.series = pack;
   } else if (series) {
     host.shop.series = series;
   } else if (missing) {
