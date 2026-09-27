@@ -213,6 +213,10 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .badge.atk { color: #ffb38a; } .badge.def { color: #9fdcea; } .badge.item { color: #d7c8f0; } .badge.taunt { color: #1d1408; background: var(--white); }
 .r-R.zone { border-top: 3px solid var(--r-r); } .r-SR.zone { border-top: 3px solid var(--r-sr); } .r-UR.zone { border-top: 3px solid var(--r-ur); }
 .zone.taunt { box-shadow: 0 0 0 2px var(--white) inset; }
+/* 聖盾：金色的光圈 */
+.zone.shielded { box-shadow: 0 0 0 2px #f2d27a inset, 0 0 12px #f2d27a88; }
+.zone.taunt.shielded { box-shadow: 0 0 0 2px var(--white) inset, 0 0 0 4px #f2d27a inset, 0 0 12px #f2d27a88; }
+.badge.shield { color: #1d1408; background: #f2d27a; }
 .zone.ready { border-color: var(--energy); }
 .zone.spent { opacity: .62; }
 .zone.selected, .hero.selected, .card.selected { outline: 2px solid var(--ink); outline-offset: 2px; }
@@ -258,6 +262,13 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .card.k-field { background: linear-gradient(180deg, #2c3d2a, #233020); }
 .card.playable { border-color: var(--energy); box-shadow: 0 0 10px #6fd3e633; }
 .card.playable:hover { translate: 0 -3px; }
+/* 連擊成立：現在打會多發動一段 */
+.card.combo-ready { border-color: #ff9ad5; box-shadow: 0 0 12px #ff9ad588; }
+.card.combo-ready::after {
+  content: '連擊'; position: absolute; top: -8px; right: -4px; z-index: 2; padding: 1px 6px; border-radius: 8px;
+  font: 700 11px/1.4 var(--num); color: #2a0f20; background: #ff9ad5;
+}
+.power.combo-ready { border-color: #ff9ad5; box-shadow: 0 0 10px #ff9ad588; }
 .c-cost {
   position: absolute; top: -7px; left: -7px; width: 26px; height: 26px; display: grid; place-items: center;
   font: 700 15px var(--num); color: #0c2530; isolation: isolate;

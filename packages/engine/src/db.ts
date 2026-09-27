@@ -25,6 +25,9 @@ function targetProblem(effect: Effect, spec: TargetSpec): string | null {
     case 'buff':
       if (effect.on === 'self') return null;
       return spec.kind === 'ally' && spec.allow === 'creature' ? null : '對目標增益只能指定我方生物';
+    case 'shield':
+      if (effect.on !== 'target') return null;
+      return spec.kind === 'ally' && spec.allow === 'creature' ? null : '給聖盾只能指定我方生物';
     case 'poison':
     case 'burn':
     case 'paralyze':
@@ -40,7 +43,7 @@ function targetProblem(effect: Effect, spec: TargetSpec): string | null {
 }
 
 function usesTarget(effect: Effect): boolean {
-  if (effect.type === 'buff') return effect.on === 'target';
+  if (effect.type === 'buff' || effect.type === 'shield') return effect.on === 'target';
   const statuses = ['poison', 'burn', 'paralyze', 'silence', 'weaken'];
   if ((effect.type === 'halveHp' || statuses.includes(effect.type)) && 'all' in effect && effect.all) return false;
   return ['damage', 'heal', 'halveHp', 'destroy', 'destroyCreature', ...statuses].includes(effect.type);
@@ -54,8 +57,12 @@ function checkAbility(ability: Ability, where: string, isCreatureSkill: boolean)
   if (ability.maxEnergyCost !== undefined && (!Number.isInteger(ability.maxEnergyCost) || ability.maxEnergyCost <= 0)) {
     problems.push(`${at}：能量上限的費用必須是正整數`);
   }
-  if (ability.effects.length === 0) problems.push(`${at}：沒有任何效果`);
-  for (const effect of ability.effects) {
+  // 連擊那一段跟本來的效果用同一個目標，合起來一起檢查；生物技能沒有連擊。
+  if (isCreatureSkill && ability.combo) problems.push(`${at}：生物技能不能有連擊`);
+  if (ability.combo?.length === 0) problems.push(`${at}：連擊沒有效果`);
+  const effects = [...ability.effects, ...(ability.combo ?? [])];
+  if (effects.length === 0) problems.push(`${at}：沒有任何效果`);
+  for (const effect of effects) {
     if (effect.type === 'summonToken' && effect.count <= 0) problems.push(`${at}：召喚的數量至少 1`);
     if (effect.type === 'lookPick' && (effect.pick <= 0 || effect.pick >= effect.look)) problems.push(`${at}：選的張數要比翻開的少，而且至少 1 張`);
   }
@@ -64,7 +71,7 @@ function checkAbility(ability: Ability, where: string, isCreatureSkill: boolean)
     problems.push(`${at}：找進化卡、直接進化只能用在生物技能上`);
   }
 
-  const targeted = ability.effects.filter(usesTarget);
+  const targeted = effects.filter(usesTarget);
   if (ability.target.kind === 'none' && targeted.length > 0) {
     problems.push(`${at}：效果需要目標，但沒有指定目標類型`);
   }
@@ -75,7 +82,7 @@ function checkAbility(ability: Ability, where: string, isCreatureSkill: boolean)
     const problem = targetProblem(effect, ability.target);
     if (problem) problems.push(`${at}：${problem}`);
   }
-  for (const effect of ability.effects) {
+  for (const effect of effects) {
     for (const [key, value] of Object.entries(effect)) {
       if (typeof value === 'number' && (!Number.isInteger(value) || value < 0)) {
         problems.push(`${at}：${effect.type}.${key} 必須是非負整數`);
@@ -111,9 +118,11 @@ function checkCard(
       }
       for (const skill of card.skills) problems.push(...checkAbility(skill, where, true));
       if (card.entry) {
-        const { awaken = [], ...entry } = card.entry;
-        problems.push(...checkAbility({ ...entry, effects: [...entry.effects, ...awaken], cost: 0 }, `${where}的進場效果`, true));
+        // 覺醒、連擊跟本來的效果用同一個目標，合起來一起檢查；本來的效果可以是空的（只有連擊時才有效果）。
+        const { awaken = [], combo = [], ...entry } = card.entry;
+        problems.push(...checkAbility({ ...entry, effects: [...entry.effects, ...awaken, ...combo], cost: 0 }, `${where}的進場效果`, true));
         if (card.entry.awaken?.length === 0) problems.push(`${where}：覺醒沒有效果`);
+        if (card.entry.combo?.length === 0) problems.push(`${where}：連擊沒有效果`);
       }
       if (card.death) problems.push(...checkAbility({ ...card.death, cost: 0, target: { kind: 'none' } }, `${where}的遺言`, false));
       for (const trigger of card.triggers ?? []) {

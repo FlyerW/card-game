@@ -171,6 +171,18 @@ export const TEST_CARDS: DeckCardDef[] = [
   creature('pouncer', [], { rarity: 'N', race: 'beast', attack: 3, hp: 4 }),
   creature('ghoul', [], { rarity: 'N', race: 'undead', attack: 2, hp: 3 }),
   creature('sprite', [hit('zap', ANY, 2)], { race: 'elemental', hp: 4 }),
+  // 聖盾與連擊（第三彈）
+  creature('guardian', [], { keywords: ['shield'], hp: 5 }),
+  creature('shield-giver', [{ name: 'ward', cost: 1, target: { kind: 'ally', allow: 'creature' }, effects: [{ type: 'shield', on: 'target' }] }]),
+  { kind: 'spell', id: 'aegis', name: 'aegis', rarity: 'R', colors: [], cost: 1, target: NONE, effects: [{ type: 'shield', on: 'all' }] },
+  {
+    kind: 'spell', id: 'combo-bolt', name: 'combo-bolt', rarity: 'R', colors: [], cost: 1,
+    target: ANY, effects: [{ type: 'damage', amount: 1 }], combo: [{ type: 'damage', amount: 2 }],
+  },
+  creature('ambusher', [], {
+    entry: { name: 'ambush', target: { kind: 'enemy', allow: 'creature' }, effects: [], combo: [{ type: 'damage', amount: 3 }] },
+  }),
+  { kind: 'spell', id: 'hush', name: 'hush', rarity: 'R', colors: [], cost: 1, target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'silence' }] },
   creature('sapling', [], { rarity: 'N', race: 'plant', attack: 1, hp: 5 }),
   creature('drake', [], { rarity: 'N', race: 'dragon', attack: 3, hp: 6 }),
   creature('golem', [], { rarity: 'N', race: 'machine', attack: 2, hp: 6 }),
@@ -231,6 +243,10 @@ export const TEST_HEROES: HeroDef[] = [
   { kind: 'hero', id: 'mender', name: 'mender', colors: ['green'], hp: 47, passive: { name: 'growth', creatures: { regenerate: 1 } } },
   { kind: 'hero', id: 'duelist', name: 'duelist', colors: ['white'], hp: 47, passive: { name: 'edge', ownTurn: { attack: 1 } } },
   { kind: 'hero', id: 'warder', name: 'warder', colors: ['green'], hp: 47, passive: { name: 'bark', opponentTurn: { hp: 2 } } },
+  {
+    kind: 'hero', id: 'combo-hero', name: 'combo-hero', colors: ['black', 'red'], hp: 40,
+    power: { name: 'cut', cost: 1, target: ANY, effects: [{ type: 'damage', amount: 1 }], combo: [{ type: 'damage', amount: 1 }] },
+  },
   {
     kind: 'hero', id: 'overlord', name: 'overlord', colors: ['black'], hp: 60, boss: true,
     passive: { name: 'dread', heroArmor: 2, turnStart: [{ type: 'summonToken', token: 'imp-token', count: 1 }] },

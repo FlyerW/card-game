@@ -31,8 +31,8 @@ const hit = (name: string, cost: number, target: TargetSpec, amount: number): Ab
  */
 const HEROES: HeroDef[] = [
   {
-    kind: 'hero', id: 'sky-envoy', name: '天穹龍使', rarity: 'UR', colors: ['white', 'blue'], hp: 43,
-    passive: { name: '天穹庇護', opponentTurn: { hp: 2 } },
+    kind: 'hero', id: 'sky-envoy', name: '天穹龍使', rarity: 'UR', colors: ['white', 'blue'], hp: 40,
+    passive: { name: '天穹庇護', opponentTurn: { hp: 1 } },
     power: { name: '聖諭', cost: 3, target: NONE, effects: [{ type: 'draw', count: 1 }, { type: 'healHero', amount: 2 }] },
   },
   {

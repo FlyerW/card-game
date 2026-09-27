@@ -12,7 +12,8 @@ export type PlayerId = 0 | 1;
  * 速攻：召喚當回合就能攻擊或發動技能。
  * 吸血：這隻生物造成傷害時（攻擊、反擊、技能、進場效果），自己的英雄回復等量的 HP。
  */
-export type Keyword = 'haste' | 'lifesteal';
+/** haste 速攻；lifesteal 吸血；shield 聖盾（第一次受到傷害時傷害變成 0，聖盾消失）。 */
+export type Keyword = 'haste' | 'lifesteal' | 'shield';
 
 /**
  * 稀有度，由低到高。N 是單純的數值卡，可以只有一個技能；R 開始有特殊機制。
@@ -77,6 +78,8 @@ export type Effect =
   | { type: 'halveHp'; all?: boolean }
   /** 發動者挑釁，直到對手下回合結束。 */
   | { type: 'taunt' }
+  /** 給聖盾：自身、我方目標生物，或我方每隻生物。已經有聖盾的不會疊。 */
+  | { type: 'shield'; on: 'self' | 'target' | 'all' }
   /**
    * 放增益指示物。attack 讓攻擊力增加，hp 讓 HP 上限增加。
    * 「增益 N」就是 attack 與 hp 各 N。
@@ -127,6 +130,8 @@ export interface Ability {
    * 能量上限之後照常每回合 +2，所以前期代價大、後期接近免費，效果給得比同樣能量的強一點。
    */
   maxEnergyCost?: number;
+  /** 連擊：這回合已經打出過別的牌時，接著發動的效果，目標相同。用在天生技上（生物技能不用）。 */
+  combo?: Effect[];
 }
 
 interface CardBase {
@@ -210,8 +215,11 @@ export interface DeathEffect {
   effects: Effect[];
 }
 
-/** 進場效果跟技能一樣是「目標類型 + 效果」，只是沒有費用。awaken：覺醒時（能量上限 8 以上）接著發動的效果，目標相同。 */
-export type EntryEffect = Omit<Ability, 'cost'> & { awaken?: Effect[] };
+/**
+ * 進場效果跟技能一樣是「目標類型 + 效果」，只是沒有費用。awaken：覺醒時（能量上限 8 以上）接著發動的效果，目標相同；
+ * combo：連擊時（這回合已經打出過別的牌）接著發動的效果。effects 可以是空的，只有連擊時才有效果。
+ */
+export type EntryEffect = Omit<Ability, 'cost'> & { awaken?: Effect[]; combo?: Effect[] };
 
 export interface SpellDef extends CardBase {
   kind: 'spell';
@@ -220,6 +228,8 @@ export interface SpellDef extends CardBase {
   effects: Effect[];
   /** 覺醒時（能量上限 8 以上）接著發動的效果，目標相同。 */
   awaken?: Effect[];
+  /** 連擊時（這回合已經打出過別的牌）接著發動的效果，目標相同。 */
+  combo?: Effect[];
 }
 
 export interface ItemDef extends CardBase {
@@ -390,6 +400,8 @@ export interface Creature {
   silencedUntilTurn: number | null;
   /** 虛弱到這個回合結束（含）。 */
   weakenedUntilTurn: number | null;
+  /** 聖盾：第一次受到傷害時傷害變成 0，聖盾消失。舊存檔沒有這個欄位（當作沒有）。 */
+  shield?: boolean;
 }
 
 export interface PlayerState {
@@ -414,6 +426,8 @@ export interface PlayerState {
   field: CardRef | null;
   fieldPlayedTurn: number | null;
   mulliganDone: boolean;
+  /** 這回合打出了幾張牌（生物、進化、法術、道具、場地、英雄進化）；連擊看這個。回合開始歸零；舊存檔沒有（當作 0）。 */
+  playedThisTurn?: number;
 }
 
 export type GameOverReason = 'heroDefeated' | 'deckOut' | 'concede';
@@ -506,6 +520,10 @@ export type GameEvent =
   | { type: 'healed'; target: Target; amount: number }
   | { type: 'buffed'; player: PlayerId; zone: number; attack: number; hp: number }
   | { type: 'taunting'; player: PlayerId; zone: number }
+  /** 聖盾擋掉了一次傷害，聖盾消失。 */
+  | { type: 'shieldBroken'; player: PlayerId; zone: number }
+  /** 得到聖盾。 */
+  | { type: 'shielded'; player: PlayerId; zone: number }
   | { type: 'discarded'; player: PlayerId; cardId: string }
   | { type: 'creatureDestroyed'; player: PlayerId; zone: number; cardId: string }
   /** 玩家主動讓自己的生物退場。 */

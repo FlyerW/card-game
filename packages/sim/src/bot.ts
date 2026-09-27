@@ -68,6 +68,8 @@ function boardValue(db: CardDb, state: GameState, player: PlayerId, style: BotSt
     const disabled = isParalyzed(state, creature);
     value += style.creatureHp * hp + style.creatureThreat * threat(db, state, creature) * (disabled ? 0.4 : 1);
     if (isTaunting(state, creature)) value += style.taunt;
+    // 聖盾擋掉下一次傷害，粗估等於多 3 點 HP。
+    if (creature.shield) value += style.creatureHp * 3;
   }
   return value;
 }

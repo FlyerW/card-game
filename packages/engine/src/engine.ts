@@ -45,6 +45,7 @@ import { viewFor } from './view';
 import type {
   Ability,
   Action,
+  Effect,
   CardDb,
   Creature,
   CreatureDef,
@@ -138,11 +139,41 @@ function ownCreature(state: GameState, player: PlayerId, zone: number) {
 /** 覺醒了沒：能量上限 8 以上。 */
 const awakened = (state: GameState, player: PlayerId) => state.players[player].maxEnergy >= AWAKEN_AT;
 
+/** 連擊了沒：這回合已經打出過別的牌。 */
+export const comboReady = (state: GameState, player: PlayerId) => (state.players[player].playedThisTurn ?? 0) > 0;
+
+/** 打出一張牌之後記下來（連擊看這個）。 */
+function played(state: GameState, player: PlayerId): void {
+  const p = state.players[player];
+  p.playedThisTurn = (p.playedThisTurn ?? 0) + 1;
+}
+
+/** 效果加上覺醒、連擊那兩段（條件成立時）。 */
+function withBonus(
+  state: GameState,
+  player: PlayerId,
+  effects: Effect[],
+  extra: { awaken?: Effect[] | undefined; combo?: Effect[] | undefined },
+): Effect[] {
+  return [
+    ...effects,
+    ...(extra.awaken && awakened(state, player) ? extra.awaken : []),
+    ...(extra.combo && comboReady(state, player) ? extra.combo : []),
+  ];
+}
+
 function spellAbility(db: CardDb, state: GameState, player: PlayerId, cardId: string): Ability | null {
   const def = cardDef(db, cardId);
   if (def.kind !== 'spell') return null;
-  const effects = def.awaken && awakened(state, player) ? [...def.effects, ...def.awaken] : def.effects;
-  return { name: def.name, cost: def.cost, target: def.target, effects };
+  return { name: def.name, cost: def.cost, target: def.target, effects: withBonus(state, player, def.effects, def) };
+}
+
+/** 生物的進場效果，加上覺醒、連擊；條件不成立、又沒有基本效果時是 null（不發動、不選目標）。 */
+function entryAbility(state: GameState, def: CreatureDef, player: PlayerId): Ability | null {
+  if (def.entry === undefined) return null;
+  const { awaken, combo, ...entry } = def.entry;
+  const effects = withBonus(state, player, entry.effects, { awaken, combo });
+  return effects.length === 0 ? null : { ...entry, cost: 0, effects };
 }
 
 /** 驗證玩家選的目標；只有一個合法目標時可以不選。 */
@@ -169,12 +200,11 @@ function chooseTarget(ctx: Ctx, ability: Ability, source: AbilitySource, chosen:
  * 場上沒有合法目標時，生物照樣進場，只是效果不發動。
  */
 function triggerEntry(ctx: Ctx, def: CreatureDef, player: PlayerId, zone: number, chosen: Target | undefined): void {
-  if (def.entry === undefined) {
-    if (chosen !== undefined) fail('TARGET_NOT_ALLOWED', `${def.name} 沒有進場效果，不需要指定目標`);
+  const ability = entryAbility(ctx.state, def, player);
+  if (ability === null) {
+    if (chosen !== undefined) fail('TARGET_NOT_ALLOWED', `${def.name} 現在沒有進場效果，不需要指定目標`);
     return;
   }
-  const { awaken, ...entry } = def.entry;
-  const ability: Ability = { ...entry, cost: 0, effects: awaken && awakened(ctx.state, player) ? [...entry.effects, ...awaken] : entry.effects };
   const source: AbilitySource = { kind: 'creature', player, zone };
   // 進場效果不能選自己（例如「目標增益 2」不能加在自己身上）。
   const self: Target = { kind: 'creature', player, zone };
@@ -191,8 +221,8 @@ function triggerEntry(ctx: Ctx, def: CreatureDef, player: PlayerId, zone: number
 
 /** 生物放到 zone 之後，進場效果能選的目標：不含牠自己。 */
 function entryTargets(state: GameState, def: CreatureDef, player: PlayerId, zone: number): Target[] {
-  if (def.entry === undefined || def.entry.target.kind === 'none') return [];
-  const ability: Ability = { ...def.entry, cost: 0 };
+  const ability = entryAbility(state, def, player);
+  if (ability === null || ability.target.kind === 'none') return [];
   const self: Target = { kind: 'creature', player, zone };
   return legalTargets(state, ability, { kind: 'creature', player, zone }).filter((t) => !sameTarget(t, self));
 }
@@ -211,6 +241,7 @@ function startTurn(ctx: Ctx, player: PlayerId): void {
   }
 
   const p = state.players[player];
+  p.playedThisTurn = 0;
   drawCards(ctx, player, 1 + (fieldDef(db, state, player)?.extraDraw ?? 0));
   if (state.phase !== 'main') return; // 牌庫抽完，落敗
 
@@ -271,12 +302,13 @@ function summon(ctx: Ctx, a: ActionOf<'summon'>): void {
 
   pay(p, def.cost);
   removeFromHand(p, card.uid);
-  p.zones[a.zone] = newCreature(card.uid, a.player, card.cardId, state.turn);
+  p.zones[a.zone] = newCreature(card.uid, a.player, card.cardId, state.turn, def.keywords?.includes('shield') ?? false);
   ctx.events.push({ type: 'summoned', player: a.player, zone: a.zone, cardId: card.cardId });
   fireTriggers(ctx, a.player, 'allySummoned', p.zones[a.zone]!);
   // 天使的「光輝 N」：召喚時你的英雄回復 N。
   if (def.race === 'angel' && traitOf(def) > 0) healHero(ctx, a.player, traitOf(def));
   triggerEntry(ctx, def, a.player, a.zone, a.target);
+  played(state, a.player);
 }
 
 function evolve(ctx: Ctx, a: ActionOf<'evolve'>): void {
@@ -298,7 +330,10 @@ function evolve(ctx: Ctx, a: ActionOf<'evolve'>): void {
   creature.cards.push(card);
   ctx.events.push({ type: 'evolved', player: a.player, zone: a.zone, from, to: card.cardId });
   clearStatuses(ctx, creature, a.player, a.zone);
+  // 進化成有聖盾的卡就多一面聖盾；原本的聖盾保留。
+  if (def.keywords?.includes('shield')) creature.shield = true;
   triggerEntry(ctx, def, a.player, a.zone, a.target);
+  played(state, a.player);
 }
 
 /**
@@ -387,7 +422,7 @@ function heroPower(ctx: Ctx, a: ActionOf<'heroPower'>): void {
   p.heroPowerUsedTurn = state.turn;
   p.heroPowerUses += 1;
   ctx.events.push({ type: 'abilityUsed', player: a.player, source: 'hero', cardId: hero.id, ability: power.name });
-  resolveAbility(ctx, power, source, target);
+  resolveAbility(ctx, { ...power, effects: withBonus(state, a.player, power.effects, { combo: power.combo }) }, source, target);
 }
 
 function evolveHero(ctx: Ctx, a: ActionOf<'evolveHero'>): void {
@@ -411,6 +446,7 @@ function evolveHero(ctx: Ctx, a: ActionOf<'evolveHero'>): void {
   ctx.events.push({ type: 'heroEvolved', player: a.player, cardId: card.cardId });
   cleanup(ctx);
   triggerHeroEntry(ctx, def, a.player, a.target);
+  played(state, a.player);
 }
 
 /**
@@ -446,6 +482,7 @@ function castSpell(ctx: Ctx, a: ActionOf<'castSpell'>): void {
   ctx.events.push({ type: 'abilityUsed', player: a.player, source: 'spell', cardId: card.cardId, ability: spell.name });
   resolveAbility(ctx, spell, source, target);
   p.discard.push(card);
+  played(state, a.player);
 }
 
 function attachItem(ctx: Ctx, a: ActionOf<'attachItem'>): void {
@@ -462,6 +499,7 @@ function attachItem(ctx: Ctx, a: ActionOf<'attachItem'>): void {
   creature.item = card;
   ctx.events.push({ type: 'itemAttached', player: a.player, zone: a.zone, cardId: card.cardId });
   cleanup(ctx); // 道具可能改變 HP 上限
+  played(state, a.player);
 }
 
 function playField(ctx: Ctx, a: ActionOf<'playField'>): void {
@@ -483,6 +521,7 @@ function playField(ctx: Ctx, a: ActionOf<'playField'>): void {
   p.fieldPlayedTurn = state.turn;
   ctx.events.push({ type: 'fieldPlayed', player: a.player, cardId: card.cardId });
   cleanup(ctx); // 換掉場地卡可能讓生物失去 HP 加成
+  played(state, a.player);
 }
 
 /** 讓自己的生物退場，空出格子給新的生物。跟被擊倒一樣，進化堆疊與道具都進棄牌區。 */
@@ -609,6 +648,7 @@ export function createEngine(db: CardDb) {
       field: null,
       fieldPlayedTurn: null,
       mulliganDone: false,
+      playedThisTurn: 0,
     });
     const initial: GameState = {
       rules,

@@ -67,6 +67,8 @@ export const KEYWORDS: Record<string, string> = {
   進場: '召喚時（或進化成這張時）發動',
   遺言: '死掉時發動（被打倒或被消滅）；沉默中死掉就不發動',
   覺醒: '你的能量上限 8 以上時，多發動這一段（目標跟前面一樣）',
+  連擊: '這回合你已經打出過別的牌（生物、進化、法術、道具、場地、英雄進化）時，多發動這一段',
+  聖盾: '第一次受到傷害時，傷害變成 0，聖盾消失（中毒、HP 減半、消滅擋不住；沉默會拿掉聖盾）',
   回合開始: '在場上時，你的每個回合開始時發動（抽牌之後）',
   回合結束: '在場上時，你的每個回合結束時發動',
   每當回復: '在場上時，每當你的英雄回復 ♥ 就發動',
@@ -180,6 +182,10 @@ export function describeEffect(effect: Effect, names: Names = ids, bonus = 0): s
       return `${effect.all ? '對手每隻生物' : ''}剩餘 ♥ 減半`;
     case 'taunt':
       return keyword('挑釁');
+    case 'shield': {
+      const who = effect.on === 'self' ? '自身' : effect.on === 'all' ? '我方每隻生物' : '';
+      return `${who}${keyword('聖盾')}`;
+    }
     case 'buff': {
       const who = effect.on === 'self' ? '自身' : effect.on === 'all' ? '我方每隻生物' : '目標';
       if (effect.attack === effect.hp) return `${who}${keyword(`增益 ${effect.attack}`)}`;
@@ -225,16 +231,26 @@ export function describeAbility(ability: Ability, names: Names = ids, bonus = 0)
   if (ability.maxEnergyCost) parts.push(`能量上限 −${ability.maxEnergyCost}`);
   if (ability.rest) parts.push(keyword('休息'));
   if (ability.uses) parts.push(`每局 ${ability.uses} 次`);
-  return `${ability.name}（${parts.join('，')}）：${describeEffects(ability, names, bonus)}`;
+  return `${ability.name}（${parts.join('，')}）：${describeEffects(ability, names, bonus)}${describeCombo(ability.combo, names, bonus)}`;
 }
 
 /** 進場效果：「**進場** 火星：〔任意目標〕造成 2 傷害」。 */
-export const describeEntry = (entry: EntryEffect, names: Names = ids, bonus = 0): string =>
-  `${keyword('進場')} ${entry.name}：${describeEffects(entry, names, bonus)}${describeAwaken(entry.awaken, names, bonus)}`;
+export function describeEntry(entry: EntryEffect, names: Names = ids, bonus = 0): string {
+  // 只有連擊才有效果的進場：「**進場** 暗刃：**連擊**時〔只打生物〕造成 3 傷害」。
+  if (entry.effects.length === 0 && entry.combo?.length) {
+    const target = describeTarget(entry.target);
+    return `${keyword('進場')} ${entry.name}：${keyword('連擊')}時${target === null ? '' : `〔${target}〕`}${entry.combo
+      .map((effect) => describeEffect(effect, names, bonus))
+      .join('，')}`;
+  }
+  return `${keyword('進場')} ${entry.name}：${describeEffects(entry, names, bonus)}${describeAwaken(entry.awaken, names, bonus)}${describeCombo(entry.combo, names, bonus)}`;
+}
 
-/** 覺醒的那一段：「；**覺醒**：再造成 3 傷害」。 */
-const describeAwaken = (awaken: readonly Effect[] | undefined, names: Names, bonus = 0) =>
-  awaken?.length ? `；${keyword('覺醒')}：${awaken.map((effect) => describeEffect(effect, names, bonus)).join('，')}` : '';
+/** 覺醒、連擊那一段：「；**覺醒**：再造成 3 傷害」。 */
+const describeExtra = (label: string, effects: readonly Effect[] | undefined, names: Names, bonus = 0) =>
+  effects?.length ? `；${keyword(label)}：${effects.map((effect) => describeEffect(effect, names, bonus)).join('，')}` : '';
+const describeAwaken = (awaken: readonly Effect[] | undefined, names: Names, bonus = 0) => describeExtra('覺醒', awaken, names, bonus);
+const describeCombo = (combo: readonly Effect[] | undefined, names: Names, bonus = 0) => describeExtra('連擊', combo, names, bonus);
 
 /** 遺言：「**遺言** 傳承：召喚 1 隻士兵（2/2）」。 */
 export const describeDeath = (death: DeathEffect, names: Names = ids, bonus = 0): string =>
@@ -257,6 +273,7 @@ function describeTraits(card: CreatureDef): string[] {
   // 進化卡都有速攻。
   if (card.keywords?.includes('haste') || card.evolvesFrom !== undefined) words.push(keyword('速攻'));
   if (card.keywords?.includes('lifesteal')) words.push(keyword('吸血'));
+  if (card.keywords?.includes('shield')) words.push(keyword('聖盾'));
   if (card.regenerate) words.push(keyword(`再生 ${card.regenerate}`));
   return words.length > 0 ? [words.join('、')] : [];
 }
@@ -323,7 +340,7 @@ export function describeCard(card: DeckCardDef, names: Names = ids): string[] {
       ];
     }
     case 'spell':
-      return [`${card.name}　${tag}・法術｜${cost}`, `${describeEffects(card, names)}${describeAwaken(card.awaken, names)}`];
+      return [`${card.name}　${tag}・法術｜${cost}`, `${describeEffects(card, names)}${describeAwaken(card.awaken, names)}${describeCombo(card.combo, names)}`];
     case 'item':
       const stats = describeModifier(card);
       return [

@@ -40,6 +40,8 @@ export interface CreatureView {
   weakened: boolean;
   /** 亡靈的「不死」用過了。 */
   undyingUsed: boolean;
+  /** 有聖盾（下一次受到的傷害變成 0）。 */
+  shield: boolean;
   /** 這回合攻擊過（或休息了）。 */
   attackedThisTurn: boolean;
   skillUsedThisTurn: boolean;
@@ -65,6 +67,8 @@ export interface SideView {
   /** 自己場地區的場地卡。 */
   field: string | null;
   mulliganDone: boolean;
+  /** 這回合打出了幾張牌；大於 0 時連擊成立。 */
+  playedThisTurn: number;
 }
 
 /**
@@ -107,6 +111,7 @@ function creatureView(db: CardDb, state: GameState, creature: Creature): Creatur
     silenced: isSilenced(state, creature),
     weakened: isWeakened(state, creature),
     undyingUsed: creature.undyingUsed,
+    shield: creature.shield === true,
     attackedThisTurn: creature.attackedTurn === state.turn,
     skillUsedThisTurn: creature.skillUsedTurn === state.turn,
     summonedThisTurn: creature.summonedTurn === state.turn,
@@ -131,6 +136,7 @@ function sideView(db: CardDb, state: GameState, player: PlayerId): SideView {
     ceiling: ceiling(db, state, player),
     field: p.field?.cardId ?? null,
     mulliganDone: p.mulliganDone,
+    playedThisTurn: p.playedThisTurn ?? 0,
   };
 }
 

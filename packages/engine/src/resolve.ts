@@ -105,8 +105,9 @@ export function endGame(ctx: Ctx, result: GameResult): void {
 }
 
 /** 剛進場的生物：沒有傷害、指示物與狀態，召喚當回合不能行動。 */
-export function newCreature(uid: number, owner: PlayerId, cardId: string, turn: number): Creature {
+export function newCreature(uid: number, owner: PlayerId, cardId: string, turn: number, shield = false): Creature {
   return {
+    shield,
     uid,
     owner,
     cards: [{ uid, cardId }],
@@ -215,6 +216,12 @@ function dealDamage(ctx: Ctx, target: Target, creature: Creature | null, amount:
   }
   if (creature !== null) {
     const dealt = Math.max(0, amount - damageReduction(ctx.db, ctx.state, creature));
+    // 聖盾：這一下的傷害變成 0，聖盾消失（減傷擋到 0 時聖盾不會破）。
+    if (dealt > 0 && creature.shield) {
+      creature.shield = false;
+      if (target.kind === 'creature') ctx.events.push({ type: 'shieldBroken', player: target.player, zone: target.zone });
+      return 0;
+    }
     creature.damage += dealt;
     ctx.events.push({ type: 'damaged', target, amount: dealt });
     return dealt;
@@ -271,6 +278,7 @@ function stripEffects(ctx: Ctx, creature: Creature): void {
   creature.attackCounters = 0;
   creature.hpCounters = 0;
   creature.tauntUntilTurn = null;
+  creature.shield = false;
   creature.damage = Math.max(0, maxHp(ctx.db, ctx.state, creature) - Math.min(before, maxHp(ctx.db, ctx.state, creature)));
 }
 
@@ -489,7 +497,8 @@ function applyEffect(
         const zone = vacated ? source.zone : player.zones.findIndex((each) => each === null);
         if (zone === -1) return;
         const uid = state.nextUid++;
-        player.zones[zone] = newCreature(uid, me, effect.token, state.turn);
+        const tokenDef = db.cards.get(effect.token);
+        player.zones[zone] = newCreature(uid, me, effect.token, state.turn, tokenDef?.kind === 'creature' && (tokenDef.keywords?.includes('shield') ?? false));
         ctx.events.push({ type: 'summoned', player: me, zone, cardId: effect.token });
         fireTriggers(ctx, me, 'allySummoned', player.zones[zone]!);
       }
@@ -529,6 +538,19 @@ function applyEffect(
         ctx.events.push({ type: 'taunting', player: me, zone: source.zone });
       }
       return;
+
+    case 'shield': {
+      // 給聖盾：自身、我方目標生物，或我方每隻生物。已經有的不會疊。
+      const give = (each: Creature | null, zone: number) => {
+        if (each === null || each.shield) return;
+        each.shield = true;
+        ctx.events.push({ type: 'shielded', player: me, zone });
+      };
+      if (effect.on === 'all') player.zones.forEach(give);
+      else if (effect.on === 'self' && source.kind === 'creature') give(sourceCreature, source.zone);
+      else if (effect.on === 'target' && target?.kind === 'creature') give(creature, target.zone);
+      return;
+    }
 
     case 'buff': {
       // 增益自身、我方目標生物，或我方每隻生物；都是我方的生物。

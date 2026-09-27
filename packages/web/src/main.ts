@@ -716,7 +716,8 @@ function choices(): Map<string, Action> {
 function floatsFrom(events: GameEvent[]): Float[] {
   const out: Float[] = [];
   for (const e of events) {
-    if (e.type === 'damaged') out.push({ key: targetKey(e.target), text: `−${e.amount}`, tone: 'damage' });
+    if (e.type === 'damaged' && e.amount > 0) out.push({ key: targetKey(e.target), text: `−${e.amount}`, tone: 'damage' });
+    if (e.type === 'shieldBroken') out.push({ key: `z${e.player}${e.zone}`, text: '聖盾', tone: 'heal' });
     else if (e.type === 'hpLost') out.push({ key: targetKey(e.target), text: `−${e.amount}`, tone: 'loss' });
     else if (e.type === 'healed' && e.amount > 0) out.push({ key: targetKey(e.target), text: `+${e.amount}`, tone: 'heal' });
     else if (e.type === 'buffed') out.push({ key: `z${e.player}${e.zone}`, text: `+${e.attack}/+${e.hp}`, tone: 'buff' });
@@ -975,7 +976,14 @@ function powerPill(side: SideView, mine: boolean): string {
   const body = `${costBadge(power)}${esc(power.name)}${left}${then}`;
   if (!mine) return `<button class="power" data-do="their-power" aria-label="對手的天生技 ${esc(power.name)}，點了看說明">${body}</button>`;
   const usable = actsForPower().length > 0;
-  return `<button class="power${app.selection?.kind === 'heroPower' ? ' selected' : ''}" data-do="power" ${usable ? '' : 'disabled'}>${body}</button>`;
+  const combo = usable && power.combo?.length && side.playedThisTurn > 0 ? ' combo-ready' : '';
+  return `<button class="power${app.selection?.kind === 'heroPower' ? ' selected' : ''}${combo}" data-do="power" ${usable ? '' : 'disabled'}>${body}</button>`;
+}
+
+/** 這張卡有沒有連擊（法術或生物的進場）。 */
+function hasCombo(def: DeckCardDef): boolean {
+  if (def.kind === 'spell') return (def.combo?.length ?? 0) > 0;
+  return def.kind === 'creature' && (def.entry?.combo?.length ?? 0) > 0;
 }
 
 /** 目前的天生技，以及輪流的話下一次換成哪一個（跟引擎的 heroPower 同一套規則）。 */
@@ -1231,10 +1239,12 @@ function zone(cv: CreatureView | null, player: PlayerId, index: number, picks: M
     classes.push(ready ? 'ready' : 'spent');
   }
   if (cv.taunting) classes.push('taunt');
+  if (cv.shield) classes.push('shielded');
   const badges: string[] = [];
 
   if (cv.damageReduction) badges.push(`<i class="badge def">減${cv.damageReduction}</i>`);
   if (cv.item) badges.push(`<i class="badge item" title="${esc(nameOf(cv.item))}">${esc(nameOf(cv.item))}</i>`);
+  if (cv.shield) badges.push('<i class="badge shield">聖盾</i>');
   if (cv.taunting) badges.push('<i class="badge taunt">挑釁</i>');
   if (def.kind === 'creature' && def.triggers?.length && !cv.silenced) badges.push('<i class="badge death">持續</i>');
   if (def.kind === 'creature' && def.death && !cv.silenced) badges.push('<i class="badge death">遺言</i>');
@@ -1313,9 +1323,11 @@ function hand(view: PlayerView): string {
       const def = card(held.cardId);
       const playable = actsForCard(held.uid).length > 0;
       const selected = app.selection?.kind === 'hand' && app.selection.uid === held.uid;
+      // 這回合已經打出過牌：有連擊的卡標亮，提醒現在打會多一段。
+      const combo = playable && view.you.playedThisTurn > 0 && hasCombo(def);
       return cardFace(def, {
         attrs: `data-hand="${held.uid}"`,
-        classes: [...(playable ? ['playable'] : []), ...(selected ? ['selected'] : [])],
+        classes: [...(playable ? ['playable'] : []), ...(selected ? ['selected'] : []), ...(combo ? ['combo-ready'] : [])],
       });
     })
     .join('');

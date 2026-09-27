@@ -283,51 +283,56 @@ describe('牌組驗證', () => {
   });
 });
 
-describe('第二彈（還沒發布）', () => {
-  const preview = sampleDb(true);
-  const expansion = [...preview.cards.values()].filter((card) => card.set === 'awakening');
+// 擴充卡包（還沒發布）：第二彈「龍脈覺醒」、第三彈「天機神殿」照同一套規則檢查。
+for (const [set, title] of [['awakening', '第二彈「龍脈覺醒」'], ['celestial', '第三彈「天機神殿」']] as const) {
+  describe(`${title}（還沒發布）`, () => {
+    const preview = sampleDb(true);
+    const expansion = [...preview.cards.values()].filter((card) => card.set === set);
 
-  it('預覽的資料庫建得起來；平常的資料庫看不到第二彈', () => {
-    expect(expansion.length).toBeGreaterThanOrEqual(25);
-    expect([...sampleDb().cards.values()].some((card) => card.set === 'awakening')).toBe(false);
-  });
+    it('預覽的資料庫建得起來；平常的資料庫看不到這一彈的卡與英雄', () => {
+      expect(expansion.length).toBeGreaterThanOrEqual(100);
+      expect([...sampleDb().cards.values()].some((card) => card.set === set)).toBe(false);
+      expect([...sampleDb().heroes.values()].some((hero) => hero.set === set)).toBe(false);
+    });
 
-  it('100 張卡（不算衍生物）：每個顏色 16 張、無色 10 張', () => {
-    const collectible = expansion.filter((card) => !(card.kind === 'creature' && card.token));
-    expect(collectible).toHaveLength(100);
-    for (const color of ['white', 'blue', 'black', 'red', 'green']) expect(collectible.filter((card) => card.colors.length === 1 && card.colors[0] === color), color).toHaveLength(16);
-    expect(collectible.filter((card) => card.colors.length === 0)).toHaveLength(10);
-  });
+    it('100 張卡（不算衍生物）：每個顏色 16 張、無色 10 張', () => {
+      const collectible = expansion.filter((card) => !(card.kind === 'creature' && card.token));
+      expect(collectible).toHaveLength(100);
+      for (const color of ['white', 'blue', 'black', 'red', 'green']) {
+        expect(collectible.filter((card) => card.colors.length === 1 && card.colors[0] === color), color).toHaveLength(16);
+      }
+      expect(collectible.filter((card) => card.colors.length === 0)).toHaveLength(10);
+    });
 
-  it('新的雙色英雄只在預覽出現；每個都有英雄進化與一張雙色卡', () => {
-    const heroes = [...preview.heroes.values()].filter((hero) => hero.set === 'awakening');
-    expect(heroes).toHaveLength(5);
-    expect([...sampleDb().heroes.values()].some((hero) => hero.set === 'awakening')).toBe(false);
-    for (const hero of heroes) {
-      expect(hero.rarity).toBe('UR');
-      expect(expansion.some((card) => card.kind === 'heroEvolution' && card.evolvesFrom === hero.id), hero.name).toBe(true);
-      const sameColors = (card: DeckCardDef) => card.kind === 'creature' && card.colors.join() === hero.colors.join();
-      expect(expansion.some(sameColors), hero.name).toBe(true);
-    }
-    // 雙色組合不跟已經有的英雄重複
-    const pairs = [...preview.heroes.values()].filter((hero) => !hero.boss && hero.colors.length === 2).map((hero) => hero.colors.join('+'));
-    expect(new Set(pairs).size).toBe(pairs.length);
-  });
+    it('5 個新的多色英雄（UR），每個都有英雄進化與一張同顏色的多色卡；多色組合不跟別的英雄重複', () => {
+      const heroes = [...preview.heroes.values()].filter((hero) => hero.set === set);
+      expect(heroes).toHaveLength(5);
+      for (const hero of heroes) {
+        expect(hero.rarity).toBe('UR');
+        expect(expansion.some((card) => card.kind === 'heroEvolution' && card.evolvesFrom === hero.id), hero.name).toBe(true);
+        const sameColors = (card: DeckCardDef) => card.kind === 'creature' && card.colors.join() === hero.colors.join();
+        expect(expansion.some(sameColors), hero.name).toBe(true);
+      }
+      const combos = [...preview.heroes.values()].filter((hero) => !hero.boss && hero.colors.length > 1).map((hero) => hero.colors.join('+'));
+      expect(new Set(combos).size).toBe(combos.length);
+    });
 
-  it('能力數照稀有度：N／R／SR／UR 各 1／2／3／4 個（種族特色、關鍵字、再生、進場、遺言、持續效果、同族加成、技能都算一個）', () => {
-    const expected = { N: 1, R: 2, SR: 3, UR: 4 } as const;
-    for (const card of expansion) {
-      if (card.kind !== 'creature' || card.token) continue;
-      const count =
-        (traitOf(card) > 0 ? 1 : 0) +
-        (card.keywords?.length ?? 0) +
-        (card.regenerate ? 1 : 0) +
-        card.skills.length +
-        (card.triggers?.length ?? 0) +
-        (card.kin ? 1 : 0) +
-        (card.entry ? 1 : 0) +
-        (card.death ? 1 : 0);
-      expect(count, card.name).toBe(expected[card.rarity]);
-    }
+    it('能力數照稀有度：N／R／SR／UR 各 1／2／3／4 個（種族特色、關鍵字、再生、進場、遺言、持續效果、同族加成、技能都算一個）', () => {
+      const expected = { N: 1, R: 2, SR: 3, UR: 4 } as const;
+      for (const card of expansion) {
+        if (card.kind !== 'creature' || card.token) continue;
+        const count =
+          (traitOf(card) > 0 ? 1 : 0) +
+          (card.keywords?.length ?? 0) +
+          (card.regenerate ? 1 : 0) +
+          card.skills.length +
+          (card.triggers?.length ?? 0) +
+          (card.kin ? 1 : 0) +
+          (card.entry ? 1 : 0) +
+          (card.death ? 1 : 0);
+        expect(count, card.name).toBe(expected[card.rarity]);
+      }
+    });
   });
-});
+}
+
