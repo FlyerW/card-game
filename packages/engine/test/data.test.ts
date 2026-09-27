@@ -4,6 +4,7 @@ import { buildCardDb, CardDataError } from '../src/db';
 import { copyLimit, deckPool, validateDeck } from '../src/deck';
 import { describeCard, explainKeywords } from '../src/describe';
 import { DEFAULT_RULES } from '../src/rules';
+import { traitOf } from '../src/queries';
 import type { Ability, DeckCardDef, HeroDef } from '../src/types';
 import { db } from './helpers';
 
@@ -313,11 +314,19 @@ describe('第二彈（還沒發布）', () => {
     expect(new Set(pairs).size).toBe(pairs.length);
   });
 
-  it('技能數照稀有度：N／R／SR／UR 各 1／2／3／4 個（進場、遺言、持續效果、同族加成都算一個）', () => {
+  it('能力數照稀有度：N／R／SR／UR 各 1／2／3／4 個（種族特色、關鍵字、再生、進場、遺言、持續效果、同族加成、技能都算一個）', () => {
     const expected = { N: 1, R: 2, SR: 3, UR: 4 } as const;
     for (const card of expansion) {
       if (card.kind !== 'creature' || card.token) continue;
-      const count = card.skills.length + (card.triggers?.length ?? 0) + (card.kin ? 1 : 0) + (card.entry ? 1 : 0) + (card.death ? 1 : 0);
+      const count =
+        (traitOf(card) > 0 ? 1 : 0) +
+        (card.keywords?.length ?? 0) +
+        (card.regenerate ? 1 : 0) +
+        card.skills.length +
+        (card.triggers?.length ?? 0) +
+        (card.kin ? 1 : 0) +
+        (card.entry ? 1 : 0) +
+        (card.death ? 1 : 0);
       expect(count, card.name).toBe(expected[card.rarity]);
     }
   });
