@@ -73,6 +73,34 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 /* ─── 開局選英雄 ─── */
 .setup { max-width: 920px; margin: 0 auto; display: grid; gap: 20px; padding-block: 12px 32px; }
 .setup h1 { font: 700 30px/1.2 var(--display); margin: 0 0 6px; letter-spacing: .04em; }
+/* 遊戲標題（ui.ts 的 logo()）：金屬金的字（中間一道反光線）、每隔幾秒一道五色的光掃過、下面一排五色寶石 */
+.setup h1.logo { display: inline-grid; justify-items: center; gap: 2px; margin: 0 0 8px; }
+.logo-text {
+  position: relative; display: block; padding-left: .16em; /* letter-spacing 在字的右邊，左邊補一樣多才置中 */
+  font: 900 46px/1.15 var(--display); letter-spacing: .16em;
+  background: linear-gradient(180deg, #fffaf0 0%, #f8e2a0 26%, #e3b458 46%, #87540f 50%, #c68b29 60%, #f3d17f 82%, #fff2c8 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 1px 0 #2a1805) drop-shadow(0 0 1px #000) drop-shadow(0 4px 10px #000a) drop-shadow(0 0 16px #d4a24c38);
+}
+.logo-text::after {
+  content: attr(data-text); position: absolute; inset: 0; padding-left: inherit;
+  /* 只換色相（color 混合）：金屬的明暗與反光線留著，看起來像虹彩金屬 */
+  background: linear-gradient(105deg, transparent 43%, var(--white) 45.5%, var(--blue) 47.5%, var(--black) 50%, var(--red) 52.5%, var(--green) 54.5%, transparent 57%)
+    120% 0 / 420% 100% no-repeat;
+  -webkit-background-clip: text; background-clip: text; color: transparent; mix-blend-mode: color;
+  animation: logo-sheen 8s ease-in-out infinite;
+}
+@keyframes logo-sheen { 0%, 60% { background-position: 120% 0; } 100% { background-position: -20% 0; } }
+.logo-gems { display: flex; align-items: center; gap: 10px; }
+.logo-gems::before, .logo-gems::after { content: ''; width: 64px; height: 1px; background: linear-gradient(90deg, transparent, #d4a24c); }
+.logo-gems::after { transform: scaleX(-1); }
+.gem {
+  --c: var(--white); width: 7px; height: 7px; transform: rotate(45deg); border: 1px solid #e7c177;
+  background: linear-gradient(135deg, #fffc 0 25%, transparent 55%), var(--c); box-shadow: 0 0 6px var(--c);
+}
+.gem.blue { --c: var(--blue); } .gem.black { --c: var(--black); } .gem.red { --c: var(--red); } .gem.green { --c: var(--green); }
+@media (prefers-reduced-motion: reduce) { .logo-text::after { animation: none; opacity: 0; } }
+@media (max-width: 600px) { .logo-text { font-size: 36px; } .logo-gems::before, .logo-gems::after { width: 44px; } }
 .setup header p { margin: 0; color: var(--ink-soft); }
 .heroes { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 12px; }
 .hero-pick {

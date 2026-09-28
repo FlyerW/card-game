@@ -26,6 +26,12 @@ export function pips(colors: Color[]): string {
   return `<span class="pips" aria-label="${colors.join('')}">${colors.map((c) => `<i class="pip ${c}"></i>`).join('')}</span>`;
 }
 
+/** 遊戲標題：金屬金的「幻彩英雄」，每隔幾秒有一道五色的光掃過；下面一排五色寶石（樣式在 style.css 的 .logo）。 */
+export function logo(): string {
+  const gems = (['white', 'blue', 'black', 'red', 'green'] as const).map((c) => `<i class="gem ${c}"></i>`).join('');
+  return `<h1 class="logo"><span class="logo-text" data-text="幻彩英雄">幻彩英雄</span><span class="logo-gems" aria-hidden="true">${gems}</span></h1>`;
+}
+
 export function kindLabel(def: DeckCardDef): string {
   switch (def.kind) {
     case 'creature': {

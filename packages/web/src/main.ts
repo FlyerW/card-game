@@ -111,7 +111,7 @@ import { music, type Sound } from './music';
 import { ONLINE_AVAILABLE, OnlineClient } from './online';
 import { scriptedTurn, startTutorial, STEPS, TUTORIAL_KEY } from './tutorial';
 import { newShop, ownedOf, shopClick, shopScreen, walletBar, type Shop } from './shop';
-import { artUrl, cardFace, detailLines, esc, pips, rich } from './ui';
+import { artUrl, cardFace, detailLines, esc, logo, pips, rich } from './ui';
 import './style.css';
 
 /**
@@ -1524,7 +1524,7 @@ function loginScreen(): string {
         ? '<p class="d-line">登入中……</p>'
         : '<div id="google-button" class="google-slot"></div>';
   return `<main class="setup login">
-    <header><h1>幻彩英雄</h1><p>登入後開始收集卡片、拿金幣、解每日任務。</p></header>
+    <header>${logo()}<p>登入後開始收集卡片、拿金幣、解每日任務。</p></header>
     <div class="login-options">
       <section class="login-card">
         <p class="d-head">測試帳號</p>
@@ -1596,7 +1596,7 @@ function setupScreen(): string {
   ].join('');
   const who = app.session;
   return `<main class="setup">
-    <header class="setup-head"><div><h1>幻彩英雄</h1><p>${
+    <header class="setup-head"><div>${logo()}<p>${
       ONLINE_AVAILABLE
         ? '選一名英雄，跟電腦打，或開一個房間跟朋友連線對戰。'
         : '選一名英雄，跟電腦打一局。對手的英雄隨機，開局時會先告訴你是誰。'
