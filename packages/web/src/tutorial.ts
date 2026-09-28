@@ -40,7 +40,7 @@ const enemyZone = (state: GameState, cardId: string) =>
 export const STEPS: TutorialStep[] = [
   {
     title: '歡迎',
-    text: '下面是你的英雄「無名劍士」，上面是對手。把對手英雄的 ♥ 打到 0 就贏了。無名劍士讓你的生物攻擊力變高，還有 **突破**（被擋住也打得到英雄）。',
+    text: '下面是你的英雄「無名劍士」，上面是對手。把對手英雄的 ♥ 打到 0 就贏了。無名劍士讓你的生物攻擊力 +1。',
     highlight: () => ['.hero'],
   },
   {

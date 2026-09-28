@@ -12,10 +12,15 @@ parentPort!.on('message', (task: { a: string; b: string; from: number; to: numbe
     const seed = game * 104729 + 3;
     const deckA = buildDeck(seed, task.a, deckPool(engine.db, task.a));
     const deckB = buildDeck(seed + 1, task.b, deckPool(engine.db, task.b));
-    const outcome = playMatch(engine, { seed: game + 11, players: [{ heroId: task.a, deck: deckA }, { heroId: task.b, deck: deckB }] }, style);
+    // 單雙局輪流先攻：先攻勝率約 53%–54%，固定讓英雄清單前面的先攻會把他們算高、後面的算低。
+    const aFirst = game % 2 === 0;
+    const a = { heroId: task.a, deck: deckA };
+    const b = { heroId: task.b, deck: deckB };
+    const outcome = playMatch(engine, { seed: game + 11, players: aFirst ? [a, b] : [b, a] }, style);
     if (outcome.result.winner === 'draw') continue;
-    rows.push({ hero: task.a, deck: deckA, won: outcome.result.winner === 0 });
-    rows.push({ hero: task.b, deck: deckB, won: outcome.result.winner === 1 });
+    const aWon = outcome.result.winner === (aFirst ? 0 : 1);
+    rows.push({ hero: task.a, deck: deckA, won: aWon });
+    rows.push({ hero: task.b, deck: deckB, won: !aWon });
   }
   parentPort!.postMessage(rows);
 });

@@ -39,30 +39,33 @@ const CORE_HEROES: HeroDef[] = [
   // 單色的五個是基礎英雄，每個人都有；雙色以上的是 UR，要從卡包抽到。
   {
     kind: 'hero', id: 'nameless-swordsman', name: '無名劍士', colors: ['white'], hp: 44,
-    // 原本還有「我方回合再 ⚔ +1」；在有第二、三彈的環境裡他太強（63%），拿掉那一段。
-    passive: { name: '劍士之道', creatures: { attack: 1 }, pierce: true },
+    // 原本還有「我方回合再 ⚔ +1」與突破；在有第二、三彈的環境裡他太強（63%），兩個都拿掉，第一彈補了白色的強力單卡。
+    passive: { name: '劍士之道', creatures: { attack: 1 } },
   },
   {
     kind: 'hero', id: 'deep-seer', name: '深海先知', colors: ['blue'], hp: 45,
     power: { name: '預見', cost: 3, target: NONE, effects: [{ type: 'draw', count: 1 }] },
   },
   {
-    kind: 'hero', id: 'underworld-priest', name: '冥府祭司', colors: ['black'], hp: 37,
-    power: { name: '蝕心', cost: 5, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
+    // HP 37 → 41：有第二、三彈時 37 只有 43%、40 是 44%；42 在只有第一彈時太強（59%）。
+    kind: 'hero', id: 'underworld-priest', name: '冥府祭司', colors: ['black'], hp: 41,
+    // 5 → 4 費：模擬裡 4 費和 5 費勝率幾乎一樣（差不到 0.5%），4 費玩起來順手。
+    power: { name: '蝕心', cost: 4, target: NONE, effects: [{ type: 'opponentDiscardRandom', count: 1 }] },
   },
   {
-    kind: 'hero', id: 'flame-lord', name: '烈焰領主', colors: ['red'], hp: 43,
+    // HP 43 → 45：第一彈補了白、藍的卡之後紅色整體偏弱，他只剩 44%。
+    kind: 'hero', id: 'flame-lord', name: '烈焰領主', colors: ['red'], hp: 45,
     power: hit('燃燼', 2, ANY, 2),
   },
   {
     kind: 'hero', id: 'forest-king', name: '林海之王', colors: ['green'], hp: 45,
     passive: { name: '林海之息', creatures: { regenerate: 1 } },
-    // 比能量結晶（2 費上限 +1）、森林之息（2 費全體回復 3）貴，那兩張牌才有人帶。
-    power: { name: '萌發', cost: 3, target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }, { type: 'healAll', amount: 2 }] },
+    // 原本 3 費（比能量結晶、森林之息貴，那兩張牌才有人帶）；第一彈補了白、藍的卡之後他只剩 43%–45%，改 2 費是 54%。
+    power: { name: '萌發', cost: 2, target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }, { type: 'healAll', amount: 2 }] },
   },
   // ── UR 英雄：多色。技能盡量不跟別的英雄重複 ──
   {
-    kind: 'hero', id: 'grove-saint', name: '翠林聖女', rarity: 'UR', colors: ['white', 'green'], hp: 39,
+    kind: 'hero', id: 'grove-saint', name: '翠林聖女', rarity: 'UR', colors: ['white', 'green'], hp: 36,
     passive: { name: '豐饒', creatures: { hp: 2 } },
   },
   {
@@ -204,6 +207,32 @@ const CORE_CARDS: DeckCardDef[] = [
     skills: [{ name: '祈禱', cost: 1, target: ALLY, effects: [{ type: 'heal', amount: 3 }] }],
   },
   { kind: 'field', id: 'sanctuary', name: '聖域', rarity: 'R', colors: ['white'], cost: 3, heroRegenerate: 3 },
+  // 白色的強力單卡：第一彈的白卡整體偏弱（模擬 41%–45%），補鋪場與全體增益，每隻生物都吃得到無名劍士的 ⚔ +1 與突破。
+  {
+    kind: 'creature', id: 'sword-knight', name: '聖劍騎士', rarity: 'R', colors: ['white'], race: 'human',
+    stage: 0, cost: 4, attack: 3, hp: 4,
+    entry: { name: '隨行', target: NONE, effects: [{ type: 'summonToken', token: 'soldier-token', count: 1 }] },
+    skills: [{ name: '鼓舞', cost: 2, target: ALLY_CREATURE, effects: [{ type: 'buff', attack: 1, hp: 1, on: 'target' }] }],
+  },
+  {
+    kind: 'creature', id: 'realm-marshal', name: '王國元帥', rarity: 'SR', colors: ['white'], race: 'human',
+    stage: 0, cost: 6, attack: 4, hp: 5,
+    entry: { name: '集結', target: NONE, effects: [{ type: 'summonToken', token: 'soldier-token', count: 2 }] },
+    skills: [{ name: '王令', cost: 4, target: NONE, effects: [{ type: 'buff', attack: 1, hp: 0, on: 'all' }] }],
+  },
+  {
+    kind: 'spell', id: 'victory-horn', name: '勝利號角', rarity: 'SR', colors: ['white'], cost: 4,
+    target: NONE, effects: [{ type: 'buff', attack: 1, hp: 1, on: 'all' }, { type: 'draw', count: 1 }],
+  },
+  {
+    kind: 'creature', id: 'celestial-king', name: '天界聖王', rarity: 'UR', colors: ['white'], race: 'angel',
+    stage: 0, cost: 8, attack: 8, hp: 9,
+    entry: { name: '聖光祝福', target: NONE, effects: [{ type: 'buff', attack: 1, hp: 1, on: 'all' }] },
+    skills: [
+      hit('聖劍審判', 3, ANY, 3),
+      { name: '聖王之令', cost: 3, target: NONE, effects: [{ type: 'summonToken', token: 'soldier-token', count: 1 }] },
+    ],
+  },
 
   // ── 藍：知識、控制。抽牌、干擾對手；異常狀態是麻痺 ──
   { kind: 'creature', id: 'jellyfish', name: '小水母', rarity: 'N', colors: ['blue'], race: 'beast', trait: 0, stage: 0, cost: 1, attack: 1, hp: 2, skills: [] },
@@ -294,28 +323,29 @@ const CORE_CARDS: DeckCardDef[] = [
   },
   { kind: 'field', id: 'wellspring', name: '知識之泉', rarity: 'R', colors: ['blue'], cost: 2, extraDraw: 1 },
   // 藍色抽了一堆牌之後的勝利手段：手牌越多打越痛；加上把對手的生物彈回手牌的解場，以及藍色的大牌。
+  // 手牌傷害的技能照「約 1 能量 1 傷害」估：藍色中盤手牌約 4–5 張，所以可以重複用的技能要 4–5 能量。
   { kind: 'spell', id: 'tidal-rebound', name: '潮汐反彈', rarity: 'R', colors: ['blue'], cost: 2, target: CREATURE, effects: [{ type: 'bounce' }] },
   { kind: 'spell', id: 'blade-of-knowledge', name: '知識之刃', rarity: 'R', colors: ['blue'], cost: 3, target: ANY, effects: [{ type: 'handDamage' }] },
   {
     kind: 'creature', id: 'tome-warden', name: '秘典守衛', rarity: 'R', colors: ['blue'], race: 'human',
-    stage: 0, cost: 4, attack: 2, hp: 6, skills: [{ name: '心靈衝擊', cost: 2, target: CREATURE, effects: [{ type: 'handDamage' }] }],
+    stage: 0, cost: 4, attack: 2, hp: 6, skills: [{ name: '心靈衝擊', cost: 4, target: CREATURE, effects: [{ type: 'handDamage' }] }],
   },
   {
     kind: 'creature', id: 'memory-whale', name: '記憶巨鯨', rarity: 'SR', colors: ['blue'], race: 'beast',
-    stage: 0, cost: 7, attack: 6, hp: 9, entry: { name: '回憶之歌', target: NONE, effects: [{ type: 'draw', count: 2 }] },
-    skills: [{ name: '潮湧', cost: 3, target: ANY, effects: [{ type: 'handDamage' }] }],
+    stage: 0, cost: 7, attack: 6, hp: 9, entry: { name: '回憶之歌', target: NONE, effects: [{ type: 'draw', count: 1 }] },
+    skills: [{ name: '潮湧', cost: 5, target: ANY, effects: [{ type: 'handDamage' }] }],
   },
   {
     kind: 'creature', id: 'omniscient-sea-emperor', name: '萬知海皇', rarity: 'UR', colors: ['blue'], race: 'elemental',
-    stage: 0, cost: 9, attack: 9, hp: 12, entry: { name: '全知', target: NONE, effects: [{ type: 'draw', count: 2 }] },
+    stage: 0, cost: 9, attack: 8, hp: 11, entry: { name: '全知', target: NONE, effects: [{ type: 'draw', count: 2 }] },
     skills: [
-      { name: '知識洪流', cost: 3, target: ANY, effects: [{ type: 'handDamage' }] },
-      { name: '放逐之潮', cost: 3, target: CREATURE, effects: [{ type: 'bounce' }] },
+      { name: '知識洪流', cost: 5, target: ANY, effects: [{ type: 'handDamage' }] },
+      { name: '放逐之潮', cost: 4, target: CREATURE, effects: [{ type: 'bounce' }] },
     ],
   },
   {
-    kind: 'spell', id: 'great-tide-reversal', name: '天潮倒灌', rarity: 'SR', colors: ['blue'], cost: 8,
-    target: NONE, effects: [{ type: 'bounce', all: true }, { type: 'draw', count: 1 }],
+    kind: 'spell', id: 'great-tide-reversal', name: '天潮倒灌', rarity: 'SR', colors: ['blue'], cost: 9,
+    target: NONE, effects: [{ type: 'bounce', all: true }],
   },
 
   // ── 黑：侵蝕、犧牲。破壞卡牌、讓對手棄牌、HP 減半、消滅；異常狀態是中毒與詛咒 ──
