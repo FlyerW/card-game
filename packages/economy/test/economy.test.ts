@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { copyLimit, DEFAULT_RULES, SAMPLE_HEROES, sampleDb, validateDeck, type GameEvent } from '@card-game/engine';
+import { copyLimit, DEFAULT_RULES, SAMPLE_HEROES, sampleDb, setOf, validateDeck, type GameEvent } from '@card-game/engine';
 import {
   ADVENTURE,
   ADVENTURE_REWARD,
@@ -40,6 +40,9 @@ import {
   refreshDay,
   seededRandom,
   starterDecks,
+  starterDeck,
+  STARTER_HEROES,
+  withStarterCards,
   summarizeGame,
   tallyEvents,
   type GameSummary,
@@ -67,6 +70,30 @@ describe('新玩家', () => {
       expect(validateDeck(db, DEFAULT_RULES, hero.id, deck), hero.name).toEqual([]);
       expect(ownershipProblems(profile, db, deck), hero.name).toEqual([]);
     }
+  });
+
+  it('五個基礎英雄各有一副固定的起始牌組：合法、只用基本卡包的卡、有自己的英雄進化；新玩家的收藏都有', () => {
+    const profile = fresh();
+    const bases = SAMPLE_HEROES.filter((each) => each.rarity === undefined);
+    expect([...STARTER_HEROES].sort()).toEqual(bases.map((hero) => hero.id).sort());
+    for (const hero of bases) {
+      const deck = starterDeck(hero.id)!;
+      expect(validateDeck(db, DEFAULT_RULES, hero.id, deck), hero.name).toEqual([]);
+      expect(deck.every((id) => setOf(db.cards.get(id)!) === 'core'), hero.name).toBe(true);
+      expect(deck.some((id) => { const card = db.cards.get(id); return card?.kind === 'heroEvolution' && card.evolvesFrom === hero.id; }), hero.name).toBe(true);
+      expect(ownershipProblems(profile, db, deck), hero.name).toEqual([]);
+    }
+    expect(starterDeck('prism-sage')).toBeNull();
+  });
+
+  it('舊帳號補上起始牌組用到的卡；已經都有就不動', () => {
+    const profile = fresh();
+    expect(withStarterCards(profile, starterDecks(db))).toBe(profile);
+    const old = { ...profile, collection: { squire: 1, 'prism-sage': 1 } };
+    const topped = withStarterCards(old, starterDecks(db));
+    expect(topped.collection.squire).toBe(2);
+    expect(topped.collection['prism-sage']).toBe(1);
+    expect(ownershipProblems(topped, db, starterDeck('flame-lord')!)).toEqual([]);
   });
 
   it('一開始有 100 金幣，剛好開一包；沒有粉塵', () => {

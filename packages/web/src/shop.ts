@@ -239,7 +239,8 @@ export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: stri
     <header class="b-head">
       <div><h1>卡包與收藏</h1>
         <p>收藏${seriesName ? `「${esc(seriesName)}」` : ''} ${kinds}/${inSeries.length} 種，共 ${copies} 張。贏一場 ${ECONOMY.winGold} 金幣（每天最多 ${ECONOMY.dailyWinGoldCap}），完成每日任務 ${ECONOMY.questReward} 金幣。</p></div>
-      <div class="w-gold"><span class="coin" aria-hidden="true"></span><b>${profile.gold}</b><span>金幣</span></div>
+      <div class="b-head-side"><div class="w-gold"><span class="coin" aria-hidden="true"></span><b>${profile.gold}</b><span>金幣</span></div>
+        <button class="primary small" data-do="shop-done">回到主頁</button></div>
     </header>
     ${packTabs}
     <section class="pack-bar">
@@ -272,7 +273,6 @@ export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: stri
       ${focus ? '<div class="shop-backdrop" data-do="focus-close"></div>' : ''}
       <aside class="b-side">
         <div class="detail${focus ? ' has-focus' : ''}">${focusBox}</div>
-        <button class="primary big" data-do="shop-done">回到開局</button>
       </aside>
     </div>
   </main>`;

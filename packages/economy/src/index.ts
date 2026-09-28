@@ -16,6 +16,7 @@ import {
 } from '@card-game/engine';
 import { buildDeck } from '@card-game/sim/deck';
 import type { AdventureDifficulty } from './adventure';
+import { starterDeck } from './starters';
 
 // 經濟系統：金幣、每日任務、卡包、粉塵合成。全部是純函式，輸入舊的玩家資料、輸出新的，
 // 不碰網路也不碰儲存，所以能直接寫測試；目前由網頁存在瀏覽器裡，之後搬到伺服器的帳號上。
@@ -112,14 +113,12 @@ export function questFor(day: string): QuestDef {
 
 export const questDef = (id: string): QuestDef | undefined => QUESTS.find((quest) => quest.id === id);
 
-/** 起始牌組用的種子；改了卡池之後，新玩家拿到的起始卡也會跟著變。 */
-const STARTER_SEED = 1;
-
-/** 每個基礎英雄（單色、每個人都有）一副起始牌組，組法跟自動組牌一樣。UR 英雄要抽到才有，不送牌組。 */
+/** 每個基礎英雄（單色、每個人都有）一副固定的起始牌組（見 starters.ts）。UR 英雄要抽到才有，沒有起始牌組。 */
 export const starterDecks = (db: CardDb): string[][] =>
   [...db.heroes.values()]
-    .filter((hero) => hero.rarity === undefined)
-    .map((hero) => buildDeck(STARTER_SEED, hero.id, deckPool(db, hero.id)));
+    .filter((hero) => hero.rarity === undefined && !hero.boss)
+    .map((hero) => starterDeck(hero.id))
+    .filter((deck): deck is string[] => deck !== null);
 
 /** 能不能用這個英雄：基礎英雄每個人都有，UR 英雄要在收藏裡。 */
 export const ownsHero = (profile: Profile, db: CardDb, heroId: string): boolean => {
@@ -127,18 +126,30 @@ export const ownsHero = (profile: Profile, db: CardDb, heroId: string): boolean 
   return hero !== undefined && (hero.rarity === undefined || (profile.collection[heroId] ?? 0) > 0);
 };
 
-/** 新玩家：收藏是每個基礎英雄一副起始牌組用到的卡（同一張取最多的那副），保證每個基礎英雄都組得出牌。 */
-export function newProfile(day: string, starterDecks: readonly (readonly string[])[]): Profile {
+/** 起始牌組用到的卡（同一張取最多的那副）。 */
+function starterCollection(starterDecks: readonly (readonly string[])[]): Record<string, number> {
   const collection: Record<string, number> = {};
   for (const deck of starterDecks) {
     const counts = new Map<string, number>();
     for (const id of deck) counts.set(id, (counts.get(id) ?? 0) + 1);
     for (const [id, n] of counts) collection[id] = Math.max(collection[id] ?? 0, n);
   }
+  return collection;
+}
+
+/** 收藏至少要有起始牌組用到的卡：舊帳號在起始牌組換過之後補上。已經都有就回傳同一個 profile。 */
+export function withStarterCards(profile: Profile, starterDecks: readonly (readonly string[])[]): Profile {
+  const missing = Object.entries(starterCollection(starterDecks)).filter(([id, n]) => (profile.collection[id] ?? 0) < n);
+  if (missing.length === 0) return profile;
+  return { ...profile, collection: { ...profile.collection, ...Object.fromEntries(missing) } };
+}
+
+/** 新玩家：收藏是每個基礎英雄一副起始牌組用到的卡，所以起始牌組複製出來改也都組得出來。 */
+export function newProfile(day: string, starterDecks: readonly (readonly string[])[]): Profile {
   return {
     version: 1,
     gold: ECONOMY.startingGold,
-    collection,
+    collection: starterCollection(starterDecks),
     dust: 0,
     day,
     winGoldToday: 0,
@@ -445,3 +456,4 @@ export function seededRandom(seed: number): () => number {
 export * from './rank';
 export * from './decks';
 export * from './adventure';
+export * from './starters';

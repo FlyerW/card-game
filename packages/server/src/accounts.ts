@@ -13,6 +13,7 @@ import {
   rolloverSeason,
   seasonOf,
   starterDecks,
+  withStarterCards,
   unlimitedProfile,
   type GameSummary,
   type Profile,
@@ -156,8 +157,10 @@ export class AccountStore {
       try {
         const raw = JSON.parse(await readFile(store.file!, 'utf8')) as Data;
         for (const [id, account] of Object.entries(raw.accounts ?? {})) {
-          const profile = parseProfile(account.profile);
-          if (!profile) continue;
+          const parsed = parseProfile(account.profile);
+          if (!parsed) continue;
+          // 起始牌組換過的話，舊帳號補上新起始牌組用到的卡（下次存檔時寫回）。
+          const profile = withStarterCards(parsed, starterDecks(db));
           // 舊存檔的牌組是「英雄 id → 卡片清單」（每個英雄一副），轉成牌組清單。
           const { rank: savedRank, decks: oldDecks, deckBook: savedBook, ...rest } = account as Account & { decks?: unknown };
           const rank = savedRank === undefined ? null : parseRank(savedRank);

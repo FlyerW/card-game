@@ -185,7 +185,9 @@ packages/sim/             平衡模擬
 └── src/run.ts            多程序平行跑大量對局，統計並寫出報告
 
 packages/economy/         金幣、每日任務、卡包、粉塵合成：純函式，網頁與伺服器共用
-└── src/index.ts
+├── src/index.ts
+├── src/decks.ts          牌組清單（每個英雄最多 5 副）
+└── src/starters.ts       五個基礎英雄的固定起始牌組
 
 packages/server/          連線對戰伺服器（Node + WebSocket），也負責提供網頁
 ├── src/lobby.ts          房間與對局：驗證動作、分別送出各自的視角

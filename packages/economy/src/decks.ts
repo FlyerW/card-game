@@ -19,7 +19,7 @@ export interface DeckBook {
   selected: Record<string, string>;
 }
 
-/** 每個英雄最多存幾副牌組（「自動組牌」不算）。 */
+/** 每個英雄最多存幾副牌組（起始牌組、自動組牌不算）。 */
 export const HERO_DECK_LIMIT = 5;
 /** 一個帳號最多存幾副（只是防資料無限長；平常先碰到每個英雄的上限）、牌組名字最長幾個字。 */
 export const DECK_LIMIT = 200;
@@ -97,7 +97,7 @@ export function putDeck(book: DeckBook, deck: SavedDeck): DeckBook | null {
   return { ...book, decks };
 }
 
-/** 刪掉一副；如果是某個英雄開局要用的，那個英雄改回自動組牌。 */
+/** 刪掉一副；如果是某個英雄開局要用的，那個英雄改回起始牌組（UR 英雄是自動組牌）。 */
 export function removeDeck(book: DeckBook, id: string): DeckBook {
   const selected = Object.fromEntries(Object.entries(book.selected).filter(([, each]) => each !== id));
   return { decks: book.decks.filter((deck) => deck.id !== id), selected };

@@ -52,6 +52,9 @@ export const CARD_BACKS: readonly CardBack[] = [
 
 export const DEFAULT_BACK = CARD_BACKS[0]!.id;
 
+/** 每個顏色的卡背：起始牌組用自己顏色的。 */
+export const COLOR_BACKS: Record<string, string> = { white: 'radiance', blue: 'tide', black: 'shade', red: 'ember', green: 'grove' };
+
 /** 認得的卡背；不認得（舊存檔、別人的新版本）就用預設的。 */
 export const backOf = (id: string | undefined): CardBack => CARD_BACKS.find((back) => back.id === id) ?? CARD_BACKS[0]!;
 

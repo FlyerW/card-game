@@ -53,6 +53,7 @@ import {
   newProfile,
   ownsHero,
   putDeck,
+  starterDeck,
   removeDeck,
   selectDeck as selectDeckIn,
   questDef,
@@ -83,7 +84,7 @@ import {
   type ColorPick,
   type KindFilter,
 } from './deck-builder';
-import { CARD_BACKS, cardBack, DEFAULT_BACK } from './card-backs';
+import { CARD_BACKS, cardBack, COLOR_BACKS, DEFAULT_BACK } from './card-backs';
 import {
   backendFor,
   fetchLeaderboard,
@@ -252,6 +253,7 @@ const app: App = {
     deckId: '',
     showCode: false,
     confirmDelete: false,
+    backOpen: false,
     filter: 'all',
     color: 'all',
     cost: 'all',
@@ -594,7 +596,7 @@ const roomName = (): string => app.playerName.trim() || app.session?.account.nam
 function createRoom(): void {
   const deck = myDeck();
   resetGameRecord(deck);
-  online.send({ t: 'create', name: roomName(), heroId: app.heroId, deck, back: chosenDeck(app.heroId)?.back ?? DEFAULT_BACK });
+  online.send({ t: 'create', name: roomName(), heroId: app.heroId, deck, back: myBack() });
 }
 
 function joinRoom(): void {
@@ -606,7 +608,7 @@ function joinRoom(): void {
   }
   const deck = myDeck();
   resetGameRecord(deck);
-  online.send({ t: 'join', code, name: roomName(), heroId: app.heroId, deck, back: chosenDeck(app.heroId)?.back ?? DEFAULT_BACK });
+  online.send({ t: 'join', code, name: roomName(), heroId: app.heroId, deck, back: myBack() });
 }
 
 function leaveRoom(): void {
@@ -909,7 +911,7 @@ function startGame(adventure: App['adventure'] = null): void {
   const stage = adventure ? ADVENTURE.find((each) => each.id === adventure.stage) : undefined;
   const rival = stage ? (adventure!.difficulty === 'nightmare' ? stage.boss.nightmare : stage.boss.normal) : rivals[seed % rivals.length]!.id;
   YOU = 0;
-  // 雙方都照正式規則組牌；你有自訂牌組就用你的，沒有就用收藏自動組一副。電腦每局從全部的卡自動組一副。
+  // 雙方都照正式規則組牌；你有選自訂牌組就用你的，沒有就用起始牌組（UR 英雄用收藏自動組一副）。電腦每局從全部的卡自動組一副。
   const deck = myDeck();
   const rivalDeck = autoDeck(db, rival, seed + 1);
   const created = engine.createGame({
@@ -929,7 +931,7 @@ function startGame(adventure: App['adventure'] = null): void {
   Object.assign(app, { mode: 'bot', screen: 'play', log: [], redraw: [], selection: null, toast: null, view: null, adventure, story: null, stageReward: null });
   resetGameRecord(deck);
   // 卡背：你用牌組選的，電腦隨機一種。
-  const backs: [string, string] = [chosenDeck(app.heroId)?.back ?? DEFAULT_BACK, CARD_BACKS[(seed >>> 3) % CARD_BACKS.length]!.id];
+  const backs: [string, string] = [myBack(), CARD_BACKS[(seed >>> 3) % CARD_BACKS.length]!.id];
   app.botGame = { rival, rivalDeck, startedAt: Date.now(), backs };
   localStep(kept.state, []);
 }
@@ -941,13 +943,21 @@ const owned = () => ownedOf(app.profile);
 function backFor(player: PlayerId): string {
   if (app.mode === 'online') return online.room?.seats[player]?.back ?? DEFAULT_BACK;
   if (app.mode === 'bot') return app.botGame?.backs?.[player] ?? DEFAULT_BACK;
-  return player === YOU ? (chosenDeck(app.heroId)?.back ?? DEFAULT_BACK) : DEFAULT_BACK;
+  return player === YOU ? (myBack()) : DEFAULT_BACK;
 }
 
-/** 你這局要用的牌組：有自訂牌組就用，沒有就用收藏自動組一副。 */
-const myDeck = (): string[] => chosenDeck(app.heroId)?.cards ?? autoDeck(db, app.heroId, (Math.random() * 2 ** 32) >>> 0, owned());
+/** 你這局要用的牌組：有選自訂牌組就用；沒有的話基礎英雄用起始牌組（不用收藏也能打），UR 英雄用收藏自動組一副。 */
+const myDeck = (): string[] =>
+  chosenDeck(app.heroId)?.cards ?? starterDeck(app.heroId) ?? autoDeck(db, app.heroId, (Math.random() * 2 ** 32) >>> 0, owned());
 
-/** 這個英雄開局要用的牌組；沒選就是 null（用收藏自動組一副）。 */
+/** 你這局的卡背：自訂牌組選的；起始牌組用英雄顏色的卡背；自動組牌用預設的。 */
+function myBack(): string {
+  const chosen = chosenDeck(app.heroId);
+  if (chosen) return chosen.back ?? DEFAULT_BACK;
+  return starterDeck(app.heroId) ? (COLOR_BACKS[hero(app.heroId).colors[0]!] ?? DEFAULT_BACK) : DEFAULT_BACK;
+}
+
+/** 這個英雄開局要用的牌組；沒選就是 null（起始牌組，UR 英雄是自動組牌）。 */
 const chosenDeck = (heroId: string): SavedDeck | null =>
   app.book.decks.find((deck) => deck.id === app.book.selected[heroId] && deck.heroId === heroId) ?? null;
 
@@ -1396,7 +1406,7 @@ function overlay(view: PlayerView): string {
     const asked = online.room?.rematch;
     const actions =
       app.mode === 'online' && app.rankedRoom
-        ? '<div class="end-actions"><button class="primary" data-do="requeue">再排一場</button><button class="ghost" data-do="leave-room">回到開局</button></div>'
+        ? '<div class="end-actions"><button class="primary" data-do="requeue">再排一場</button><button class="ghost" data-do="leave-room">回到主頁</button></div>'
         : app.mode === 'online'
         ? asked?.[YOU]
           ? `<p class="d-line">等${esc(themName())}也按「再來一局」……</p><button class="ghost" data-do="leave-room">離開房間</button>`
@@ -1404,7 +1414,7 @@ function overlay(view: PlayerView): string {
              <div class="end-actions"><button class="primary" data-do="rematch">再來一局</button><button class="ghost" data-do="leave-room">離開房間</button></div>`
         : app.adventure
           ? `<div class="end-actions"><button class="primary" data-do="adventure">回到冒險</button><button class="ghost" data-do="again">${winner === YOU ? '再打一次' : '再挑戰一次'}</button></div>`
-          : '<div class="end-actions"><button class="primary" data-do="again">再來一局</button><button class="ghost" data-do="setup">換英雄</button><button class="ghost" data-do="shop">卡包與收藏</button></div>';
+          : '<div class="end-actions"><button class="primary" data-do="again">再來一局</button><button class="ghost" data-do="setup">回到主頁</button><button class="ghost" data-do="shop">卡包與收藏</button></div>';
     return `<div class="overlay"><div class="dialog end ${winner === YOU ? 'won' : 'lost'}" role="dialog" aria-label="${title}">
       <h2>${title}</h2><p class="d-line">${app.rankedRoom ? '排位賽・' : ''}${why}・共 ${view.turn} 回合</p>${adventureLines(winner === YOU)}${app.rankedRoom ? rankedLines() : rewardLines()}${actions}
     </div></div>`;
@@ -1468,7 +1478,7 @@ function importDialog(): string {
   if (!app.importing) return '';
   return `<div class="overlay"><div class="dialog" role="dialog" aria-label="貼上牌組代碼">
     <h2>貼上牌組代碼</h2>
-    <p class="d-line">朋友在組牌畫面按「複製牌組代碼」，把那串 CG1- 開頭的文字貼在這裡，就會多一副一樣的牌組。
+    <p class="d-line">朋友在組牌畫面按「複製代碼」，把那串 CG1- 開頭的文字貼在這裡，就會多一副一樣的牌組。
       收藏裡缺的卡照樣會放進去，但要補齊（開卡包或用粉塵合成）之後才能拿來開局。</p>
     <textarea id="deck-code-in" rows="3" placeholder="CG1-……">${esc(app.importText)}</textarea>
     <div class="respond"><button class="primary" data-do="import-confirm">加成新牌組</button><button class="ghost" data-do="import-cancel">取消</button></div>
@@ -1575,17 +1585,24 @@ function setupScreen(): string {
   const chosen = chosenDeck(app.heroId);
   const problems = chosen ? deckIssues(db, app.heroId, chosen.cards, owned()).problems : [];
   const colors = describeColors(hero(app.heroId).colors);
+  const starter = starterDeck(app.heroId);
   const deckText = !chosen
-    ? `每局從收藏裡${colors}與無色的卡自動組一副（進化線照 2/2 帶）。`
+    ? starter
+      ? `用起始牌組開局：${colors}的固定 30 張，不用收藏也能打。按「複製」可以做一副自己的來改。`
+      : `每局從收藏裡${colors}與無色的卡自動組一副（進化線照 2/2 帶）。`
     : problems.length
       ? `「${chosen.name}」還不能用：${problems[0]}`
       : `用「${chosen.name}」開局。`;
   // 這個英雄的牌組：點一下選來開局用，旁邊的「編輯」進組牌畫面。
   const myDecks = app.book.decks.filter((deck) => deck.heroId === app.heroId);
-  // 每個英雄最多存 HERO_DECK_LIMIT 副（自動組牌不算）：滿了就不能新增或貼上，要先刪。
+  // 每個英雄最多存 HERO_DECK_LIMIT 副（起始牌組、自動組牌不算）：滿了就不能新增、貼上或複製，要先刪。
   const deckFull = myDecks.length >= HERO_DECK_LIMIT;
   const deckItems = [
-    `<button class="deck-item${chosen ? '' : ' on'}" data-deck-pick="auto" aria-pressed="${!chosen}"><b>自動組牌</b><small>用收藏自動組一副</small></button>`,
+    // 基礎英雄的預設是固定的起始牌組（旁邊「複製」做成自己的牌組來改）；UR 英雄沒有起始牌組，用收藏自動組。
+    starter
+      ? `<span class="deck-item${chosen ? '' : ' on'}"><button class="deck-pick" data-deck-pick="auto" aria-pressed="${!chosen}"><b>起始牌組</b><small>固定 30 張</small></button>
+        <button class="ghost small" data-do="starter-copy"${deckFull ? ' disabled' : ''}>複製</button></span>`
+      : `<button class="deck-item${chosen ? '' : ' on'}" data-deck-pick="auto" aria-pressed="${!chosen}"><b>自動組牌</b><small>用收藏自動組一副</small></button>`,
     ...myDecks.map((deck) => {
       const status = deckStatus(db, deck, owned());
       const on = chosen?.id === deck.id;
@@ -1696,7 +1713,7 @@ function startQueue(): void {
   const deck = myDeck();
   resetGameRecord(deck);
   Object.assign(app, { screen: 'queue', queue: { since: Date.now(), waiting: 1 }, toast: null, rankedReport: null });
-  online.send({ t: 'queue', token: session.token, heroId: app.heroId, deck, back: chosenDeck(app.heroId)?.back ?? DEFAULT_BACK });
+  online.send({ t: 'queue', token: session.token, heroId: app.heroId, deck, back: myBack() });
   render();
 }
 
@@ -1724,7 +1741,7 @@ function adventureMode(): string {
 function adventureScreen(): string {
   const chosen = chosenDeck(app.heroId);
   const problems = chosen ? deckIssues(db, app.heroId, chosen.cards, owned()).problems : [];
-  const deckName = chosen ? `「${chosen.name}」` : '自動組牌';
+  const deckName = chosen ? `「${chosen.name}」` : starterDeck(app.heroId) ? '起始牌組' : '自動組牌';
   const stages = ADVENTURE.map((stage, index) => {
     const unlocked = stageUnlocked(app.profile, index);
     const cleared = clearedOn(app.profile, stage.id);
@@ -1745,7 +1762,7 @@ function adventureScreen(): string {
   return `<main class="setup adventure">
     <header class="setup-head"><div><h1>冒險模式・黑霧之謎</h1>
       <p>黑色的霧從大陸各地湧出，你一路追查源頭。普通、困難的 BOSS 用一般的能力；惡夢難度的 BOSS 有專屬的被動與天生技，一般玩家拿不到。</p></div>
-      <button class="ghost" data-do="setup">回到開局</button></header>
+      <button class="ghost" data-do="setup">回到主頁</button></header>
     ${walletBar(app.profile)}
     <p class="d-line${problems.length ? ' warn' : ''}">出戰：${esc(hero(app.heroId).name)}・${esc(deckName)}${problems.length ? `——這副牌組還不能用：${esc(problems[0]!)}` : ''}（到開局畫面換英雄或牌組）</p>
     <div class="stages">${stages}</div>
@@ -1930,12 +1947,12 @@ function persistDeck(id: string): void {
 }
 
 /** 加一副新牌組並設成那個英雄開局用的；超過上限回傳 null。 */
-function addDeck(heroId: string, name: string, cards: string[]): SavedDeck | null {
-  const deck: SavedDeck = { id: newDeckId(), name: name.slice(0, DECK_NAME_LIMIT), heroId, cards };
+function addDeck(heroId: string, name: string, cards: string[], back?: string): SavedDeck | null {
+  const deck: SavedDeck = { id: newDeckId(), name: name.slice(0, DECK_NAME_LIMIT), heroId, cards, ...(back ? { back } : {}) };
   const book = putDeck(app.book, deck);
   if (!book) {
     app.toast = heroDeckCount(app.book, heroId) >= HERO_DECK_LIMIT
-      ? `每個英雄最多存 ${HERO_DECK_LIMIT} 副牌組（自動組牌不算），先刪掉用不到的`
+      ? `每個英雄最多存 ${HERO_DECK_LIMIT} 副牌組（起始牌組不算），先刪掉用不到的`
       : `牌組最多存 ${DECK_LIMIT} 副，先刪掉用不到的`;
     return null;
   }
@@ -1970,7 +1987,7 @@ function nextDeckName(heroId: string, base = `${hero(heroId).name}的牌組`): s
 function openBuilder(deck: SavedDeck): void {
   // 換英雄時顏色篩選回到全部（每個英雄能用的顏色不一樣）；種類、稀有度與費用照舊。
   const same = app.builder.heroId === deck.heroId;
-  app.builder = { ...app.builder, heroId: deck.heroId, deckId: deck.id, showCode: false, confirmDelete: false, color: same ? app.builder.color : 'all', focus: null };
+  app.builder = { ...app.builder, heroId: deck.heroId, deckId: deck.id, showCode: false, confirmDelete: false, backOpen: false, color: same ? app.builder.color : 'all', focus: null };
   app.screen = 'deck';
   app.toast = null;
   render();
@@ -2042,19 +2059,20 @@ function builderClick(el: HTMLElement, command: string | undefined): boolean {
     const next = deckSet === 'all' ? [] : sets.includes(deckSet) ? sets.filter((id) => id !== deckSet) : [...sets, deckSet];
     const all = CARD_SETS.filter((set) => deckPool(db, heroId).some((card) => setOf(card) === set.id)).length;
     app.builder.sets = next.length >= all ? [] : next;
+  } else if (command === 'back-toggle') {
+    app.builder.backOpen = !app.builder.backOpen;
   } else if (back) {
     app.book = { ...app.book, decks: app.book.decks.map((each) => (each.id === saved.id ? { ...each, back } : each)) };
     persistDeck(saved.id);
+    app.builder.backOpen = false;
   } else if (command === 'focus-close') {
     app.builder.focus = null;
   } else if (command === 'deck-fill') {
     edit(fillRandom(db, heroId, deck, owned()));
-  } else if (command === 'deck-auto') {
-    edit(autoDeck(db, heroId, (Math.random() * 2 ** 32) >>> 0, owned()));
   } else if (command === 'deck-clear') {
     edit([]);
   } else if (command === 'deck-code') {
-    // 複製牌組代碼；瀏覽器不讓複製（例如在別的網頁裡面）的話，下面顯示出來讓玩家自己複製。
+    // 複製代碼；瀏覽器不讓複製（例如在別的網頁裡面）的話，下面顯示出來讓玩家自己複製。
     app.builder.showCode = true;
     const code = encodeDeckCode(saved.heroId, saved.cards);
     navigator.clipboard?.writeText(code).then(
@@ -2065,10 +2083,10 @@ function builderClick(el: HTMLElement, command: string | undefined): boolean {
       () => undefined,
     );
   } else if (command === 'deck-copy') {
-    const copy = addDeck(heroId, nextDeckName(heroId, `${saved.name}（複製）`), [...saved.cards]);
+    const copy = addDeck(heroId, nextDeckName(heroId, `${saved.name}（複製）`), [...saved.cards], saved.back);
     if (copy) {
       openBuilder(copy);
-      app.toast = `另存成「${copy.name}」`;
+      app.toast = `複製成「${copy.name}」`;
     }
   } else if (command === 'deck-delete') {
     app.builder.confirmDelete = true;
@@ -2150,6 +2168,12 @@ root.addEventListener('click', (event) => {
     else if (app.view) inspect(key);
   } else if (command === 'deck-new') {
     const deck = addDeck(app.heroId, nextDeckName(app.heroId), []);
+    if (deck) openBuilder(deck);
+    else render();
+  } else if (command === 'starter-copy') {
+    const cards = starterDeck(app.heroId);
+    // 複製出來的牌組沿用起始牌組的卡背（英雄顏色的那一種）。
+    const deck = cards ? addDeck(app.heroId, nextDeckName(app.heroId, `${hero(app.heroId).name}的起始牌組`), cards, COLOR_BACKS[hero(app.heroId).colors[0]!]) : null;
     if (deck) openBuilder(deck);
     else render();
   } else if (deckEdit) {

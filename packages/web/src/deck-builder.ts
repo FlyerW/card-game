@@ -23,7 +23,7 @@ import { cardFace, detailLines, esc, pips } from './ui';
 
 // 組牌：照正式規則，30 張、同名最多 2 張、UR 最多 1 張、只能放英雄顏色內的卡與無色卡；
 // 而且只能放收藏裡有的卡，張數不超過擁有的。
-// 牌組每個帳號、每個英雄各存一副，存在這個瀏覽器裡；沒有自訂牌組就每局用收藏自動組一副。
+// 組牌畫面。牌組清單與存檔見 economy 的 decks.ts；沒選自訂牌組時，基礎英雄用起始牌組、UR 英雄每局用收藏自動組一副。
 
 /** 每張卡最多能放幾張：規則上限與擁有張數取小的。電腦組牌不看收藏，用 copyLimit。 */
 export type Owned = (card: DeckCardDef) => number;
@@ -54,8 +54,10 @@ export interface Builder {
   deckId: string;
   /** 顯示牌組代碼（可以手動複製）。 */
   showCode: boolean;
-  /** 按了「刪除這副」，等確認。 */
+  /** 按了「刪除牌組」，等確認。 */
   confirmDelete: boolean;
+  /** 卡背選項打開了（平常收起來，只顯示現在用的卡背）。 */
+  backOpen: boolean;
   filter: KindFilter;
   color: ColorPick;
   cost: CostPick;
@@ -124,7 +126,7 @@ const HIGH_COST = 9;
 const MAX_HIGH_COST = 2;
 const highCostCount = (db: CardDb, deck: readonly string[]) => deck.filter((id) => (db.cards.get(id)?.cost ?? 0) >= HIGH_COST).length;
 
-/** 用英雄能用的卡隨機補滿，已經放的不動。高費卡補到上限為止。 */
+/** 「自動組牌」：用英雄能用的卡隨機補滿，已經放的不動。高費卡補到上限為止。 */
 export function fillRandom(db: CardDb, heroId: string, deck: readonly string[], owned: Owned): string[] {
   const spare = deckPool(db, heroId).flatMap((card) => Array<string>(Math.max(0, owned(card) - count(deck, card.id))).fill(card.id));
   for (let i = spare.length - 1; i > 0; i--) {
@@ -279,15 +281,23 @@ export function deckScreen(db: CardDb, b: Builder, saved: SavedDeck, owned: Owne
           .join('')}</div>`
       : '';
   const back = backOf(saved.back).id;
-  const backPicker = `<div class="back-picker" role="group" aria-label="卡背">${CARD_BACKS.map(
-    (each) => `<button class="back-pick${each.id === back ? ' on' : ''}" data-back="${each.id}" aria-pressed="${each.id === back}">${cardBack(each.id)}<span>${esc(each.name)}</span></button>`,
-  ).join('')}</div>`;
+  // 卡背：平常收起來，只顯示現在用的那一種；點開才列出全部，選了就收起來。
+  const backPicker = `<button class="back-fold${b.backOpen ? ' open' : ''}" data-do="back-toggle" aria-expanded="${b.backOpen}">
+      <span class="dl-head">卡背</span>${cardBack(back)}<span>${esc(backOf(back).name)}</span><span class="fold-mark" aria-hidden="true">${b.backOpen ? '收起' : '更換'}</span></button>
+    ${
+      b.backOpen
+        ? `<div class="back-picker" role="group" aria-label="卡背">${CARD_BACKS.map(
+            (each) => `<button class="back-pick${each.id === back ? ' on' : ''}" data-back="${each.id}" aria-pressed="${each.id === back}">${cardBack(each.id)}<span>${esc(each.name)}</span></button>`,
+          ).join('')}</div>`
+        : ''
+    }`;
 
   return `<main class="builder">
     <header class="b-head">
       <div><h1 class="deck-title">組牌・${esc(hero.name)}・<input id="deck-name" maxlength="${DECK_NAME_LIMIT}" value="${esc(saved.name)}" aria-label="牌組名字"></h1>
         <p>${pips(hero.colors)} ${describeColors(hero.colors)}的卡加上無色卡；${deckSize} 張，同名最多 ${maxCopies} 張，UR 最多 ${maxUrCopies} 張，只能放收藏裡有的卡。牌組會自動存起來。</p></div>
-      <div class="b-count${deck.length === deckSize ? ' full' : ''}"><b>${deck.length}</b>/${deckSize}</div>
+      <div class="b-head-side"><div class="b-count${deck.length === deckSize ? ' full' : ''}"><b>${deck.length}</b>/${deckSize}</div>
+        <button class="primary small" data-do="deck-done">完成</button></div>
     </header>
     <div class="b-body">
       <section class="b-pool" aria-label="可以放的卡">
@@ -302,21 +312,19 @@ export function deckScreen(db: CardDb, b: Builder, saved: SavedDeck, owned: Owne
       <aside class="b-side">
         <div class="detail b-tools">
           <div class="b-actions">
-            <button class="ghost" data-do="deck-fill" ${deck.length >= deckSize ? 'disabled' : ''}>隨機補滿</button>
-            <button class="ghost" data-do="deck-auto">自動組一副</button>
+            <button class="ghost" data-do="deck-fill" ${deck.length >= deckSize ? 'disabled' : ''}>自動組牌</button>
             <button class="ghost" data-do="deck-clear" ${deck.length === 0 ? 'disabled' : ''}>清空</button>
           </div>
           <div class="b-actions">
-            <button class="ghost" data-do="deck-code">複製牌組代碼</button>
-            <button class="ghost" data-do="deck-copy">另存一副</button>
+            <button class="ghost" data-do="deck-code">複製代碼</button>
+            <button class="ghost" data-do="deck-copy">複製牌組</button>
             ${
               b.confirmDelete
                 ? '<button class="primary danger" data-do="deck-delete-confirm">確定刪除</button><button class="ghost" data-do="deck-delete-cancel">留著</button>'
-                : '<button class="ghost" data-do="deck-delete">刪除這副</button>'
+                : '<button class="ghost" data-do="deck-delete">刪除牌組</button>'
             }
           </div>
           ${b.showCode ? `<label class="deck-code">把代碼傳給朋友，他在開局畫面按「貼上代碼」就能拿到一樣的牌組：<input id="deck-code-out" readonly value="${esc(code)}"></label>` : ''}
-          <p class="dl-head">卡背</p>
           ${backPicker}
         </div>
         <div class="detail${focus ? ' has-focus' : ''}">${focusBox}</div>
@@ -325,7 +333,6 @@ export function deckScreen(db: CardDb, b: Builder, saved: SavedDeck, owned: Owne
           ${curve(db, deck)}
           ${deckList(db, deck)}
         </div>
-        <button class="primary big" data-do="deck-done">完成</button>
       </aside>
     </div>
   </main>`;

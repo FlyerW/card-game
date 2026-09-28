@@ -62,6 +62,7 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .ghost { background: none; border: 1px solid var(--mat-edge); border-radius: var(--radius); padding: 6px 12px; color: var(--ink-soft); }
 .ghost:hover { color: var(--ink); border-color: var(--zone-edge); }
 .ghost.small { font-size: 12px; padding: 4px 10px; justify-self: start; }
+.primary.small { font-size: 13px; padding: 5px 16px; }
 .toast { margin: 0 0 8px; padding: 8px 10px; border-radius: 6px; background: #3a1f1f; color: #ffc9c2; }
 .pips { display: inline-flex; gap: 3px; vertical-align: middle; }
 .pip { width: 8px; height: 8px; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 1px #0006; }
@@ -542,6 +543,8 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .b-head h1 { font: 700 26px/1.2 var(--display); margin: 0 0 4px; letter-spacing: .04em; }
 .b-head p { margin: 0; color: var(--ink-soft); font-size: 13px; }
 .b-count { font: 600 18px var(--num); color: var(--ink-soft); flex: none; }
+/* 張數旁邊的「完成」：放在最上面，小顆 */
+.b-head-side { display: flex; align-items: center; gap: 12px; flex: none; }
 .b-count b { font-size: 36px; color: var(--pick); }
 .b-count.full b { color: var(--heal); }
 .b-body { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; align-items: start; }
@@ -562,7 +565,6 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 }
 .pc-count button:disabled { opacity: .35; }
 .b-side { display: grid; gap: 10px; position: sticky; top: 12px; min-width: 0; }
-.b-side .primary.big { justify-self: stretch; }
 .focus { display: grid; gap: 4px; }
 .ok { margin: 0; color: var(--heal); font-weight: 700; }
 .problems, .tips { margin: 0; padding-left: 1.2em; font-size: 12.5px; display: grid; gap: 2px; }
@@ -751,6 +753,12 @@ button.deck-item { border: 1px solid var(--mat-edge); }
 .hand-backs .card-back svg { left: 10%; width: 80%; }
 
 /* 組牌畫面選卡背 */
+/* 組牌畫面的卡背：平常一行（現在的卡背＋名字），點開才列出全部 */
+.back-fold { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; border: 1px solid var(--mat-edge); border-radius: 8px; background: #0002; color: var(--ink); text-align: left; cursor: pointer; }
+.back-fold .dl-head { margin: 0; }
+.back-fold .card-back { width: 26px; }
+.back-fold .fold-mark { margin-left: auto; font-size: 12px; color: var(--ink-soft); }
+.back-fold.open { border-color: var(--hero-edge); }
 .back-picker { display: flex; gap: 10px; flex-wrap: wrap; }
 .back-pick { display: grid; justify-items: center; gap: 4px; padding: 6px; border-radius: 8px; border: 1px solid transparent; background: none; color: var(--ink-soft); font-size: 12px; }
 .back-pick .card-back { width: 44px; }
