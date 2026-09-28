@@ -72,7 +72,7 @@ export function cardFace(def: DeckCardDef | HeroDef, options: FaceOptions = {}):
   const kind = isHero ? '英雄' : kindLabel(def);
   const stats =
     def.kind === 'creature'
-      ? `<span class="c-hp"><span class="c-atk">⚔${def.attack}</span> <span class="c-heart">♥</span>${def.hp}</span>`
+      ? `<span class="c-hp"><span class="c-atk">⚔</span>${def.attack} <span class="c-heart">♥</span>${def.hp}</span>`
       : isHero
         ? `<span class="c-hp"><span class="c-heart">♥</span>${def.hp}</span>`
         : '';
