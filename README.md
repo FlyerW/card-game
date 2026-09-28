@@ -31,7 +31,7 @@
 - [x] 卡背：每副牌組可以選（經典、烈焰、翠林），牌庫與對手手牌會顯示，連線對戰對手也看得到（`packages/web/src/card-backs.ts`）
 - [x] 背景音樂與音效：瀏覽器即時合成（[`packages/web/src/music.ts`](packages/web/src/music.ts)），各有開關
 
-範例卡牌見 [docs/cards.md](docs/cards.md)。
+卡牌見 [docs/cards.md](docs/cards.md)（總覽與關鍵字），每一彈各一份：[基本卡包](docs/cards-core.md)、[龍脈覺醒](docs/cards-awakening.md)、[天機神殿](docs/cards-celestial.md)。
 
 ## 開發
 
@@ -41,7 +41,7 @@
 npm install
 npm test            # 全部測試
 npm run typecheck   # 型別檢查
-npm run cards       # 從卡牌資料重新產生 docs/cards.md
+npm run cards       # 從卡牌資料重新產生 docs/cards.md 與每一彈的 docs/cards-<系列>.md
 npm run sim         # 平衡模擬，16 個 worker 約 8 分鐘（核心少會久很多）；結果寫到 docs/balance-results.md
 npm run sim -- --games 200   # 快速試跑
 npm run game-stats            # 真人對局的數據（讀 data/games.jsonl）
@@ -149,7 +149,7 @@ npm run admin -- unlimited Flyer off   # 取消（已經有的金幣和卡保留
 
 1. `npm test`——資料有錯會列出所有問題，例如進化來源不存在、R 卡少於兩個技能、
    進化沒有升一級稀有度、位置技能放到法術上
-2. `npm run cards`——更新 docs/cards.md
+2. `npm run cards`——更新 docs/cards.md 與 docs/cards-<系列>.md
 
 ## 結構
 
@@ -158,7 +158,7 @@ docs/
 ├── design.md             規則設計文件
 ├── art.md                卡牌美術的 AI 繪圖指南
 ├── board.svg             場上配置圖（由 scripts/board-svg.py 產生）
-├── cards.md              範例卡牌（自動產生，請勿手動編輯）
+├── cards.md              卡牌總覽與關鍵字；cards-<系列>.md 是每一彈的卡表（自動產生，請勿手動編輯）
 └── balance-results.md    平衡模擬結果（自動產生，請勿手動編輯）
 
 packages/engine/          規則引擎：純函式庫，不碰網路也不碰畫面
@@ -173,7 +173,7 @@ packages/engine/          規則引擎：純函式庫，不碰網路也不碰畫
 │   ├── describe.ts       由資料產生卡面文字
 │   ├── rules.ts          規則參數（牌組張數、能量制度……）
 │   └── cards/sample.ts   範例卡牌
-├── scripts/cards-md.ts   產生 docs/cards.md
+├── scripts/cards-md.ts   產生 docs/cards.md 與每一彈的卡表
 └── test/                 測試用的是獨立的測試卡，調整範例卡的平衡不會讓測試壞掉
 
 packages/sim/             平衡模擬
