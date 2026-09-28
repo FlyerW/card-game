@@ -14,7 +14,7 @@ import {
 } from '@card-game/engine';
 import { ECONOMY, PACK_BATCH, packItems, packSets, questDef, TOPUPS, type PackCard, type PackItem, type Profile } from '@card-game/economy';
 import type { Backend } from './account';
-import { cardFace, detailLines, esc, pips } from './ui';
+import { artUrl, cardFace, detailLines, esc, pips } from './ui';
 
 // 卡包與收藏：金幣、開卡包、粉塵合成。規則在 @card-game/economy，這裡只負責畫面；
 // 開卡包與兌換交給登入的帳號（測試帳號在瀏覽器裡算，Google 帳號交給伺服器）。
@@ -144,6 +144,16 @@ function topupBar(canTopup: boolean, paying: boolean): string {
     </section>`;
 }
 
+/** 卡包的主視覺：像真的卡包一樣，上下是鋸齒封口，中間印系列名稱；點了也能開一包，開包時會抖。 */
+function booster(set: { id: string; name: string }, canOpen: boolean, opening: boolean): string {
+  return `<button class="booster bs-${esc(set.id)}${opening ? ' opening' : ''}" data-do="open-pack" ${canOpen ? '' : 'disabled'}
+      style="--art:url('${artUrl(`booster-${set.id}`)}')" aria-label="開一包${esc(set.name)}">
+    <span class="bs-art" aria-hidden="true"></span><span class="bs-shine" aria-hidden="true"></span>
+    <span class="bs-crimp top" aria-hidden="true"></span><span class="bs-crimp bottom" aria-hidden="true"></span>
+    <span class="bs-title"><small>卡牌試玩桌</small><b>${esc(set.name)}</b><small>卡包・5 張</small></span>
+  </button>`;
+}
+
 export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: string | null, canTopup = false): string {
   const all = collectibles(db);
   const owned = (item: { id: string }) => profile.collection[item.id] ?? 0;
@@ -233,6 +243,7 @@ export function shopScreen(db: CardDb, profile: Profile, shop: Shop, toast: stri
     </header>
     ${packTabs}
     <section class="pack-bar">
+      ${booster(pack, canBuy && !shop.busy, shop.busy)}
       <div class="pack-info">
         <p class="d-head">${sets.length > 1 ? `${pack.name}・` : '卡包・'}${ECONOMY.packPrice} 金幣</p>
         <p class="d-line">一包 ${ECONOMY.packSize} 張，每張 R ${pct(R)}、SR ${pct(SR)}、UR ${pct(UR)}，其餘 N；每包至少一張 R 以上。
