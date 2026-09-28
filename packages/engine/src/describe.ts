@@ -164,6 +164,11 @@ export function describeEffect(effect: Effect, names: Names = ids, bonus = 0): s
       return `造成 ${amountWith(effect.amount, bonus)} 傷害`;
     case 'damageEnemyCreatures':
       return `對手每隻生物各受 ${amountWith(effect.amount, bonus)} 傷害`;
+    case 'handDamage':
+      // 元素之力的加成一樣寫在括號裡：「造成等同你手牌張數的傷害（+1）」。
+      return `造成等同你手牌張數${effect.bonus ? ` +${effect.bonus}` : ''}的傷害${bonus > 0 ? `（+${bonus}）` : ''}`;
+    case 'bounce':
+      return `${effect.all ? '對手每隻生物' : ''}回到手牌`;
     case 'draw':
       return `抽 ${effect.count} 張牌`;
     case 'opponentDiscardRandom':

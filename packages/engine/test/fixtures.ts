@@ -182,6 +182,9 @@ export const TEST_CARDS: DeckCardDef[] = [
   creature('ambusher', [], {
     entry: { name: 'ambush', target: { kind: 'enemy', allow: 'creature' }, effects: [], combo: [{ type: 'damage', amount: 3 }] },
   }),
+  { kind: 'spell', id: 'rebound', name: 'rebound', rarity: 'R', colors: [], cost: 1, target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'bounce' }] },
+  { kind: 'spell', id: 'tide-all', name: 'tide-all', rarity: 'R', colors: [], cost: 1, target: NONE, effects: [{ type: 'bounce', all: true }] },
+  { kind: 'spell', id: 'mind-blade', name: 'mind-blade', rarity: 'R', colors: [], cost: 1, target: ANY, effects: [{ type: 'handDamage' }] },
   { kind: 'spell', id: 'hush', name: 'hush', rarity: 'R', colors: [], cost: 1, target: { kind: 'enemy', allow: 'creature' }, effects: [{ type: 'silence' }] },
   creature('sapling', [], { rarity: 'N', race: 'plant', attack: 1, hp: 5 }),
   creature('drake', [], { rarity: 'N', race: 'dragon', attack: 3, hp: 6 }),

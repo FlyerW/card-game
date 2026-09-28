@@ -8,7 +8,7 @@
 | | |
 |---|---|
 | 比例 | 卡面的插圖框是 4:3（320×240），主體放中間 |
-| 格式 | WebP，檔名用卡牌 id：`packages/web/public/art/seraph.webp`（id 見 [cards.md](cards.md) 或 `sample.ts`） |
+| 格式 | WebP，檔名用卡牌 id：`packages/web/public/art/seraph.webp`（id 見每一彈的卡表 [cards-core.md](cards-core.md) 等，或 `packages/engine/src/cards/`） |
 | 英雄 | 同樣 3:4，胸像或半身，`art/hero-flame-lord.webp` |
 | 場地、法術 | 場景或效果本身，不一定要有角色 |
 

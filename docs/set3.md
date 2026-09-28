@@ -1,5 +1,7 @@
 # 第三彈「天機神殿」（設計稿）
 
+> 目前的卡表（跟程式一致）見 [cards-celestial.md](cards-celestial.md)。
+>
 > 狀態：**已經做進程式，還沒發布**（`packages/engine/src/cards/celestial.ts`，系列 id `celestial`）。預覽（`?preview`、超級帳號）看得到。
 > 插圖與困難電腦的平衡模擬進行中；平衡調整會直接改程式，這份設計稿的數字以程式為準。
 

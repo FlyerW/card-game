@@ -78,6 +78,13 @@ export type Effect =
   | { type: 'halveHp'; all?: boolean }
   /** 發動者挑釁，直到對手下回合結束。 */
   | { type: 'taunt' }
+  /** 造成等同你手牌張數（再加 bonus）的傷害，目標跟 damage 一樣。手牌是結算時的張數（法術自己已經不在手上）。 */
+  | { type: 'handDamage'; bonus?: number }
+  /**
+   * 把對手的生物彈回擁有者的手牌：進化堆疊的卡都回去（手牌滿了就進棄牌區），道具進棄牌區，衍生物直接消失。
+   * all 為 true 時不選目標，對手每隻生物都回去。
+   */
+  | { type: 'bounce'; all?: boolean }
   /** 給聖盾：自身、我方目標生物，或我方每隻生物。已經有聖盾的不會疊。 */
   | { type: 'shield'; on: 'self' | 'target' | 'all' }
   /**
@@ -524,6 +531,8 @@ export type GameEvent =
   | { type: 'shieldBroken'; player: PlayerId; zone: number }
   /** 得到聖盾。 */
   | { type: 'shielded'; player: PlayerId; zone: number }
+  /** 生物被彈回擁有者的手牌。 */
+  | { type: 'bounced'; player: PlayerId; zone: number; cardId: string }
   | { type: 'discarded'; player: PlayerId; cardId: string }
   | { type: 'creatureDestroyed'; player: PlayerId; zone: number; cardId: string }
   /** 玩家主動讓自己的生物退場。 */

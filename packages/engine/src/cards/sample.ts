@@ -39,7 +39,8 @@ const CORE_HEROES: HeroDef[] = [
   // 單色的五個是基礎英雄，每個人都有；雙色以上的是 UR，要從卡包抽到。
   {
     kind: 'hero', id: 'nameless-swordsman', name: '無名劍士', colors: ['white'], hp: 44,
-    passive: { name: '劍士之道', creatures: { attack: 1 }, ownTurn: { attack: 1 }, pierce: true },
+    // 原本還有「我方回合再 ⚔ +1」；在有第二、三彈的環境裡他太強（63%），拿掉那一段。
+    passive: { name: '劍士之道', creatures: { attack: 1 }, pierce: true },
   },
   {
     kind: 'hero', id: 'deep-seer', name: '深海先知', colors: ['blue'], hp: 45,
@@ -292,6 +293,30 @@ const CORE_CARDS: DeckCardDef[] = [
     skills: [{ name: '冰凍', cost: 2, target: CREATURE, effects: [{ type: 'paralyze' }] }],
   },
   { kind: 'field', id: 'wellspring', name: '知識之泉', rarity: 'R', colors: ['blue'], cost: 2, extraDraw: 1 },
+  // 藍色抽了一堆牌之後的勝利手段：手牌越多打越痛；加上把對手的生物彈回手牌的解場，以及藍色的大牌。
+  { kind: 'spell', id: 'tidal-rebound', name: '潮汐反彈', rarity: 'R', colors: ['blue'], cost: 2, target: CREATURE, effects: [{ type: 'bounce' }] },
+  { kind: 'spell', id: 'blade-of-knowledge', name: '知識之刃', rarity: 'R', colors: ['blue'], cost: 3, target: ANY, effects: [{ type: 'handDamage' }] },
+  {
+    kind: 'creature', id: 'tome-warden', name: '秘典守衛', rarity: 'R', colors: ['blue'], race: 'human',
+    stage: 0, cost: 4, attack: 2, hp: 6, skills: [{ name: '心靈衝擊', cost: 2, target: CREATURE, effects: [{ type: 'handDamage' }] }],
+  },
+  {
+    kind: 'creature', id: 'memory-whale', name: '記憶巨鯨', rarity: 'SR', colors: ['blue'], race: 'beast',
+    stage: 0, cost: 7, attack: 6, hp: 9, entry: { name: '回憶之歌', target: NONE, effects: [{ type: 'draw', count: 2 }] },
+    skills: [{ name: '潮湧', cost: 3, target: ANY, effects: [{ type: 'handDamage' }] }],
+  },
+  {
+    kind: 'creature', id: 'omniscient-sea-emperor', name: '萬知海皇', rarity: 'UR', colors: ['blue'], race: 'elemental',
+    stage: 0, cost: 9, attack: 9, hp: 12, entry: { name: '全知', target: NONE, effects: [{ type: 'draw', count: 2 }] },
+    skills: [
+      { name: '知識洪流', cost: 3, target: ANY, effects: [{ type: 'handDamage' }] },
+      { name: '放逐之潮', cost: 3, target: CREATURE, effects: [{ type: 'bounce' }] },
+    ],
+  },
+  {
+    kind: 'spell', id: 'great-tide-reversal', name: '天潮倒灌', rarity: 'SR', colors: ['blue'], cost: 8,
+    target: NONE, effects: [{ type: 'bounce', all: true }, { type: 'draw', count: 1 }],
+  },
 
   // ── 黑：侵蝕、犧牲。破壞卡牌、讓對手棄牌、HP 減半、消滅；異常狀態是中毒與詛咒 ──
   { kind: 'creature', id: 'skeleton', name: '骷髏兵', rarity: 'N', colors: ['black'], race: 'undead', stage: 0, cost: 2, attack: 2, hp: 3, skills: [] },

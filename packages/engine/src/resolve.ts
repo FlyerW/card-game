@@ -138,6 +138,18 @@ interface Fallen {
 }
 
 /** 生物離場（死掉或被消滅）。有遺言、而且不在沉默中的，回傳等著發動的遺言。 */
+/** 把生物彈回擁有者的手牌（不算死亡，遺言不發動）。 */
+function bounceCreature(ctx: Ctx, player: PlayerId, zone: number): void {
+  const p = ctx.state.players[player];
+  const creature = p.zones[zone];
+  if (creature == null) return;
+  p.zones[zone] = null;
+  if (creature.item !== null) p.discard.push(creature.item);
+  ctx.events.push({ type: 'bounced', player, zone, cardId: currentCardId(creature) });
+  // 衍生物離場就消失；其他的連同進化堆疊回到手牌，手牌滿了就進棄牌區。
+  if (!isToken(ctx.db, creature)) for (const card of creature.cards) toHand(ctx, player, card);
+}
+
 function removeCreature(ctx: Ctx, player: PlayerId, zone: number): Fallen | null {
   const p = ctx.state.players[player];
   const creature = p.zones[zone];
@@ -439,6 +451,23 @@ function applyEffect(
     case 'damage':
       if (target !== null && (target.kind === 'hero' || creature !== null)) {
         steal(dealDamage(ctx, target, creature, effect.amount + elemental));
+      }
+      return;
+
+    case 'handDamage':
+      if (target !== null && (target.kind === 'hero' || creature !== null)) {
+        steal(dealDamage(ctx, target, creature, player.hand.length + (effect.bonus ?? 0) + elemental));
+      }
+      return;
+
+    case 'bounce':
+      if (effect.all) {
+        const enemy = other(me);
+        state.players[enemy].zones.forEach((each, zone) => {
+          if (each !== null) bounceCreature(ctx, enemy, zone);
+        });
+      } else if (creature !== null && target?.kind === 'creature') {
+        bounceCreature(ctx, target.player, target.zone);
       }
       return;
 

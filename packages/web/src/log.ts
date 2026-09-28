@@ -129,6 +129,9 @@ export function describeEvents(
       case 'taunting':
         lines.push({ text: `　${ZONE[event.zone]} 開始挑釁`, tone: 'turn' });
         break;
+      case 'bounced':
+        lines.push({ text: `　${who(event.player)}的 ${name(event.cardId)} 回到手牌`, tone: 'turn' });
+        break;
       case 'shielded':
         lines.push({ text: `　${targetText({ kind: 'creature', player: event.player, zone: event.zone })}得到聖盾`, tone: 'turn' });
         break;

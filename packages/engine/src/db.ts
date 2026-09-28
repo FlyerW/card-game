@@ -10,7 +10,11 @@ export class CardDataError extends Error {}
 function targetProblem(effect: Effect, spec: TargetSpec): string | null {
   switch (effect.type) {
     case 'damage':
+    case 'handDamage':
       return spec.kind === 'enemy' || spec.kind === 'lane' ? null : '傷害只能指定對手或位置目標';
+    case 'bounce':
+      if (effect.all) return null;
+      return spec.kind === 'enemy' && spec.allow === 'creature' ? null : '回到手牌只能指定對手的生物';
     case 'heal':
       return spec.kind === 'ally' ? null : '回復只能指定我方目標';
     case 'halveHp':
@@ -45,8 +49,8 @@ function targetProblem(effect: Effect, spec: TargetSpec): string | null {
 function usesTarget(effect: Effect): boolean {
   if (effect.type === 'buff' || effect.type === 'shield') return effect.on === 'target';
   const statuses = ['poison', 'burn', 'paralyze', 'silence', 'weaken'];
-  if ((effect.type === 'halveHp' || statuses.includes(effect.type)) && 'all' in effect && effect.all) return false;
-  return ['damage', 'heal', 'halveHp', 'destroy', 'destroyCreature', ...statuses].includes(effect.type);
+  if ((effect.type === 'halveHp' || effect.type === 'bounce' || statuses.includes(effect.type)) && 'all' in effect && effect.all) return false;
+  return ['damage', 'handDamage', 'bounce', 'heal', 'halveHp', 'destroy', 'destroyCreature', ...statuses].includes(effect.type);
 }
 
 function checkAbility(ability: Ability, where: string, isCreatureSkill: boolean): string[] {
