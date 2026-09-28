@@ -39,6 +39,8 @@ import {
   cleanBook,
   clearedOn,
   DECK_LIMIT,
+  HERO_DECK_LIMIT,
+  heroDeckCount,
   DIFFICULTY_NAMES,
   stageUnlocked,
   type AdventureDifficulty,
@@ -1522,7 +1524,7 @@ function loginScreen(): string {
         ? '<p class="d-line">登入中……</p>'
         : '<div id="google-button" class="google-slot"></div>';
   return `<main class="setup login">
-    <header><h1>卡牌試玩桌</h1><p>登入後開始收集卡片、拿金幣、解每日任務。</p></header>
+    <header><h1>幻彩英雄</h1><p>登入後開始收集卡片、拿金幣、解每日任務。</p></header>
     <div class="login-options">
       <section class="login-card">
         <p class="d-head">測試帳號</p>
@@ -1580,6 +1582,8 @@ function setupScreen(): string {
       : `用「${chosen.name}」開局。`;
   // 這個英雄的牌組：點一下選來開局用，旁邊的「編輯」進組牌畫面。
   const myDecks = app.book.decks.filter((deck) => deck.heroId === app.heroId);
+  // 每個英雄最多存 HERO_DECK_LIMIT 副（自動組牌不算）：滿了就不能新增或貼上，要先刪。
+  const deckFull = myDecks.length >= HERO_DECK_LIMIT;
   const deckItems = [
     `<button class="deck-item${chosen ? '' : ' on'}" data-deck-pick="auto" aria-pressed="${!chosen}"><b>自動組牌</b><small>用收藏自動組一副</small></button>`,
     ...myDecks.map((deck) => {
@@ -1592,7 +1596,7 @@ function setupScreen(): string {
   ].join('');
   const who = app.session;
   return `<main class="setup">
-    <header class="setup-head"><div><h1>卡牌試玩桌</h1><p>${
+    <header class="setup-head"><div><h1>幻彩英雄</h1><p>${
       ONLINE_AVAILABLE
         ? '選一名英雄，跟電腦打，或開一個房間跟朋友連線對戰。'
         : '選一名英雄，跟電腦打一局。對手的英雄隨機，開局時會先告訴你是誰。'
@@ -1606,8 +1610,8 @@ function setupScreen(): string {
     ${PREVIEW ? `<p class="notice" role="status">${ACCOUNT_PREVIEW ? '超級帳號' : '預覽模式'}：看得到還沒發布的卡包（${esc(CARD_SETS.filter((set) => !set.released).map((set) => set.name).join('、'))}），可以開包、組牌、跟電腦打。${ACCOUNT_PREVIEW ? '連線對戰只能用已發布的卡。' : '預覽建議用測試帳號。'}</p>` : ''}
     <div class="heroes">${heroes}</div>
     <section class="deck-bar">
-      <div class="deck-head"><div><p class="d-head">牌組・${esc(hero(app.heroId).name)}</p><p class="d-line${problems.length ? ' warn' : ''}">${esc(deckText)}</p></div>
-        <div class="deck-actions"><button class="ghost" data-do="deck-new">新增牌組</button><button class="ghost" data-do="deck-import">貼上代碼</button></div></div>
+      <div class="deck-head"><div><p class="d-head">牌組・${esc(hero(app.heroId).name)}<small class="deck-count">${myDecks.length}/${HERO_DECK_LIMIT}</small></p><p class="d-line${problems.length ? ' warn' : ''}">${esc(deckText)}</p></div>
+        <div class="deck-actions"><button class="ghost" data-do="deck-new"${deckFull ? ' disabled' : ''}>新增牌組</button><button class="ghost" data-do="deck-import"${deckFull ? ' disabled' : ''}>貼上代碼</button></div></div>
       <div class="deck-list">${deckItems}</div>
     </section>
     ${importDialog()}
@@ -1930,7 +1934,9 @@ function addDeck(heroId: string, name: string, cards: string[]): SavedDeck | nul
   const deck: SavedDeck = { id: newDeckId(), name: name.slice(0, DECK_NAME_LIMIT), heroId, cards };
   const book = putDeck(app.book, deck);
   if (!book) {
-    app.toast = `牌組最多存 ${DECK_LIMIT} 副，先刪掉用不到的`;
+    app.toast = heroDeckCount(app.book, heroId) >= HERO_DECK_LIMIT
+      ? `每個英雄最多存 ${HERO_DECK_LIMIT} 副牌組（自動組牌不算），先刪掉用不到的`
+      : `牌組最多存 ${DECK_LIMIT} 副，先刪掉用不到的`;
     return null;
   }
   app.book = selectDeckIn(book, heroId, deck.id);

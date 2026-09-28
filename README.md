@@ -1,6 +1,6 @@
-# card-game
+# 幻彩英雄
 
-一款線上對戰卡牌遊戲。骨架來自寶可夢卡牌，差別在於能量屬於玩家：每位玩家有自己的能量池，
+一款線上對戰卡牌遊戲（程式裡的專案名稱是 card-game）。骨架來自寶可夢卡牌，差別在於能量屬於玩家：每位玩家有自己的能量池，
 召喚生物、使用技能、施放法術都從池裡付費；每位玩家有一名英雄，英雄的顏色決定牌組能放哪些卡，
 英雄被打倒就輸。遊戲名稱暫定。
 
@@ -28,7 +28,7 @@
 - [x] 儲值：綠界 ECPay，NT$30 = 100 金幣（見下面「儲值」）
 - [x] 第二彈「龍脈覺醒」、第三彈「天機神殿」（新機制聖盾、連擊，見 [design.md](docs/design.md)）各 100 張卡、5 個新英雄，還沒發布，預覽看得到
 - [x] 卡牌插圖：AI 畫的試玩用插圖（`python3 packages/web/scripts/art.py`，見 [docs/art.md](docs/art.md)）
-- [x] 卡背：每副牌組可以選（經典、烈焰、翠林），牌庫與對手手牌會顯示，連線對戰對手也看得到（`packages/web/src/card-backs.ts`）
+- [x] 卡背：每副牌組可以選（經典，以及五個顏色各一種：聖光、潮汐、冥府、烈焰、翠林），牌庫與對手手牌會顯示，連線對戰對手也看得到（`packages/web/src/card-backs.ts`）
 - [x] 背景音樂與音效：瀏覽器即時合成（[`packages/web/src/music.ts`](packages/web/src/music.ts)），各有開關
 
 卡牌見 [docs/cards.md](docs/cards.md)（總覽與關鍵字），每一彈各一份：[基本卡包](docs/cards-set1-core.md)、[龍脈覺醒](docs/cards-set2-awakening.md)、[天機神殿](docs/cards-set3-celestial.md)。

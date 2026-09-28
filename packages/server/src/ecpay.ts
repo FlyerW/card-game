@@ -68,7 +68,7 @@ export function checkoutFields(config: EcpayConfig, order: CheckoutOrder): Recor
     MerchantTradeDate: tradeDate(order.now),
     PaymentType: 'aio',
     TotalAmount: String(order.amount),
-    TradeDesc: '卡牌遊戲金幣',
+    TradeDesc: '幻彩英雄金幣',
     ItemName: order.itemName,
     ReturnURL: order.returnUrl,
     ClientBackURL: order.clientBackUrl,

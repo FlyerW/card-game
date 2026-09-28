@@ -19,9 +19,14 @@ export interface DeckBook {
   selected: Record<string, string>;
 }
 
-/** 一個帳號最多存幾副牌組、牌組名字最長幾個字。 */
-export const DECK_LIMIT = 40;
+/** 每個英雄最多存幾副牌組（「自動組牌」不算）。 */
+export const HERO_DECK_LIMIT = 5;
+/** 一個帳號最多存幾副（只是防資料無限長；平常先碰到每個英雄的上限）、牌組名字最長幾個字。 */
+export const DECK_LIMIT = 200;
 export const DECK_NAME_LIMIT = 20;
+
+/** 這個英雄存了幾副牌組。 */
+export const heroDeckCount = (book: DeckBook, heroId: string): number => book.decks.filter((deck) => deck.heroId === heroId).length;
 
 export const emptyBook = (): DeckBook => ({ decks: [], selected: {} });
 
@@ -79,10 +84,15 @@ export function cleanBook(db: CardDb, raw: unknown): DeckBook {
   return book;
 }
 
-/** 存一副（新的就加在最後面，舊的換掉）；超過上限回傳 null。 */
+/**
+ * 存一副（新的就加在最後面，舊的換掉）；新的一副會超過這個英雄的上限（或整個帳號的上限）就回傳 null。
+ * 上限只擋新增：以前存超過的照樣留著、照樣能改。
+ */
 export function putDeck(book: DeckBook, deck: SavedDeck): DeckBook | null {
-  const exists = book.decks.some((each) => each.id === deck.id);
+  const old = book.decks.find((each) => each.id === deck.id);
+  const exists = old !== undefined;
   if (!exists && book.decks.length >= DECK_LIMIT) return null;
+  if (old?.heroId !== deck.heroId && heroDeckCount(book, deck.heroId) >= HERO_DECK_LIMIT) return null;
   const decks = exists ? book.decks.map((each) => (each.id === deck.id ? deck : each)) : [...book.decks, deck];
   return { ...book, decks };
 }

@@ -14,6 +14,8 @@ import {
   cleanDeck,
   craft,
   DECK_LIMIT,
+  HERO_DECK_LIMIT,
+  heroDeckCount,
   DECK_NAME_LIMIT,
   emptyBook,
   newDeckId,
@@ -360,10 +362,21 @@ describe('牌組清單', () => {
     expect(book.selected['flame-lord']).toBeUndefined();
   });
 
-  it('最多存 DECK_LIMIT 副；名字太長會截掉', () => {
+  it('每個英雄最多存 HERO_DECK_LIMIT 副（自動組牌不算）；已經存的照樣能改；名字太長會截掉', () => {
     let book = emptyBook();
-    for (let i = 0; i < DECK_LIMIT; i++) book = putDeck(book, { id: `deck${i}x`, name: `#${i}`, heroId: 'flame-lord', cards: [] })!;
+    for (let i = 0; i < HERO_DECK_LIMIT; i++) book = putDeck(book, { id: `deck${i}x`, name: `#${i}`, heroId: 'flame-lord', cards: [] })!;
+    expect(heroDeckCount(book, 'flame-lord')).toBe(HERO_DECK_LIMIT);
     expect(putDeck(book, { id: 'onemore', name: 'x', heroId: 'flame-lord', cards: [] })).toBeNull();
+    expect(putDeck(book, { id: 'deck0x', name: '改名', heroId: 'flame-lord', cards: ['fireball'] })!.decks[0]!.name).toBe('改名');
+    // 別的英雄不受影響；把別的英雄的牌組改成這個英雄也算新增
+    book = putDeck(book, { id: 'other1', name: 'y', heroId: 'deep-seer', cards: [] })!;
+    expect(putDeck(book, { id: 'other1', name: 'y', heroId: 'flame-lord', cards: [] })).toBeNull();
+    expect(cleanDeck(db, { id: 'abcd1', name: '很'.repeat(50), heroId: 'flame-lord', cards: [] })!.name).toHaveLength(DECK_NAME_LIMIT);
+  });
+
+  it('整個帳號最多存 DECK_LIMIT 副', () => {
+    const decks = Array.from({ length: DECK_LIMIT }, (_, i) => ({ id: `deck${i}x`, name: `#${i}`, heroId: 'flame-lord', cards: [] }));
+    expect(putDeck({ decks, selected: {} }, { id: 'onemore', name: 'x', heroId: 'deep-seer', cards: [] })).toBeNull();
     expect(cleanDeck(db, { id: 'abcd1', name: '很'.repeat(50), heroId: 'flame-lord', cards: [] })!.name).toHaveLength(DECK_NAME_LIMIT);
   });
 

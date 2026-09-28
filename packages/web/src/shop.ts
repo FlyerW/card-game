@@ -150,7 +150,7 @@ function booster(set: { id: string; name: string }, canOpen: boolean, opening: b
       style="--art:url('${artUrl(`booster-${set.id}`)}')" aria-label="開一包${esc(set.name)}">
     <span class="bs-art" aria-hidden="true"></span><span class="bs-shine" aria-hidden="true"></span>
     <span class="bs-crimp top" aria-hidden="true"></span><span class="bs-crimp bottom" aria-hidden="true"></span>
-    <span class="bs-title"><small>卡牌試玩桌</small><b>${esc(set.name)}</b><small>卡包・5 張</small></span>
+    <span class="bs-title"><small>幻彩英雄</small><b>${esc(set.name)}</b><small>卡包・5 張</small></span>
   </button>`;
 }
 

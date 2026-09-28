@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { DEFAULT_RULES, type CardDb } from '@card-game/engine';
-import { clearStage, cleanDeck, craft, DECK_LIMIT, emptyBook, openPacks, PACK_BATCH, packSets, parseSummary, putDeck, recordGame, removeDeck, selectDeck, TOPUPS } from '@card-game/economy';
+import { clearStage, cleanDeck, craft, DECK_LIMIT, emptyBook, HERO_DECK_LIMIT, openPacks, PACK_BATCH, packSets, parseSummary, putDeck, recordGame, removeDeck, selectDeck, TOPUPS } from '@card-game/economy';
 import { AccountError, accountInfo, serverDay, type Account, type AccountStore } from './accounts';
 import { checkoutFields, checkoutUrl, newTradeNo, readNotice, type EcpayConfig } from './ecpay';
 import { parseBotRecord, type GameLog } from './gamelog';
@@ -222,7 +222,7 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
         const deck = cleanDeck(dbFor(account), (await readJson(request)).deck);
         if (!deck) throw new HttpError(400, '牌組格式不對');
         const book = putDeck(account.deckBook ?? emptyBook(), deck);
-        if (!book) throw new HttpError(400, `牌組最多存 ${DECK_LIMIT} 副`);
+        if (!book) throw new HttpError(400, `每個英雄最多存 ${HERO_DECK_LIMIT} 副牌組（自動組牌不算），整個帳號最多 ${DECK_LIMIT} 副`);
         await store.saveDeckBook(account, book);
         return send(response, 200, {}), true;
       }

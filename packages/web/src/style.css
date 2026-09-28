@@ -646,6 +646,8 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 /* 開局畫面的牌組清單：點一副選來開局用，旁邊「編輯」進組牌畫面 */
 .deck-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; }
 .deck-actions { display: flex; gap: 8px; }
+.deck-count { margin-left: 8px; font: 500 13px/1 var(--body); color: var(--ink-soft); }
+.deck-actions button:disabled { opacity: .45; cursor: not-allowed; }
 .deck-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .deck-item { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--mat-edge); border-radius: 10px; background: #0002; padding: 4px 6px 4px 4px; }
 button.deck-item, .deck-pick { display: grid; justify-items: start; gap: 1px; padding: 6px 10px; border: 0; background: none; color: var(--ink); text-align: left; cursor: pointer; }
@@ -693,6 +695,9 @@ button.deck-item { border: 1px solid var(--mat-edge); }
 .card-back svg { position: absolute; left: 18%; top: 24%; width: 64%; height: 52%; }
 .card-back .cb-ring { fill: none; stroke: var(--cb-edge); stroke-width: 3; opacity: .7; }
 .card-back .cb-mark { fill: var(--cb-edge); fill-opacity: .9; stroke: var(--cb-bg); stroke-width: 2.5; stroke-linejoin: round; }
+.cb-radiance { --cb-bg: #efe6cf; --cb-edge: #b07f2a; --cb-line: #b07f2a2e; --cb-glow: #fffbe8; }
+.cb-tide { --cb-bg: #07303b; --cb-edge: #7fe0f0; --cb-line: #7fe0f024; --cb-glow: #16607a; }
+.cb-shade { --cb-bg: #1b1026; --cb-edge: #c39bf0; --cb-line: #c39bf024; --cb-glow: #4a2a6a; }
 .cb-ember { --cb-bg: #3a0f0c; --cb-edge: #f08a3c; --cb-line: #f08a3c26; --cb-glow: #9c3316; }
 .cb-grove { --cb-bg: #12301d; --cb-edge: #9bd38f; --cb-line: #9bd38f24; --cb-glow: #2d6a3a; }
 
