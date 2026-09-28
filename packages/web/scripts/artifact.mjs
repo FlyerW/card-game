@@ -14,7 +14,7 @@ const js = asset(/<script type="module" crossorigin src="([^"]+)"/).replaceAll('
 const css = asset(/<link rel="stylesheet" crossorigin href="([^"]+)"/);
 const fonts = index.match(/<link\s+rel="stylesheet"\s+href="(https:\/\/fonts\.googleapis\.com[^"]+)"/)[1];
 
-const html = `<title>卡牌試玩桌</title>
+const html = `<title>幻彩英雄</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="${fonts}">
