@@ -1,5 +1,5 @@
 // 從卡牌資料產生卡表，讓文件裡的卡永遠跟程式碼一致：docs/cards.md 是總覽（系列與關鍵字），
-// 每一彈各一份 docs/cards-<系列>.md。
+// 每一彈各一份 docs/cards-set<第幾彈>-<系列>.md（例如 cards-set1-core.md）。
 // 用法：npm run cards
 
 import { writeFileSync } from 'node:fs';
@@ -48,7 +48,7 @@ function heroRow(hero: HeroDef): string {
 
 const heroesOf = (set: string) => ALL_HEROES.filter((hero) => (hero.set ?? 'core') === set);
 const cardsOf = (set: string) => ALL_CARDS.filter((card) => setOf(card) === set);
-const fileOf = (set: CardSet) => `cards-${set.id}.md`;
+const fileOf = (set: CardSet) => `cards-set${CARD_SETS.indexOf(set) + 1}-${set.id}.md`;
 
 /** 一個系列的卡表。 */
 function setPage(set: CardSet): string {

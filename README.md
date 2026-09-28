@@ -26,12 +26,12 @@
 - [x] 牌組清單：同一個英雄可以存很多副、選開局用哪一副；牌組代碼可以複製給朋友（缺卡的不能開局）；伺服器帳號存在伺服器
 - [x] 對局紀錄：每一局記進 `data/games.jsonl`，`npm run game-stats` 看真人對局的英雄與卡牌勝率
 - [x] 儲值：綠界 ECPay，NT$30 = 100 金幣（見下面「儲值」）
-- [x] 第二彈「龍脈覺醒」、第三彈「天機神殿」（[docs/set3.md](docs/set3.md)：新機制聖盾、連擊）各 100 張卡、5 個新英雄，還沒發布，預覽看得到
+- [x] 第二彈「龍脈覺醒」、第三彈「天機神殿」（新機制聖盾、連擊，見 [design.md](docs/design.md)）各 100 張卡、5 個新英雄，還沒發布，預覽看得到
 - [x] 卡牌插圖：AI 畫的試玩用插圖（`python3 packages/web/scripts/art.py`，見 [docs/art.md](docs/art.md)）
 - [x] 卡背：每副牌組可以選（經典、烈焰、翠林），牌庫與對手手牌會顯示，連線對戰對手也看得到（`packages/web/src/card-backs.ts`）
 - [x] 背景音樂與音效：瀏覽器即時合成（[`packages/web/src/music.ts`](packages/web/src/music.ts)），各有開關
 
-卡牌見 [docs/cards.md](docs/cards.md)（總覽與關鍵字），每一彈各一份：[基本卡包](docs/cards-core.md)、[龍脈覺醒](docs/cards-awakening.md)、[天機神殿](docs/cards-celestial.md)。
+卡牌見 [docs/cards.md](docs/cards.md)（總覽與關鍵字），每一彈各一份：[基本卡包](docs/cards-set1-core.md)、[龍脈覺醒](docs/cards-set2-awakening.md)、[天機神殿](docs/cards-set3-celestial.md)。
 
 ## 開發
 
@@ -41,7 +41,7 @@
 npm install
 npm test            # 全部測試
 npm run typecheck   # 型別檢查
-npm run cards       # 從卡牌資料重新產生 docs/cards.md 與每一彈的 docs/cards-<系列>.md
+npm run cards       # 從卡牌資料重新產生 docs/cards.md 與每一彈的 docs/cards-set<N>-<系列>.md
 npm run sim         # 平衡模擬，16 個 worker 約 8 分鐘（核心少會久很多）；結果寫到 docs/balance-results.md
 npm run sim -- --games 200   # 快速試跑
 npm run game-stats            # 真人對局的數據（讀 data/games.jsonl）
@@ -149,7 +149,7 @@ npm run admin -- unlimited Flyer off   # 取消（已經有的金幣和卡保留
 
 1. `npm test`——資料有錯會列出所有問題，例如進化來源不存在、R 卡少於兩個技能、
    進化沒有升一級稀有度、位置技能放到法術上
-2. `npm run cards`——更新 docs/cards.md 與 docs/cards-<系列>.md
+2. `npm run cards`——更新 docs/cards.md 與 docs/cards-set<N>-<系列>.md
 
 ## 結構
 
@@ -158,7 +158,7 @@ docs/
 ├── design.md             規則設計文件
 ├── art.md                卡牌美術的 AI 繪圖指南
 ├── board.svg             場上配置圖（由 scripts/board-svg.py 產生）
-├── cards.md              卡牌總覽與關鍵字；cards-<系列>.md 是每一彈的卡表（自動產生，請勿手動編輯）
+├── cards.md              卡牌總覽與關鍵字；cards-set<N>-<系列>.md 是每一彈的卡表（自動產生，請勿手動編輯）
 └── balance-results.md    平衡模擬結果（自動產生，請勿手動編輯）
 
 packages/engine/          規則引擎：純函式庫，不碰網路也不碰畫面

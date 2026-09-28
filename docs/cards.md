@@ -6,9 +6,9 @@
 
 | 系列 | 狀態 | 英雄 | 卡 | 卡表 |
 |---|---|---|---|---|
-| 基本卡包 | 已發布 | 9 | 151 | [cards-core.md](cards-core.md) |
-| 龍脈覺醒 | 還沒發布 | 5 | 100 | [cards-awakening.md](cards-awakening.md) |
-| 天機神殿 | 還沒發布 | 5 | 100 | [cards-celestial.md](cards-celestial.md) |
+| 基本卡包 | 已發布 | 9 | 151 | [cards-set1-core.md](cards-set1-core.md) |
+| 龍脈覺醒 | 還沒發布 | 5 | 100 | [cards-set2-awakening.md](cards-set2-awakening.md) |
+| 天機神殿 | 還沒發布 | 5 | 100 | [cards-set3-celestial.md](cards-set3-celestial.md) |
 
 ## 關鍵字
 
