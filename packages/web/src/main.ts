@@ -12,12 +12,15 @@ import {
   describePassive,
   other,
   describeTrait,
+  conditionLabel,
+  conditionMetBy,
   RACE_NAMES,
   sampleDb,
   SAMPLE_CARDS,
   SAMPLE_HEROES,
   type Ability,
   type Action,
+  type ConditionalEffects,
   type CreatureView,
   type DeckCardDef,
   type GameEvent,
@@ -970,7 +973,7 @@ function heroInfo(side: SideView, player: PlayerId): string {
   if (evolution?.kind === 'heroEvolution' && evolution.passive) lines.push(describePassive(evolution.passive, describeName));
   // 手牌：一排小卡背（最多畫 10 張），旁邊寫張數。
   const backs = Array.from({ length: Math.min(side.handCount, 10) }, () => cardBack(backFor(player))).join('');
-  return `<div class="hero-side">${powerPill(side, false)}<div class="hero-info"><span class="hi-hand">手牌 ${side.handCount}<span class="hand-backs">${backs}</span></span>${lines
+  return `<div class="hero-side">${powerPill(side, false)}<div class="hero-info"><span class="hi-hand">手牌 ${side.handCount}<span class="hand-backs">${backs}</span></span>${tally(side)}${lines
     .map((line) => `<p>${rich(line)}</p>`)
     .join('')}</div></div>`;
 }
@@ -989,13 +992,30 @@ function powerPill(side: SideView, mine: boolean): string {
   if (!mine) return `<button class="power" data-do="their-power" aria-label="對手的天生技 ${esc(power.name)}，點了看說明">${body}</button>`;
   const usable = actsForPower().length > 0;
   const combo = usable && power.combo?.length && side.playedThisTurn > 0 ? ' combo-ready' : '';
-  return `<button class="power${app.selection?.kind === 'heroPower' ? ' selected' : ''}${combo}" data-do="power" ${usable ? '' : 'disabled'}>${body}</button>`;
+  // 條件成立（第四彈）：標亮，data-cond 是條件的名字。
+  const condition = usable && power.condition && app.view && conditionMetBy(app.view.you, power.condition.when) ? power.condition : null;
+  const cond = condition ? ' cond-ready' : '';
+  const condAttr = condition ? ` data-cond="${esc(conditionLabel(condition.when))}"` : '';
+  return `<button class="power${app.selection?.kind === 'heroPower' ? ' selected' : ''}${combo}${cond}" data-do="power"${condAttr} ${usable ? '' : 'disabled'}>${body}</button>`;
 }
 
 /** 這張卡有沒有連擊（法術或生物的進場）。 */
 function hasCombo(def: DeckCardDef): boolean {
   if (def.kind === 'spell') return (def.combo?.length ?? 0) > 0;
   return def.kind === 'creature' && (def.entry?.combo?.length ?? 0) > 0;
+}
+
+/** 這張卡的條件（第四彈；法術或生物的進場）。 */
+function conditionOf(def: DeckCardDef): ConditionalEffects | undefined {
+  if (def.kind === 'spell') return def.condition;
+  return def.kind === 'creature' ? def.entry?.condition : undefined;
+}
+
+/** 第四彈的累積條件看的數字（軍勢、詠唱、亡魂）；看得到第四彈的卡時才顯示。 */
+const TALLY_VISIBLE = CARD_SETS.some((set) => set.id === 'trials' && (set.released || PREVIEW));
+function tally(side: SideView): string {
+  if (!TALLY_VISIBLE) return '';
+  return `<span class="tally" title="本局累積：軍勢看召喚過的生物、詠唱看施放過的法術、亡魂看倒下的生物">召喚 ${side.summonedTotal}・法術 ${side.spellsTotal}・倒下 ${side.fallenTotal}</span>`;
 }
 
 /** 目前的天生技，以及輪流的話下一次換成哪一個（跟引擎的 heroPower 同一套規則）。 */
@@ -1324,7 +1344,7 @@ function sideRows(side: SideView, player: PlayerId, picks: Map<string, Action>, 
   const energy = `<div class="row energy-row">${mine ? `<span></span>${energyRow(side)}${deck}` : `${deck}${energyRow(side)}<span></span>`}</div>`;
 
   let heroRow = `<div class="row hero-row">${heroPlate(side, player, picks)}`;
-  heroRow += player === YOU ? powerPill(side, true) : heroInfo(side, player);
+  heroRow += player === YOU ? powerPill(side, true) + tally(side) : heroInfo(side, player);
   heroRow += '</div>';
   return player === YOU ? creatures + energy + heroRow : heroRow + energy + creatures;
 }
@@ -1337,9 +1357,13 @@ function hand(view: PlayerView): string {
       const selected = app.selection?.kind === 'hand' && app.selection.uid === held.uid;
       // 這回合已經打出過牌：有連擊的卡標亮，提醒現在打會多一段。
       const combo = playable && view.you.playedThisTurn > 0 && hasCombo(def);
+      // 條件成立（打出去的這一張也算進軍勢、詠唱）：標亮並寫出條件。
+      const condition = conditionOf(def);
+      const pending = { summoned: def.kind === 'creature' && def.stage === 0 ? 1 : 0, spells: def.kind === 'spell' ? 1 : 0 };
+      const ready = playable && condition !== undefined && conditionMetBy(view.you, condition.when, pending);
       return cardFace(def, {
-        attrs: `data-hand="${held.uid}"`,
-        classes: [...(playable ? ['playable'] : []), ...(selected ? ['selected'] : []), ...(combo ? ['combo-ready'] : [])],
+        attrs: `data-hand="${held.uid}"${ready ? ` data-cond="${esc(conditionLabel(condition!.when))}"` : ''}`,
+        classes: [...(playable ? ['playable'] : []), ...(selected ? ['selected'] : []), ...(combo ? ['combo-ready'] : []), ...(ready ? ['cond-ready'] : [])],
       });
     })
     .join('');

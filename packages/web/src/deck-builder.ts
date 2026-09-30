@@ -2,9 +2,13 @@ import {
   CARD_SETS,
   cardNames,
   COLOR_NAMES,
+  conditionLabel,
   copyLimit,
   DEFAULT_RULES,
+  deckConditionMet,
   deckPool,
+  deckTraits,
+  isDeckCondition,
   describeCard,
   describeColors,
   RARITIES,
@@ -12,6 +16,7 @@ import {
   validateDeck,
   type CardDb,
   type Color,
+  type Condition,
   type DeckCardDef,
   type Rarity,
   encodeDeckCode,
@@ -260,9 +265,10 @@ export function deckScreen(db: CardDb, b: Builder, saved: SavedDeck, owned: Owne
         <button class="ghost focus-close" data-do="focus-close">關閉</button></div>`
     : '<p class="d-line">點卡片看說明；卡片下面的 − ＋ 調整張數。</p>';
   const status =
-    problems.length === 0
+    deckConditionsLine(db, b.heroId, deck) +
+    (problems.length === 0
       ? '<p class="ok">✓ 牌組合法，可以開始對戰</p>'
-      : `<ul class="problems">${problems.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>`;
+      : `<ul class="problems">${problems.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>`);
   const tipList = tips.length ? `<ul class="tips">${tips.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '';
   const chip = (attr: string, value: string, label: string, on: boolean) =>
     `<button class="chip${on ? ' on' : ''}" ${attr}="${value}" aria-pressed="${on}">${label}</button>`;
@@ -336,4 +342,30 @@ export function deckScreen(db: CardDb, b: Builder, saved: SavedDeck, owned: Owne
       </aside>
     </div>
   </main>`;
+}
+
+/** 牌組裡的卡（與英雄的天生技）用到的構築條件（第四彈）：奇數牌組、偶數牌組、獨一、階梯 N。 */
+function deckConditions(db: CardDb, heroId: string, deck: readonly string[]): Condition[] {
+  const found: Condition[] = [];
+  const add = (when: Condition | undefined) => {
+    if (when && isDeckCondition(when) && !found.some((each) => conditionLabel(each) === conditionLabel(when))) found.push(when);
+  };
+  add(db.heroes.get(heroId)?.power?.condition?.when);
+  for (const id of new Set(deck)) {
+    const card = db.cards.get(id);
+    if (card?.kind === 'spell') add(card.condition?.when);
+    if (card?.kind === 'creature') [card.entry, ...card.skills].forEach((ability) => add(ability?.condition?.when));
+    if (card?.kind === 'heroEvolution') [card.entry, card.power].forEach((ability) => add(ability?.condition?.when));
+  }
+  return found.sort((x, y) => conditionLabel(x).localeCompare(conditionLabel(y)));
+}
+
+/** 「構築條件：奇數牌組 ✓・階梯 9 ✗（不同費用 8 種）」；牌組裡沒有這類卡就不顯示。 */
+function deckConditionsLine(db: CardDb, heroId: string, deck: readonly string[]): string {
+  const used = deckConditions(db, heroId, deck);
+  if (used.length === 0) return '';
+  const traits = deckTraits(db, deck);
+  const parts = used.map((when) => `${esc(conditionLabel(when))} ${deckConditionMet(traits, when) ? '✓' : '✗'}`);
+  const costs = used.some((when) => when.kind === 'costs') ? `（不同費用 ${traits.costs} 種）` : '';
+  return `<p class="d-line cond-line">構築條件：${parts.join('・')}${costs}</p>`;
 }

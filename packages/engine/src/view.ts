@@ -14,7 +14,7 @@ import {
   maxHp,
   other,
 } from './queries';
-import type { CardDb, CardRef, Creature, GameEvent, GameResult, GameState, PlayerId } from './types';
+import type { CardDb, CardRef, Creature, DeckTraits, GameEvent, GameResult, GameState, PlayerId } from './types';
 
 export interface CreatureView {
   uid: number;
@@ -69,6 +69,10 @@ export interface SideView {
   mulliganDone: boolean;
   /** 這回合打出了幾張牌；大於 0 時連擊成立。 */
   playedThisTurn: number;
+  /** 本局召喚過幾隻生物、施放過幾個法術、我方倒下過幾隻生物（累積條件；雙方都看得到）。 */
+  summonedTotal: number;
+  spellsTotal: number;
+  fallenTotal: number;
 }
 
 /**
@@ -83,7 +87,8 @@ export interface PlayerView {
   firstPlayer: PlayerId;
   result: GameResult | null;
   /** 對手的英雄從重抽階段就看得到，可以先看對手是誰再決定要不要重抽。 */
-  you: SideView & { hand: CardRef[] };
+  /** 自己開局牌組的樣子（構築條件）只有自己看得到。 */
+  you: SideView & { hand: CardRef[]; deckTraits: DeckTraits | null };
   opponent: SideView;
   /** 你正在從翻開的牌裡選牌：翻開的牌只有你看得到。 */
   choice: { ability: string; cards: CardRef[]; pick: number } | null;
@@ -137,6 +142,9 @@ function sideView(db: CardDb, state: GameState, player: PlayerId): SideView {
     field: p.field?.cardId ?? null,
     mulliganDone: p.mulliganDone,
     playedThisTurn: p.playedThisTurn ?? 0,
+    summonedTotal: p.summonedTotal ?? 0,
+    spellsTotal: p.spellsTotal ?? 0,
+    fallenTotal: p.fallenTotal ?? 0,
   };
 }
 
@@ -160,7 +168,11 @@ export function viewFor(db: CardDb, state: GameState, player: PlayerId): PlayerV
     activePlayer: state.activePlayer,
     firstPlayer: state.firstPlayer,
     result: state.result,
-    you: { ...sideView(db, state, player), hand: state.players[player].hand.map((card) => ({ ...card })) },
+    you: {
+      ...sideView(db, state, player),
+      hand: state.players[player].hand.map((card) => ({ ...card })),
+      deckTraits: state.players[player].deckTraits ?? null,
+    },
     opponent: sideView(db, state, other(player)),
     choice:
       state.choice?.player === player

@@ -300,6 +300,15 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
   font: 700 11px/1.4 var(--num); color: #2a0f20; background: #ff9ad5;
 }
 .power.combo-ready { border-color: #ff9ad5; box-shadow: 0 0 10px #ff9ad588; }
+/* 條件成立（第四彈）：現在打會多發動一段；右上角寫條件（例如「軍勢 6」） */
+.card.cond-ready { border-color: #ffd36b; box-shadow: 0 0 12px #ffd36b88; }
+.card.cond-ready::after {
+  content: attr(data-cond); position: absolute; top: -8px; right: -4px; z-index: 2; padding: 1px 6px; border-radius: 8px;
+  font: 700 11px/1.4 var(--body); color: #2a1f05; background: #ffd36b; white-space: nowrap;
+}
+.power.cond-ready { border-color: #ffd36b; box-shadow: 0 0 10px #ffd36b88; }
+/* 本局累積：召喚、法術、倒下（軍勢、詠唱、亡魂看這些） */
+.tally { align-self: center; font-size: 12px; color: var(--ink-soft); white-space: nowrap; }
 .c-cost {
   position: absolute; top: -7px; left: -7px; width: 26px; height: 26px; display: grid; place-items: center;
   font: 700 15px var(--num); color: #0c2530; isolation: isolate;
@@ -774,6 +783,7 @@ button.deck-item { border: 1px solid var(--mat-edge); }
 }
 .booster.bs-awakening { --foil1: #ffb071; --foil2: #8c2d15; }
 .booster.bs-celestial { --foil1: #bfe3ff; --foil2: #3d5f8f; }
+.booster.bs-trials { --foil1: #e2c6ff; --foil2: #5a2e8a; }
 .booster:hover:not(:disabled) { transform: perspective(700px) rotateY(0) translateY(-4px) scale(1.04); filter: drop-shadow(0 14px 18px #000c) brightness(1.08); }
 .booster:disabled { cursor: default; filter: drop-shadow(0 10px 14px #000b) saturate(.6); }
 .bs-art { position: absolute; inset: 0; background: var(--art) center / cover no-repeat; }

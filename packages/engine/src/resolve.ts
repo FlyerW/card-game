@@ -156,6 +156,7 @@ function removeCreature(ctx: Ctx, player: PlayerId, zone: number): Fallen | null
   if (creature == null) return null;
   const death = isSilenced(ctx.state, creature) ? undefined : creatureDef(ctx.db, creature).death;
   p.zones[zone] = null;
+  p.fallenTotal = (p.fallenTotal ?? 0) + 1; // 亡魂：本局我方倒下的生物（衍生物也算）
   // 衍生物離場就消失；身上的道具照樣進棄牌區。
   if (!isToken(ctx.db, creature)) p.discard.push(...creature.cards);
   if (creature.item !== null) p.discard.push(creature.item);
@@ -528,6 +529,7 @@ function applyEffect(
         const uid = state.nextUid++;
         const tokenDef = db.cards.get(effect.token);
         player.zones[zone] = newCreature(uid, me, effect.token, state.turn, tokenDef?.kind === 'creature' && (tokenDef.keywords?.includes('shield') ?? false));
+        player.summonedTotal = (player.summonedTotal ?? 0) + 1; // 軍勢：衍生物也算
         ctx.events.push({ type: 'summoned', player: me, zone, cardId: effect.token });
         fireTriggers(ctx, me, 'allySummoned', player.zones[zone]!);
       }

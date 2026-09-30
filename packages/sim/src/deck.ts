@@ -1,4 +1,4 @@
-import { copyLimit, DEFAULT_RULES, SAMPLE_CARDS, type CreatureDef, type DeckCardDef } from '@card-game/engine';
+import { copyLimit, DEFAULT_RULES, SAMPLE_CARDS, type Ability, type Condition, type CreatureDef, type DeckCardDef, type HeroDef } from '@card-game/engine';
 
 // 試玩與模擬共用的組牌方式。
 //
@@ -56,7 +56,14 @@ export function buildDeck(
   pool: readonly DeckCardDef[] = SAMPLE_CARDS,
   lineCount = 2,
   limitOf: (card: DeckCardDef) => number = limit,
+  archetype: DeckArchetype = 'normal',
 ): string[] {
+  // 奇數／偶數牌組只用那種費用的卡；獨一牌組每張 1 張。
+  if (archetype === 'odd' || archetype === 'even') pool = pool.filter((card) => card.cost % 2 === (archetype === 'odd' ? 1 : 0));
+  if (archetype === 'singleton') {
+    const base = limitOf;
+    limitOf = (card) => Math.min(1, base(card));
+  }
   const rand = random(seed);
   const lines = evolutionLines(pool).filter((line) => line.every((card) => limitOf(card) > 0));
   const inLines = new Set(lines.flat().map((card) => card.id));
@@ -87,4 +94,34 @@ export function buildDeck(
     }
   }
   return deck;
+}
+
+/** 構築條件的牌組類型：一般、奇數牌組、偶數牌組、獨一（沒有同名卡）。 */
+export type DeckArchetype = 'normal' | 'odd' | 'even' | 'singleton';
+
+/** 一張卡（或英雄）用到的條件。 */
+function conditionsOf(card: DeckCardDef | HeroDef): Condition[] {
+  const abilities: (Pick<Ability, 'condition'> | undefined)[] = [];
+  if (card.kind === 'creature') abilities.push(card.entry, ...card.skills);
+  if (card.kind === 'spell') abilities.push(card);
+  if (card.kind === 'hero' || card.kind === 'heroEvolution') abilities.push(card.power);
+  return abilities.flatMap((ability) => (ability?.condition ? [ability.condition.when] : []));
+}
+
+/**
+ * 電腦（模擬、對手）的牌組：卡池裡有奇數／偶數／獨一這類構築條件的卡（第四彈）時，一半機會組成那種牌組；
+ * 英雄自己的天生技要的那種，七成機會。組不滿 30 張就退回一般牌組。沒有這類卡的卡池跟 buildDeck 完全一樣。
+ */
+export function botDeck(seed: number, hero: HeroDef, pool: readonly DeckCardDef[] = SAMPLE_CARDS): string[] {
+  const kinds = (cards: readonly (DeckCardDef | HeroDef)[]) =>
+    [...new Set(cards.flatMap(conditionsOf).map((when) => when.kind))].flatMap((kind): DeckArchetype[] =>
+      kind === 'odd' || kind === 'even' || kind === 'singleton' ? [kind] : [],
+    );
+  const own = kinds([hero]);
+  const inPool = kinds(pool);
+  const roll = random(seed ^ 0x5bd1e995)();
+  const archetype: DeckArchetype =
+    own.length > 0 && roll < 0.7 ? own[0]! : inPool.length > 0 && roll < 0.5 ? inPool[Math.floor((roll / 0.5) * inPool.length)]! : 'normal';
+  const deck = buildDeck(seed, hero.id, pool, 2, limit, archetype);
+  return deck.length === DECK_SIZE ? deck : buildDeck(seed, hero.id, pool);
 }

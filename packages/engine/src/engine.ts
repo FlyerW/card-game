@@ -1,3 +1,4 @@
+import { conditionMet, deckTraits } from './conditions';
 import { validateDeck } from './deck';
 import { fail, RuleError, type ErrorCode } from './errors';
 import {
@@ -45,6 +46,7 @@ import { viewFor } from './view';
 import type {
   Ability,
   Action,
+  ConditionalEffects,
   Effect,
   CardDb,
   Creature,
@@ -148,17 +150,19 @@ function played(state: GameState, player: PlayerId): void {
   p.playedThisTurn = (p.playedThisTurn ?? 0) + 1;
 }
 
-/** 效果加上覺醒、連擊那兩段（條件成立時）。 */
+/** 效果加上覺醒、連擊、條件那幾段（成立時）。 */
 function withBonus(
   state: GameState,
   player: PlayerId,
   effects: Effect[],
-  extra: { awaken?: Effect[] | undefined; combo?: Effect[] | undefined },
+  extra: { awaken?: Effect[] | undefined; combo?: Effect[] | undefined; condition?: ConditionalEffects | undefined },
+  pending: { summoned?: number } = {},
 ): Effect[] {
   return [
     ...effects,
     ...(extra.awaken && awakened(state, player) ? extra.awaken : []),
     ...(extra.combo && comboReady(state, player) ? extra.combo : []),
+    ...(extra.condition && conditionMet(state, player, extra.condition.when, pending) ? extra.condition.effects : []),
   ];
 }
 
@@ -168,11 +172,11 @@ function spellAbility(db: CardDb, state: GameState, player: PlayerId, cardId: st
   return { name: def.name, cost: def.cost, target: def.target, effects: withBonus(state, player, def.effects, def) };
 }
 
-/** 生物的進場效果，加上覺醒、連擊；條件不成立、又沒有基本效果時是 null（不發動、不選目標）。 */
-function entryAbility(state: GameState, def: CreatureDef, player: PlayerId): Ability | null {
+/** 生物的進場效果，加上覺醒、連擊、條件；條件不成立、又沒有基本效果時是 null（不發動、不選目標）。 */
+function entryAbility(state: GameState, def: CreatureDef, player: PlayerId, pending: { summoned?: number } = {}): Ability | null {
   if (def.entry === undefined) return null;
-  const { awaken, combo, ...entry } = def.entry;
-  const effects = withBonus(state, player, entry.effects, { awaken, combo });
+  const { awaken, combo, condition, ...entry } = def.entry;
+  const effects = withBonus(state, player, entry.effects, { awaken, combo, condition }, pending);
   return effects.length === 0 ? null : { ...entry, cost: 0, effects };
 }
 
@@ -221,7 +225,8 @@ function triggerEntry(ctx: Ctx, def: CreatureDef, player: PlayerId, zone: number
 
 /** 生物放到 zone 之後，進場效果能選的目標：不含牠自己。 */
 function entryTargets(state: GameState, def: CreatureDef, player: PlayerId, zone: number): Target[] {
-  const ability = entryAbility(state, def, player);
+  // 還沒召喚：軍勢要把這一隻算進去（進化不算召喚）。
+  const ability = entryAbility(state, def, player, { summoned: def.stage === 0 ? 1 : 0 });
   if (ability === null || ability.target.kind === 'none') return [];
   const self: Target = { kind: 'creature', player, zone };
   return legalTargets(state, ability, { kind: 'creature', player, zone }).filter((t) => !sameTarget(t, self));
@@ -303,6 +308,7 @@ function summon(ctx: Ctx, a: ActionOf<'summon'>): void {
   pay(p, def.cost);
   removeFromHand(p, card.uid);
   p.zones[a.zone] = newCreature(card.uid, a.player, card.cardId, state.turn, def.keywords?.includes('shield') ?? false);
+  p.summonedTotal = (p.summonedTotal ?? 0) + 1; // 軍勢：包括這一隻
   ctx.events.push({ type: 'summoned', player: a.player, zone: a.zone, cardId: card.cardId });
   fireTriggers(ctx, a.player, 'allySummoned', p.zones[a.zone]!);
   // 天使的「光輝 N」：召喚時你的英雄回復 N。
@@ -403,7 +409,7 @@ function useSkill(ctx: Ctx, a: ActionOf<'useSkill'>): void {
   creature.skillUsedTurn = state.turn;
   if (skill.rest) creature.attackedTurn = state.turn; // 休息了，這回合不能攻擊
   ctx.events.push({ type: 'abilityUsed', player: a.player, source: 'creature', cardId: def.id, ability: skill.name });
-  resolveAbility(ctx, skill, source, target);
+  resolveAbility(ctx, { ...skill, effects: withBonus(state, a.player, skill.effects, { condition: skill.condition }) }, source, target);
 }
 
 function heroPower(ctx: Ctx, a: ActionOf<'heroPower'>): void {
@@ -422,7 +428,7 @@ function heroPower(ctx: Ctx, a: ActionOf<'heroPower'>): void {
   p.heroPowerUsedTurn = state.turn;
   p.heroPowerUses += 1;
   ctx.events.push({ type: 'abilityUsed', player: a.player, source: 'hero', cardId: hero.id, ability: power.name });
-  resolveAbility(ctx, { ...power, effects: withBonus(state, a.player, power.effects, { combo: power.combo }) }, source, target);
+  resolveAbility(ctx, { ...power, effects: withBonus(state, a.player, power.effects, { combo: power.combo, condition: power.condition }) }, source, target);
 }
 
 function evolveHero(ctx: Ctx, a: ActionOf<'evolveHero'>): void {
@@ -458,7 +464,8 @@ function triggerHeroEntry(ctx: Ctx, def: HeroEvolutionDef, player: PlayerId, cho
     if (chosen !== undefined) fail('TARGET_NOT_ALLOWED', `${def.name} 沒有進場效果，不需要指定目標`);
     return;
   }
-  const ability: Ability = { ...def.entry, cost: 0 };
+  const { condition, ...entry } = def.entry;
+  const ability: Ability = { ...entry, cost: 0, effects: withBonus(ctx.state, player, entry.effects, { condition }) };
   const source: AbilitySource = { kind: 'hero', player };
   if (ability.target.kind !== 'none' && legalTargets(ctx.state, ability, source).length === 0) {
     if (chosen !== undefined) fail('ILLEGAL_TARGET', `「${ability.name}」現在沒有可以指定的目標`);
@@ -473,6 +480,8 @@ function castSpell(ctx: Ctx, a: ActionOf<'castSpell'>): void {
   const { db, state } = ctx;
   const p = state.players[a.player];
   const card = handCard(p, a.card);
+  // 詠唱：包括這一個（出錯的話整個動作不算，計數也不會留下來）。
+  if (cardDef(db, card.cardId).kind === 'spell') p.spellsTotal = (p.spellsTotal ?? 0) + 1;
   const spell = spellAbility(db, state, a.player, card.cardId) ?? fail('WRONG_CARD_KIND', `${cardDef(db, card.cardId).name} 不是法術卡`);
 
   const source: AbilitySource = { kind: 'spell', player: a.player };
@@ -649,6 +658,9 @@ export function createEngine(db: CardDb) {
       fieldPlayedTurn: null,
       mulliganDone: false,
       playedThisTurn: 0,
+      summonedTotal: 0,
+      spellsTotal: 0,
+      fallenTotal: 0,
     });
     const initial: GameState = {
       rules,
@@ -668,6 +680,7 @@ export function createEngine(db: CardDb) {
       for (const player of [0, 1] as const) {
         const p = state.players[player];
         p.deck = config.players[player].deck.map((cardId) => ({ uid: state.nextUid++, cardId }));
+        p.deckTraits = deckTraits(db, config.players[player].deck);
         shuffle(ctx, p.deck);
       }
       state.firstPlayer = randomInt(ctx, 2) as PlayerId;

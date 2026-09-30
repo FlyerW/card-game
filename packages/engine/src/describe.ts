@@ -3,6 +3,8 @@ import type {
   Ability,
   CardDb,
   Color,
+  Condition,
+  ConditionalEffects,
   CreatureDef,
   CreatureModifier,
   DeathEffect,
@@ -69,6 +71,13 @@ export const KEYWORDS: Record<string, string> = {
   覺醒: '你的能量上限 8 以上時，多發動這一段（目標跟前面一樣）',
   連擊: '這回合你已經打出過別的牌（生物、進化、法術、道具、場地、英雄進化）時，多發動這一段',
   聖盾: '第一次受到傷害時，傷害變成 0，聖盾消失（中毒、HP 減半、消滅擋不住；沉默會拿掉聖盾）',
+  奇數牌組: '開局的牌組每張卡的費用都是奇數時，多發動這一段',
+  偶數牌組: '開局的牌組每張卡的費用都是偶數時，多發動這一段',
+  階梯: '開局的牌組有 N 種以上不同費用的卡時，多發動這一段',
+  獨一: '開局的牌組沒有同名的卡時，多發動這一段',
+  軍勢: '本局你召喚過 N 隻以上生物（包括這一隻，衍生物也算）時，多發動這一段',
+  詠唱: '本局你施放過 N 個以上法術（包括這一個）時，多發動這一段',
+  亡魂: '本局我方有 N 隻以上生物倒下（衍生物也算）時，多發動這一段',
   回合開始: '在場上時，你的每個回合開始時發動（抽牌之後）',
   回合結束: '在場上時，你的每個回合結束時發動',
   每當回復: '在場上時，每當你的英雄回復 ♥ 就發動',
@@ -236,26 +245,60 @@ export function describeAbility(ability: Ability, names: Names = ids, bonus = 0)
   if (ability.maxEnergyCost) parts.push(`能量上限 −${ability.maxEnergyCost}`);
   if (ability.rest) parts.push(keyword('休息'));
   if (ability.uses) parts.push(`每局 ${ability.uses} 次`);
-  return `${ability.name}（${parts.join('，')}）：${describeEffects(ability, names, bonus)}${describeCombo(ability.combo, names, bonus)}`;
+  return `${ability.name}（${parts.join('，')}）：${describeEffects(ability, names, bonus)}${describeCombo(ability.combo, names, bonus)}${describeCondition(ability.condition, names, bonus)}`;
 }
 
 /** 進場效果：「**進場** 火星：〔任意目標〕造成 2 傷害」。 */
 export function describeEntry(entry: EntryEffect, names: Names = ids, bonus = 0): string {
-  // 只有連擊才有效果的進場：「**進場** 暗刃：**連擊**時〔只打生物〕造成 3 傷害」。
-  if (entry.effects.length === 0 && entry.combo?.length) {
+  // 只有連擊（或條件）才有效果的進場：「**進場** 暗刃：**連擊**時〔只打生物〕造成 3 傷害」。
+  const only = entry.effects.length === 0 ? (entry.combo?.length ? { label: '連擊', effects: entry.combo } : entry.condition ? { label: conditionLabel(entry.condition.when), effects: entry.condition.effects } : null) : null;
+  if (only) {
     const target = describeTarget(entry.target);
-    return `${keyword('進場')} ${entry.name}：${keyword('連擊')}時${target === null ? '' : `〔${target}〕`}${entry.combo
+    return `${keyword('進場')} ${entry.name}：${keyword(only.label)}時${target === null ? '' : `〔${target}〕`}${only.effects
       .map((effect) => describeEffect(effect, names, bonus))
       .join('，')}`;
   }
-  return `${keyword('進場')} ${entry.name}：${describeEffects(entry, names, bonus)}${describeAwaken(entry.awaken, names, bonus)}${describeCombo(entry.combo, names, bonus)}`;
+  return `${keyword('進場')} ${entry.name}：${describeEffects(entry, names, bonus)}${describeAwaken(entry.awaken, names, bonus)}${describeCombo(entry.combo, names, bonus)}${describeCondition(entry.condition, names, bonus)}`;
 }
 
-/** 覺醒、連擊那一段：「；**覺醒**：再造成 3 傷害」。 */
+/** 條件的關鍵字：「奇數牌組」「階梯 10」「軍勢 6」…… */
+export function conditionLabel(when: Condition): string {
+  switch (when.kind) {
+    case 'odd':
+      return '奇數牌組';
+    case 'even':
+      return '偶數牌組';
+    case 'costs':
+      return `階梯 ${when.count}`;
+    case 'singleton':
+      return '獨一';
+    case 'summoned':
+      return `軍勢 ${when.count}`;
+    case 'spells':
+      return `詠唱 ${when.count}`;
+    case 'fallen':
+      return `亡魂 ${when.count}`;
+  }
+}
+
+/**
+ * 覺醒、連擊、條件那一段：「；**覺醒**：再造成 3 傷害」。這一段是多出來的，造成、抽、召喚前面加「再」，
+ * 不然「**奇數牌組**：造成 1 傷害」看起來像是改成 1 傷害。
+ */
 const describeExtra = (label: string, effects: readonly Effect[] | undefined, names: Names, bonus = 0) =>
-  effects?.length ? `；${keyword(label)}：${effects.map((effect) => describeEffect(effect, names, bonus)).join('，')}` : '';
+  effects?.length
+    ? `；${keyword(label)}：${effects
+        .map((effect, i) => {
+          const text = describeEffect(effect, names, bonus);
+          return i === 0 && /^(造成|抽|召喚)/.test(text) ? `再${text}` : text;
+        })
+        .join('，')}`
+    : '';
 const describeAwaken = (awaken: readonly Effect[] | undefined, names: Names, bonus = 0) => describeExtra('覺醒', awaken, names, bonus);
 const describeCombo = (combo: readonly Effect[] | undefined, names: Names, bonus = 0) => describeExtra('連擊', combo, names, bonus);
+/** 條件那一段：「；**奇數牌組**：再造成 3 傷害」。 */
+const describeCondition = (condition: ConditionalEffects | undefined, names: Names, bonus = 0) =>
+  condition ? describeExtra(conditionLabel(condition.when), condition.effects, names, bonus) : '';
 
 /** 遺言：「**遺言** 傳承：召喚 1 隻士兵（2/2）」。 */
 export const describeDeath = (death: DeathEffect, names: Names = ids, bonus = 0): string =>
@@ -345,7 +388,10 @@ export function describeCard(card: DeckCardDef, names: Names = ids): string[] {
       ];
     }
     case 'spell':
-      return [`${card.name}　${tag}・法術｜${cost}`, `${describeEffects(card, names)}${describeAwaken(card.awaken, names)}${describeCombo(card.combo, names)}`];
+      return [
+        `${card.name}　${tag}・法術｜${cost}`,
+        `${describeEffects(card, names)}${describeAwaken(card.awaken, names)}${describeCombo(card.combo, names)}${describeCondition(card.condition, names)}`,
+      ];
     case 'item':
       const stats = describeModifier(card);
       return [

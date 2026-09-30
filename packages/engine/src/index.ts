@@ -1,4 +1,5 @@
 export { createEngine } from './engine';
+export { conditionMet, conditionMetBy, deckConditionMet, deckTraits, isDeckCondition, type ConditionCounts } from './conditions';
 export type { AbilityRef, ApplyResult, Engine, GameConfig, PlayerConfig, Successor } from './engine';
 export { buildCardDb, CardDataError } from './db';
 export {

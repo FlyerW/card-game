@@ -139,6 +139,44 @@ export interface Ability {
   maxEnergyCost?: number;
   /** 連擊：這回合已經打出過別的牌時，接著發動的效果，目標相同。用在天生技上（生物技能不用）。 */
   combo?: Effect[];
+  /** 條件（第四彈）：條件成立時接著發動的效果，目標相同。天生技、生物技能、進場、法術都可以有。 */
+  condition?: ConditionalEffects;
+}
+
+/**
+ * 條件（第四彈「命運試煉」）：看開局的牌組長什麼樣（構築條件），或本局累積了多少（累積條件）。條件越難，效果越強。
+ * - odd／even：**奇數牌組**／**偶數牌組**——開局牌組每張卡的費用都是奇數／偶數
+ * - costs：**階梯 N**——開局牌組有 N 種以上不同費用的卡
+ * - singleton：**獨一**——開局牌組沒有同名的卡
+ * - summoned：**軍勢 N**——本局你召喚過 N 隻以上生物（包括這一隻，衍生物也算）
+ * - spells：**詠唱 N**——本局你施放過 N 個以上法術（包括這一個）
+ * - fallen：**亡魂 N**——本局我方有 N 隻以上生物倒下（衍生物也算）
+ */
+export type Condition =
+  | { kind: 'odd' }
+  | { kind: 'even' }
+  | { kind: 'costs'; count: number }
+  | { kind: 'singleton' }
+  | { kind: 'summoned'; count: number }
+  | { kind: 'spells'; count: number }
+  | { kind: 'fallen'; count: number };
+
+/** 條件成立時多發動的一段效果（寫法跟覺醒、連擊一樣：本來的效果之後接著發動，目標相同）。 */
+export interface ConditionalEffects {
+  when: Condition;
+  effects: Effect[];
+}
+
+/** 開局牌組的樣子（構築條件看這個）。 */
+export interface DeckTraits {
+  /** 有幾種不同費用。 */
+  costs: number;
+  /** 每張卡的費用都是奇數。 */
+  odd: boolean;
+  /** 每張卡的費用都是偶數。 */
+  even: boolean;
+  /** 沒有同名的卡。 */
+  singleton: boolean;
 }
 
 interface CardBase {
@@ -237,6 +275,8 @@ export interface SpellDef extends CardBase {
   awaken?: Effect[];
   /** 連擊時（這回合已經打出過別的牌）接著發動的效果，目標相同。 */
   combo?: Effect[];
+  /** 條件成立時接著發動的效果，目標相同（第四彈）。 */
+  condition?: ConditionalEffects;
 }
 
 export interface ItemDef extends CardBase {
@@ -435,6 +475,12 @@ export interface PlayerState {
   mulliganDone: boolean;
   /** 這回合打出了幾張牌（生物、進化、法術、道具、場地、英雄進化）；連擊看這個。回合開始歸零；舊存檔沒有（當作 0）。 */
   playedThisTurn?: number;
+  /** 開局牌組的樣子（構築條件看這個；對手看不到）。舊存檔沒有（構築條件都不成立）。 */
+  deckTraits?: DeckTraits;
+  /** 本局召喚過幾隻生物（衍生物也算）、施放過幾個法術、我方倒下過幾隻生物；累積條件看這些。舊存檔沒有（當作 0）。 */
+  summonedTotal?: number;
+  spellsTotal?: number;
+  fallenTotal?: number;
 }
 
 export type GameOverReason = 'heroDefeated' | 'deckOut' | 'concede';

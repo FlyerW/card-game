@@ -111,6 +111,6 @@ describe('覺醒', () => {
   });
 
   it('卡面寫出覺醒', () => {
-    expect(describeCard(db.cards.get('awake-bolt')!)).toContain('〔任意目標〕造成 2 傷害；**覺醒**：造成 3 傷害');
+    expect(describeCard(db.cards.get('awake-bolt')!)).toContain('〔任意目標〕造成 2 傷害；**覺醒**：再造成 3 傷害');
   });
 });

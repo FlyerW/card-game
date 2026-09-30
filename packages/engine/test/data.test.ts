@@ -283,8 +283,8 @@ describe('牌組驗證', () => {
   });
 });
 
-// 擴充卡包（還沒發布）：第二彈「龍脈覺醒」、第三彈「天機神殿」照同一套規則檢查。
-for (const [set, title] of [['awakening', '第二彈「龍脈覺醒」'], ['celestial', '第三彈「天機神殿」']] as const) {
+// 擴充卡包（還沒發布）：第二彈「龍脈覺醒」、第三彈「天機神殿」、第四彈「命運試煉」照同一套規則檢查。
+for (const [set, title] of [['awakening', '第二彈「龍脈覺醒」'], ['celestial', '第三彈「天機神殿」'], ['trials', '第四彈「命運試煉」']] as const) {
   describe(`${title}（還沒發布）`, () => {
     const preview = sampleDb(true);
     const expansion = [...preview.cards.values()].filter((card) => card.set === set);

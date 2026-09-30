@@ -22,6 +22,7 @@ PACKS = {
     'core': 'five radiant heroes standing together on a cliff at sunrise, each glowing with a different magic: white holy light, blue water, purple shadow, red fire and green nature, colorful sky',
     'awakening': 'a colossal dragon awakening and spreading its wings above glowing ley lines of the earth, golden and crimson light',
     'celestial': 'a floating celestial temple of brass gears and marble in the clouds, angels and clockwork machines around it, golden light',
+    'trials': 'a lone hero climbing a glowing stairway toward a colossal golden wheel of fate in a starry sky, trial arena below, violet and gold light',
 }
 WIDTH, HEIGHT = 300, 450
 

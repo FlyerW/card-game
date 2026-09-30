@@ -1,5 +1,5 @@
 import { RARITIES } from './types';
-import type { Ability, CardDb, Color, CreatureModifier, DeckCardDef, Effect, HeroDef, TargetSpec } from './types';
+import type { Ability, CardDb, Color, ConditionalEffects, CreatureModifier, DeckCardDef, Effect, HeroDef, TargetSpec } from './types';
 
 const COLORS: ReadonlySet<Color> = new Set(['white', 'blue', 'black', 'red', 'green']);
 
@@ -53,6 +53,14 @@ function usesTarget(effect: Effect): boolean {
   return ['damage', 'handDamage', 'bounce', 'heal', 'halveHp', 'destroy', 'destroyCreature', ...statuses].includes(effect.type);
 }
 
+/** 條件：數字是正整數，而且要有效果。 */
+function checkCondition(condition: ConditionalEffects, at: string): string[] {
+  const problems: string[] = [];
+  if (condition.effects.length === 0) problems.push(`${at}：條件沒有效果`);
+  if ('count' in condition.when && (!Number.isInteger(condition.when.count) || condition.when.count <= 0)) problems.push(`${at}：條件的數字必須是正整數`);
+  return problems;
+}
+
 function checkAbility(ability: Ability, where: string, isCreatureSkill: boolean): string[] {
   const problems: string[] = [];
   const at = `${where}「${ability.name}」`;
@@ -64,7 +72,9 @@ function checkAbility(ability: Ability, where: string, isCreatureSkill: boolean)
   // 連擊那一段跟本來的效果用同一個目標，合起來一起檢查；生物技能沒有連擊。
   if (isCreatureSkill && ability.combo) problems.push(`${at}：生物技能不能有連擊`);
   if (ability.combo?.length === 0) problems.push(`${at}：連擊沒有效果`);
-  const effects = [...ability.effects, ...(ability.combo ?? [])];
+  // 條件那一段也跟本來的效果用同一個目標。
+  if (ability.condition) problems.push(...checkCondition(ability.condition, at));
+  const effects = [...ability.effects, ...(ability.combo ?? []), ...(ability.condition?.effects ?? [])];
   if (effects.length === 0) problems.push(`${at}：沒有任何效果`);
   for (const effect of effects) {
     if (effect.type === 'summonToken' && effect.count <= 0) problems.push(`${at}：召喚的數量至少 1`);
@@ -123,8 +133,9 @@ function checkCard(
       for (const skill of card.skills) problems.push(...checkAbility(skill, where, true));
       if (card.entry) {
         // 覺醒、連擊跟本來的效果用同一個目標，合起來一起檢查；本來的效果可以是空的（只有連擊時才有效果）。
-        const { awaken = [], combo = [], ...entry } = card.entry;
-        problems.push(...checkAbility({ ...entry, effects: [...entry.effects, ...awaken, ...combo], cost: 0 }, `${where}的進場效果`, true));
+        const { awaken = [], combo = [], condition, ...entry } = card.entry;
+        if (condition) problems.push(...checkCondition(condition, `${where}的進場效果`));
+        problems.push(...checkAbility({ ...entry, effects: [...entry.effects, ...awaken, ...combo, ...(condition?.effects ?? [])], cost: 0 }, `${where}的進場效果`, true));
         if (card.entry.awaken?.length === 0) problems.push(`${where}：覺醒沒有效果`);
         if (card.entry.combo?.length === 0) problems.push(`${where}：連擊沒有效果`);
       }

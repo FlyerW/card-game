@@ -419,9 +419,9 @@ describe('卡包系列', () => {
   const preview = sampleDb(true);
   const setOfId = (id: string) => preview.cards.get(id)?.set ?? 'core';
 
-  it('平常只有基本卡包；預覽時多出還沒發布的第二彈、第三彈卡包', () => {
+  it('平常只有基本卡包；預覽時多出還沒發布的第二、三、四彈卡包', () => {
     expect(packSets(db).map((set) => set.id)).toEqual(['core']);
-    expect(packSets(preview).map((set) => set.id)).toEqual(['core', 'awakening', 'celestial']);
+    expect(packSets(preview).map((set) => set.id)).toEqual(['core', 'awakening', 'celestial', 'trials']);
   });
 
   it('開哪一彈的卡包，就只開到那一彈的卡', () => {

@@ -228,6 +228,13 @@ export const TEST_CARDS: DeckCardDef[] = [
   creature('awakener', [], { rarity: 'N', attack: 1, hp: 3, entry: { name: 'stir', target: NONE, effects: [{ type: 'draw', count: 1 }], awaken: [{ type: 'draw', count: 2 }] } }),
   { kind: 'spell', id: 'awake-bolt', name: 'awake-bolt', rarity: 'R', colors: [], cost: 1, target: ANY, effects: [{ type: 'damage', amount: 2 }], awaken: [{ type: 'damage', amount: 3 }] },
 
+  // 條件（第四彈）：成立時多發動一段
+  { kind: 'spell', id: 'odd-bolt', name: 'odd-bolt', rarity: 'R', colors: [], cost: 1, target: ANY, effects: [{ type: 'damage', amount: 1 }], condition: { when: { kind: 'odd' }, effects: [{ type: 'damage', amount: 3 }] } },
+  { kind: 'spell', id: 'chant-bolt', name: 'chant-bolt', rarity: 'R', colors: [], cost: 1, target: ANY, effects: [{ type: 'damage', amount: 1 }], condition: { when: { kind: 'spells', count: 2 }, effects: [{ type: 'damage', amount: 2 }] } },
+  { kind: 'spell', id: 'grave-call', name: 'grave-call', rarity: 'R', colors: [], cost: 1, target: NONE, effects: [{ type: 'draw', count: 1 }], condition: { when: { kind: 'fallen', count: 2 }, effects: [{ type: 'summonToken', token: 'imp-token', count: 2 }] } },
+  creature('marshal', [], { entry: { name: 'muster', target: NONE, effects: [], condition: { when: { kind: 'summoned', count: 3 }, effects: [{ type: 'buff', attack: 1, hp: 1, on: 'all' }] } } }),
+  creature('lone-knight', [{ name: 'solo', cost: 1, target: ANY, effects: [{ type: 'damage', amount: 1 }], condition: { when: { kind: 'singleton' }, effects: [{ type: 'draw', count: 1 }] } }]),
+
   // 顏色測試
   creature('red-imp', [hit('x', ANY, 1), hit('y', ANY, 1)], { colors: ['red'] }),
   creature('gold-griffin', [hit('x', ANY, 1), hit('y', ANY, 1)], { colors: ['red', 'green'] }),
@@ -249,6 +256,10 @@ export const TEST_HEROES: HeroDef[] = [
   {
     kind: 'hero', id: 'combo-hero', name: 'combo-hero', colors: ['black', 'red'], hp: 40,
     power: { name: 'cut', cost: 1, target: ANY, effects: [{ type: 'damage', amount: 1 }], combo: [{ type: 'damage', amount: 1 }] },
+  },
+  {
+    kind: 'hero', id: 'climber', name: 'climber', colors: ['red'], hp: 40,
+    power: { name: 'step', cost: 1, target: ANY, effects: [{ type: 'damage', amount: 1 }], condition: { when: { kind: 'costs', count: 3 }, effects: [{ type: 'damage', amount: 2 }] } },
   },
   {
     kind: 'hero', id: 'overlord', name: 'overlord', colors: ['black'], hp: 60, boss: true,

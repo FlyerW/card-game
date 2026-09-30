@@ -1,13 +1,11 @@
 // 每張卡的強度：所有英雄兩兩對戰（困難電腦用 BOT=hard），算「帶了這張卡的牌組」的勝率，也印出每個英雄的勝率。
-// 用法：BOT=hard npx tsx packages/sim/card-all.ts 100 [輸出 json]；CARD_PREVIEW=1 連還沒發布的卡包與英雄一起量。
+// 用法：BOT=hard npx tsx packages/sim/card-all.ts 100 [輸出 json]；CARD_PREVIEW=1 連還沒發布的卡包與英雄一起量，
+// CARD_SETS=core,trials 只量這幾彈。
 import { writeFileSync } from 'node:fs';
-import { ALL_HEROES, SAMPLE_HEROES, sampleDb } from '@card-game/engine';
 import { Worker } from 'node:worker_threads';
+import { db, HEROES } from './src/experiments';
 
 const perPair = Number(process.argv[2] ?? 300);
-const db = sampleDb(process.env.CARD_PREVIEW === '1');
-// 預覽時連還沒發布的英雄一起打。
-const HEROES = process.env.CARD_PREVIEW === '1' ? ALL_HEROES : SAMPLE_HEROES;
 const ids = HEROES.map((h) => h.id);
 const tasks = ids.flatMap((a, i) => ids.slice(i + 1).flatMap((b) => Array.from({ length: perPair / 50 }, (_, k) => ({ a, b, from: k * 50, to: k * 50 + 50 }))));
 const rows: { hero: string; deck: string[]; won: boolean }[] = [];

@@ -11,6 +11,7 @@ export const CARD_SETS: CardSet[] = [
   { id: 'core', name: '基本卡包', released: true },
   { id: 'awakening', name: '龍脈覺醒', released: false },
   { id: 'celestial', name: '天機神殿', released: false },
+  { id: 'trials', name: '命運試煉', released: false },
 ];
 
 /** 卡片的系列：沒寫就是基本卡包。 */

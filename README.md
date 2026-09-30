@@ -26,12 +26,13 @@
 - [x] 牌組清單：同一個英雄可以存很多副、選開局用哪一副；牌組代碼可以複製給朋友（缺卡的不能開局）；伺服器帳號存在伺服器
 - [x] 對局紀錄：每一局記進 `data/games.jsonl`，`npm run game-stats` 看真人對局的英雄與卡牌勝率
 - [x] 儲值：綠界 ECPay，NT$30 = 100 金幣（見下面「儲值」）
-- [x] 第二彈「龍脈覺醒」、第三彈「天機神殿」（新機制聖盾、連擊，見 [design.md](docs/design.md)）各 100 張卡、5 個新英雄，還沒發布，預覽看得到
+- [x] 第二彈「龍脈覺醒」、第三彈「天機神殿」（新機制聖盾、連擊）、第四彈「命運試煉」（條件觸發：奇數／偶數牌組、獨一、階梯、軍勢、詠唱、亡魂），
+  各 100 張卡、5 個新英雄，見 [design.md](docs/design.md)；還沒發布，預覽看得到
 - [x] 卡牌插圖：AI 畫的試玩用插圖（`python3 packages/web/scripts/art.py`，見 [docs/art.md](docs/art.md)）
 - [x] 卡背：每副牌組可以選（經典，以及五個顏色各一種：聖光、潮汐、冥府、烈焰、翠林），牌庫與對手手牌會顯示，連線對戰對手也看得到（`packages/web/src/card-backs.ts`）
 - [x] 背景音樂與音效：瀏覽器即時合成（[`packages/web/src/music.ts`](packages/web/src/music.ts)），各有開關
 
-卡牌見 [docs/cards.md](docs/cards.md)（總覽與關鍵字），每一彈各一份：[基本卡包](docs/cards-set1-core.md)、[龍脈覺醒](docs/cards-set2-awakening.md)、[天機神殿](docs/cards-set3-celestial.md)。
+卡牌見 [docs/cards.md](docs/cards.md)（總覽與關鍵字），每一彈各一份：[基本卡包](docs/cards-set1-core.md)、[龍脈覺醒](docs/cards-set2-awakening.md)、[天機神殿](docs/cards-set3-celestial.md)、[命運試煉](docs/cards-set4-trials.md)。
 
 ## 開發
 

@@ -2,6 +2,7 @@ import { buildCardDb } from '../db';
 import type { Ability, DeckCardDef, HeroDef, TargetSpec } from '../types';
 import { AWAKENING_CARDS, AWAKENING_HEROES } from './awakening';
 import { CELESTIAL_CARDS, CELESTIAL_HEROES } from './celestial';
+import { TRIALS_CARDS, TRIALS_HEROES } from './trials';
 import { BOSS_HEROES } from './bosses';
 import { isReleased, setOf } from './sets';
 
@@ -801,13 +802,13 @@ const CORE_CARDS: DeckCardDef[] = [
 
 
 /** 全部的卡，包括還沒發布的系列（預覽、模擬、測試用）。 */
-export const ALL_CARDS: DeckCardDef[] = [...CORE_CARDS, ...AWAKENING_CARDS, ...CELESTIAL_CARDS];
+export const ALL_CARDS: DeckCardDef[] = [...CORE_CARDS, ...AWAKENING_CARDS, ...CELESTIAL_CARDS, ...TRIALS_CARDS];
 
 /** 已經發布的卡：遊戲、商店、組牌都只用這些。 */
 export const SAMPLE_CARDS: DeckCardDef[] = ALL_CARDS.filter((card) => isReleased(setOf(card)));
 
 /** 全部的英雄，包括還沒發布的系列；BOSS 另外放。 */
-export const ALL_HEROES: HeroDef[] = [...CORE_HEROES, ...AWAKENING_HEROES, ...CELESTIAL_HEROES];
+export const ALL_HEROES: HeroDef[] = [...CORE_HEROES, ...AWAKENING_HEROES, ...CELESTIAL_HEROES, ...TRIALS_HEROES];
 
 /** 已經發布的英雄：選角、電腦對手、模擬都只用這些。 */
 export const SAMPLE_HEROES: HeroDef[] = ALL_HEROES.filter((hero) => isReleased(hero.set ?? 'core'));

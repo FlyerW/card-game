@@ -30,10 +30,17 @@ export const BASE_HP = 40;
 export const HERO_HPS = [35, 40, 45] as const;
 const simHero = (hp: number): HeroDef => ({ kind: 'hero', id: `sim-${hp}`, name: `模擬英雄 ${hp}`, colors: ALL_COLORS, hp });
 
-/** CARD_PREVIEW=1：連還沒發布的卡包系列一起模擬（發布前測強度用）。 */
+/**
+ * CARD_PREVIEW=1：連還沒發布的卡包系列一起模擬（發布前測強度用）。
+ * CARD_SETS=core,trials：只用這幾彈的卡與英雄（衍生物大多在基本卡包，通常要帶 core）。
+ */
 const PREVIEW = process.env.CARD_PREVIEW === '1';
-const CARDS = PREVIEW ? ALL_CARDS : SAMPLE_CARDS;
-export const db = buildCardDb(CARDS, [...(PREVIEW ? ALL_HEROES : SAMPLE_HEROES), ...HERO_HPS.map(simHero)]);
+const SETS = process.env.CARD_SETS?.split(',');
+const inSets = (item: { set?: string }) => SETS === undefined || SETS.includes(item.set ?? 'core');
+const CARDS = (PREVIEW || SETS ? ALL_CARDS : SAMPLE_CARDS).filter(inSets);
+/** 這次模擬的英雄（不含模擬專用的英雄）。 */
+export const HEROES: HeroDef[] = (PREVIEW || SETS ? ALL_HEROES : SAMPLE_HEROES).filter(inSets);
+export const db = buildCardDb(CARDS, [...HEROES, ...HERO_HPS.map(simHero)]);
 export const engine = createEngine(db);
 
 export interface Experiment {
