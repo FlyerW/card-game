@@ -4,3 +4,4 @@ coverage/
 *.log
 data/
 logs/
+__pycache__/
