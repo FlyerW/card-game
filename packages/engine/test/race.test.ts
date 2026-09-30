@@ -84,7 +84,7 @@ describe('元素：元素之力', () => {
   });
 });
 
-describe('植物：扎根', () => {
+describe('植物：再生（種族特色）', () => {
   it('你的回合開始時回復 1♥', () => {
     let { state, a } = start();
     place(state, a, 0, 'sapling', { damage: 3 });
@@ -138,7 +138,7 @@ describe('種族特色的強度', () => {
     expect(attackPower(engine.db, state, peasant)).toBe(2);
   });
 
-  it('扎根 3：回合開始回復 3', () => {
+  it('再生 3：回合開始回復 3', () => {
     let { state, a } = start();
     const oak = place(state, a, 0, 'old-oak');
     oak.damage = 5;

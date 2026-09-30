@@ -41,7 +41,7 @@ export const TRAIT_NAMES: Record<Race, string> = {
   beast: '猛撲',
   undead: '不死',
   elemental: '元素之力',
-  plant: '扎根',
+  plant: '再生', // 植物的種族特色就是再生（以前叫扎根，效果一樣）
   dragon: '龍鱗',
   machine: '堅固',
   angel: '光輝',
@@ -59,7 +59,6 @@ export const KEYWORDS: Record<string, string> = {
   猛撲: '召喚當回合就能攻擊生物（不能打英雄）',
   不死: '第一次被打倒時留下 N♥',
   元素之力: '技能、進場與遺言的傷害 +N',
-  扎根: '你的回合開始時回復 N♥',
   龍鱗: '不會中異常狀態',
   堅固: '受到的傷害 −N',
   光輝: '召喚時你的英雄回復 N♥',
@@ -327,13 +326,16 @@ export const describeTrigger = (trigger: TriggeredEffect, names: Names = ids, bo
 /** 種族特色與關鍵字放在同一行：「**同袍 2**、**速攻**、**吸血**」。 */
 function describeTraits(card: CreatureDef): string[] {
   const words: string[] = [];
-  const trait = describeTrait(card);
+  // 植物的種族特色就是再生：卡上另外寫的再生合在一起，寫成一個「再生 N」。
+  const plantRegen = card.race === 'plant' ? traitOf(card) : 0;
+  const trait = plantRegen > 0 ? null : describeTrait(card);
   if (trait) words.push(trait);
   // 進化卡都有速攻。
   if (card.keywords?.includes('haste') || card.evolvesFrom !== undefined) words.push(keyword('速攻'));
   if (card.keywords?.includes('lifesteal')) words.push(keyword('吸血'));
   if (card.keywords?.includes('shield')) words.push(keyword('聖盾'));
-  if (card.regenerate) words.push(keyword(`再生 ${card.regenerate}`));
+  const regenerate = plantRegen + (card.regenerate ?? 0);
+  if (regenerate > 0) words.push(keyword(`再生 ${regenerate}`));
   return words.length > 0 ? [words.join('、')] : [];
 }
 

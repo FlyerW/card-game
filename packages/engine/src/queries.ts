@@ -166,7 +166,7 @@ export const damageReduction = (db: CardDb, state: GameState, creature: Creature
   aura(db, state, creature.owner).damageReduction +
   raceTrait(db, state, creature, 'machine');
 
-/** 再生：卡上的再生與植物的「扎根」（沉默時失效），加上英雄被動與場地卡給的。 */
+/** 再生：卡上的再生與植物的種族特色「再生」（沉默時失效），加上英雄被動與場地卡給的。 */
 export const regeneration = (db: CardDb, state: GameState, creature: Creature): number =>
   (isSilenced(state, creature) ? 0 : (creatureDef(db, creature).regenerate ?? 0)) +
   raceTrait(db, state, creature, 'plant') +
