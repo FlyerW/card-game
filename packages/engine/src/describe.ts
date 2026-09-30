@@ -145,18 +145,29 @@ export function describeTarget(spec: TargetSpec): string | null {
   }
 }
 
-/** 把卡牌 id 換成名字；召喚衍生物的說明用得到。 */
-export type Names = (id: string) => string;
+/** 把卡牌 id 換成名字；召喚衍生物的說明用得到。card：查卡片資料（進化生物要知道基礎形態的數值）。 */
+export type Names = ((id: string) => string) & { card?: (id: string) => DeckCardDef | undefined };
 const ids: Names = (id) => id;
 
 /** 卡牌 id 換成名字；衍生物帶上數值（例如「烈陽騎兵（1/1、速攻）」），看得出召喚出來的是什麼。 */
 export function cardNames(db: CardDb): Names {
-  return (id) => {
+  const names: Names = (id) => {
     const card = db.cards.get(id);
     if (card?.kind === 'creature' && card.token) return `${card.name}（${card.attack}/${card.hp}${card.keywords?.includes('haste') ? `、${keyword('速攻')}` : ''}）`;
     return card?.name ?? db.heroes.get(id)?.name ?? id;
   };
+  names.card = (id) => db.cards.get(id);
+  return names;
 }
+
+/** 進化生物比基礎形態多了多少（進化時照這個加上去，已受的傷害與指示物保留）；不是進化生物或查不到基礎形態就是 null。 */
+export function evolutionGain(card: DeckCardDef, base: DeckCardDef | undefined): { attack: number; hp: number } | null {
+  if (card.kind !== 'creature' || card.stage === 0 || base?.kind !== 'creature') return null;
+  return { attack: card.attack - base.attack, hp: card.hp - base.hp };
+}
+
+/** +3、-1、+0。 */
+export const signed = (n: number) => (n < 0 ? `${n}` : `+${n}`);
 
 /** 傷害的數字；有加成（元素之力）時寫成「7 (+1)」。 */
 const amountWith = (amount: number, bonus: number) => (bonus > 0 ? `${amount} (+${bonus})` : `${amount}`);
@@ -363,6 +374,13 @@ function describeFieldTriggers(field: Extract<DeckCardDef, { kind: 'field' }>): 
 }
 
 
+/** 生物的身材：「⚔ 5｜♥ 6」；進化生物寫成加多少：「⚔ +3｜♥ +3（進化後 5/6）」。 */
+function statLine(card: CreatureDef, names: Names): string {
+  const gain = card.evolvesFrom ? evolutionGain(card, names.card?.(card.evolvesFrom)) : null;
+  if (!gain) return `⚔ ${card.attack}｜♥ ${card.hp}`;
+  return `⚔ ${signed(gain.attack)}｜♥ ${signed(gain.hp)}（進化後 ${card.attack}/${card.hp}）`;
+}
+
 /** 整張卡的說明，第一行是標題，其餘是效果。費用一律寫成「能量 N」；進化生物寫的是進化要花的能量。 */
 export function describeCard(card: DeckCardDef, names: Names = ids): string[] {
   const tag = `${card.rarity}・${describeColors(card.colors)}`;
@@ -379,7 +397,7 @@ export function describeCard(card: DeckCardDef, names: Names = ids): string[] {
       if (card.kin) triggers.unshift(`我方每有另一隻${RACE_NAMES[card.kin.race]}，牠 ⚔ +${card.kin.attack}`);
       const skills = card.skills.map((skill) => describeAbility(skill, names, bonus));
       return [
-        `${card.name}　${tag}${race}・${stage}｜${cost}｜⚔ ${card.attack}｜♥ ${card.hp}`,
+        `${card.name}　${tag}${race}・${stage}｜${cost}｜${statLine(card, names)}`,
         ...describeTraits(card),
         ...entry,
         ...triggers,
@@ -404,9 +422,9 @@ export function describeCard(card: DeckCardDef, names: Names = ids): string[] {
       return [`${card.name}　${tag}・場地｜${cost}`, ...(own ? [own] : []), ...describeFieldTriggers(card)];
     }
     case 'heroEvolution': {
-      const lines = [`${card.name}　${tag}・英雄進化｜${cost}｜由${names(card.evolvesFrom)}進化`];
+      // 英雄加的 HP 跟生物的身材一樣寫在標題（卡面右下角也有），不另外一行。
+      const lines = [`${card.name}　${tag}・英雄進化｜${cost}｜♥ +${card.hpBonus}｜由${names(card.evolvesFrom)}進化`];
       if (card.entry) lines.push(describeEntry(card.entry, names));
-      lines.push(`英雄 ♥ 上限 +${card.hpBonus}`);
       if (card.power) lines.push(`天生技換成 ${describeAbility(card.power, names)}`);
       if (card.alternatePower) lines.push(`每發動一次就跟 ${describeAbility(card.alternatePower, names)} 輪流`);
       if (card.passive) lines.push(`多一個被動 ${describePassive(card.passive, names)}`);

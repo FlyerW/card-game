@@ -319,7 +319,8 @@ const CORE_CARDS: DeckCardDef[] = [
     effects: [{ type: 'damageEnemyCreatures', amount: 6 }, { type: 'paralyze', all: true }, { type: 'draw', count: 2 }],
   },
   {
-    kind: 'item', id: 'frost-staff', name: '冰霜法杖', rarity: 'R', colors: ['blue'], cost: 2,
+    // 2 → 1 費：模擬裡一直在 44%–45%；道具不加數值，只給一個 2 能量的麻痺技能。
+    kind: 'item', id: 'frost-staff', name: '冰霜法杖', rarity: 'R', colors: ['blue'], cost: 1,
     skills: [{ name: '冰凍', cost: 2, target: CREATURE, effects: [{ type: 'paralyze' }] }],
   },
   { kind: 'field', id: 'wellspring', name: '知識之泉', rarity: 'R', colors: ['blue'], cost: 2, extraDraw: 1 },

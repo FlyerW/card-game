@@ -1,4 +1,4 @@
-import { explainKeyword, RACE_NAMES, type Color, type DeckCardDef, type HeroDef } from '@card-game/engine';
+import { evolutionGain, explainKeyword, RACE_NAMES, signed, type Color, type DeckCardDef, type HeroDef } from '@card-game/engine';
 
 // 牌桌與組牌畫面共用的小工具。
 
@@ -35,9 +35,8 @@ export function logo(): string {
 export function kindLabel(def: DeckCardDef): string {
   switch (def.kind) {
     case 'creature': {
-      // 生物寫種族；進化卡多標「進化」。
-      const race = def.race ? RACE_NAMES[def.race] : '生物';
-      return def.stage === 0 ? race : `${race}・進化`;
+      // 生物寫種族。進化卡不另外標：費用寫成「+3」、身材寫成「⚔+3 ♥+3」就看得出來，卡面也放不下。
+      return def.race ? RACE_NAMES[def.race] : '生物';
     }
     case 'spell':
       return '法術';
@@ -65,6 +64,12 @@ export interface FaceOptions {
   mark?: string;
 }
 
+/** 查卡片資料：進化生物的卡面要知道基礎形態的數值。main.ts 啟動時設好。 */
+let findCard: (id: string) => DeckCardDef | undefined = () => undefined;
+export function useCards(find: (id: string) => DeckCardDef | undefined): void {
+  findCard = find;
+}
+
 /**
  * 卡面：左上角費用，上排正中間名字、右上角顏色，中間插圖，下排左邊稀有度與種類、右邊 ⚔ 與 ♥。
  * 插圖是 art/<id>.webp；還沒有圖時顯示卡片顏色的底色。UR 英雄沒有費用，只寫 ♥。
@@ -76,12 +81,16 @@ export function cardFace(def: DeckCardDef | HeroDef, options: FaceOptions = {}):
   const evo = def.kind === 'creature' && def.stage > 0;
   const cost = isHero ? '' : `<span class="c-cost${evo ? ' evo' : ''}">${evo ? '+' : ''}${def.cost}</span>`;
   const kind = isHero ? '英雄' : kindLabel(def);
+  // 進化生物跟費用一樣寫成加多少：「⚔+3 ♥+3」。
+  const gain = def.kind === 'creature' && def.evolvesFrom ? evolutionGain(def, findCard(def.evolvesFrom)) : null;
   const stats =
     def.kind === 'creature'
-      ? `<span class="c-hp"><span class="c-atk">⚔</span>${def.attack} <span class="c-heart">♥</span>${def.hp}</span>`
+      ? `<span class="c-hp"><span class="c-atk">⚔</span>${gain ? signed(gain.attack) : def.attack} <span class="c-heart">♥</span>${gain ? signed(gain.hp) : def.hp}</span>`
       : isHero
         ? `<span class="c-hp"><span class="c-heart">♥</span>${def.hp}</span>`
-        : '';
+        : def.kind === 'heroEvolution'
+          ? `<span class="c-hp"><span class="c-heart">♥</span>+${def.hpBonus}</span>` // 英雄進化：英雄的 ♥ 上限加多少
+          : '';
   const tint = def.colors[0] ?? 'none';
   return `<button class="${classes}" ${options.attrs ?? ''}>
       ${cost}<span class="c-name">${esc(def.name)}</span>${pips(def.colors)}

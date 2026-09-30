@@ -116,7 +116,7 @@ import { music, type Sound } from './music';
 import { ONLINE_AVAILABLE, OnlineClient } from './online';
 import { scriptedTurn, startTutorial, STEPS, TUTORIAL_KEY } from './tutorial';
 import { newShop, ownedOf, shopClick, shopScreen, walletBar, type Shop } from './shop';
-import { artUrl, cardFace, detailLines, esc, logo, pips, rich } from './ui';
+import { artUrl, cardFace, detailLines, esc, logo, pips, rich, useCards } from './ui';
 import './style.css';
 
 /**
@@ -128,6 +128,7 @@ const PAGE_PREVIEW = new URLSearchParams(location.search).has('preview') || (win
 const ACCOUNT_PREVIEW = !PAGE_PREVIEW && loadSession()?.account.preview === true;
 const PREVIEW = PAGE_PREVIEW || ACCOUNT_PREVIEW;
 const db = sampleDb(PREVIEW);
+useCards((id) => db.cards.get(id));
 /** 選得到的英雄（預覽時包括還沒發布的系列）；BOSS 不算。 */
 const HEROES = [...db.heroes.values()].filter((hero) => !hero.boss);
 const engine = createEngine(db);
