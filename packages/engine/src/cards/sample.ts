@@ -169,7 +169,7 @@ const CORE_CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'archangel', name: '天使長', rarity: 'UR', colors: ['white'], race: 'angel',
-    stage: 0, cost: 10, attack: 12, hp: 13,
+    stage: 0, cost: 10, attack: 10, hp: 12,
     entry: { name: '聖光降臨', target: ALLY, effects: [{ type: 'heal', amount: 5 }] },
     skills: [
       { name: '天使之翼', cost: 2, target: ALLY, effects: [{ type: 'heal', amount: 5 }] },
@@ -178,7 +178,7 @@ const CORE_CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'titan-of-light', name: '光之巨神', rarity: 'SR', colors: ['white'], race: 'angel', trait: 4,
-    stage: 0, cost: 11, attack: 11, hp: 14,
+    stage: 0, cost: 11, attack: 10, hp: 14,
     entry: { name: '神聖光輝', target: NONE, effects: [{ type: 'silence', all: true }] },
     skills: [{ name: '聖盾', cost: 0, rest: true, target: NONE, effects: [{ type: 'taunt' }, { type: 'buff', attack: 0, hp: 2, on: 'self' }] }],
   },
@@ -260,7 +260,7 @@ const CORE_CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'void-scholar', name: '虛空學者', rarity: 'SR', colors: ['blue'], race: 'human', trait: 0,
-    stage: 0, cost: 6, attack: 6, hp: 9,
+    stage: 0, cost: 6, attack: 5, hp: 9,
     skills: [{ name: '虛空奔流', cost: 0, maxEnergyCost: 4, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] }],
   },
   {
@@ -282,7 +282,7 @@ const CORE_CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'sea-serpent', name: '海龍', rarity: 'SR', colors: ['blue'], race: 'dragon',
-    stage: 0, cost: 6, attack: 6, hp: 9,
+    stage: 0, cost: 6, attack: 6, hp: 8,
     skills: [{ name: '深海呼喚', cost: 3, target: NONE, effects: [{ type: 'draw', count: 2 }] }],
   },
   {
@@ -403,7 +403,7 @@ const CORE_CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'lord-of-decay', name: '腐朽之王', rarity: 'SR', colors: ['black'], race: 'undead', trait: 2,
-    stage: 0, cost: 9, attack: 9, hp: 12,
+    stage: 0, cost: 9, attack: 8, hp: 12,
     entry: { name: '腐朽之息', target: NONE, effects: [{ type: 'poison', amount: 2, all: true }] },
     skills: [hit('靈魂收割', 5, HERO, 7)],
   },
@@ -474,7 +474,7 @@ const CORE_CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'inferno-demon', name: '炎魔', rarity: 'UR', colors: ['red'], race: 'elemental',
-    stage: 0, cost: 11, attack: 13, hp: 14,
+    stage: 0, cost: 11, attack: 12, hp: 12,
     entry: { name: '煉獄降臨', target: HERO, effects: [{ type: 'damage', amount: 4 }, { type: 'damageEnemyCreatures', amount: 2 }] },
     skills: [hit('爆炎', 4, DIAGONAL, 6), hit('末日烈焰', 6, HERO, 8)],
   },
@@ -501,7 +501,7 @@ const CORE_CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'grove-bear-king', name: '森林熊王', rarity: 'SR', colors: ['green'], race: 'beast',
-    stage: 1, evolvesFrom: 'grove-bear', cost: 3, attack: 7, hp: 10,
+    stage: 1, evolvesFrom: 'grove-bear', cost: 3, attack: 7, hp: 9,
     skills: [{ name: '巨力', cost: 4, target: NONE, effects: [{ type: 'buff', attack: 3, hp: 5, on: 'self' }] }],
   },
   {
@@ -541,24 +541,24 @@ const CORE_CARDS: DeckCardDef[] = [
   },
   {
     kind: 'creature', id: 'vine-colossus', name: '藤蔓巨像', rarity: 'SR', colors: ['green'], race: 'plant', trait: 2,
-    stage: 0, cost: 6, attack: 6, hp: 10,
+    stage: 0, cost: 6, attack: 4, hp: 10,
     skills: [{ name: '盤根', cost: 2, target: NONE, effects: [{ type: 'gainMaxEnergy', amount: 1 }] }],
   },
   {
     kind: 'creature', id: 'elder-treant', name: '萬年樹人', rarity: 'SR', colors: ['green'], race: 'plant',
-    stage: 0, cost: 7, attack: 7, hp: 10, regenerate: 2,
+    stage: 0, cost: 7, attack: 6, hp: 10, regenerate: 2,
     skills: [{ name: '年輪', cost: 0, rest: true, target: NONE, effects: [{ type: 'buff', attack: 0, hp: 4, on: 'self' }] }],
   },
   {
     // 原本進場是能量上限 +1，但打得出 10 費時下回合就到上限 12 了，沒有用；改成全體回復。
     kind: 'creature', id: 'mountain-giant', name: '山嶺巨人', rarity: 'SR', colors: ['green'], race: 'elemental',
-    stage: 0, cost: 10, attack: 10, hp: 13,
+    stage: 0, cost: 10, attack: 9, hp: 13,
     entry: { name: '大地之息', target: NONE, effects: [{ type: 'healAll', amount: 5 }] },
     skills: [{ name: '山崩', cost: 4, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }],
   },
   {
     kind: 'creature', id: 'earth-titan', name: '大地泰坦', rarity: 'UR', colors: ['green'], race: 'elemental',
-    stage: 0, cost: 12, attack: 13, hp: 14,
+    stage: 0, cost: 12, attack: 12, hp: 14,
     entry: { name: '震地', target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 1 }] },
     skills: [hit('泰坦之拳', 5, CREATURE, 7), { name: '地裂', cost: 4, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 3 }] }],
   },
@@ -702,7 +702,7 @@ const CORE_CARDS: DeckCardDef[] = [
   // ── 紅綠 ──
   {
     kind: 'creature', id: 'ancient-dragon', name: '遠古巨龍', rarity: 'UR', colors: ['red', 'green'], race: 'dragon',
-    stage: 0, cost: 8, attack: 10, hp: 11,
+    stage: 0, cost: 8, attack: 8, hp: 10,
     skills: [
       { name: '龍息', cost: 3, target: NONE, effects: [{ type: 'damageEnemyCreatures', amount: 2 }] },
       hit('焚天', 6, OPPOSITE, 8),

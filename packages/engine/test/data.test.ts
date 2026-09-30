@@ -114,6 +114,18 @@ describe('範例卡池', () => {
     }
   });
 
+  it('生物的攻擊＋HP 最多 2N+2（N 是費用；進化生物用基礎加進化的總費用），每一彈都一樣', () => {
+    // 有負面效果（例如召喚時對自己不利）的卡可以超過，寫進這裡並附上理由。目前沒有。
+    const drawbacks = new Set<string>();
+    const all = sampleDb(true);
+    for (const card of all.cards.values()) {
+      if (card.kind !== 'creature' || card.token || drawbacks.has(card.id)) continue;
+      const base = card.stage > 0 ? all.cards.get(card.evolvesFrom!) : undefined;
+      const cost = card.cost + (base?.cost ?? 0);
+      expect(card.attack + card.hp, `${card.name}（${cost} 費 ${card.attack}/${card.hp}）`).toBeLessThanOrEqual(2 * cost + 2);
+    }
+  });
+
   it('無色生物比同費用、同稀有度的有色生物弱一點', () => {
     const stats = (card: DeckCardDef) => (card.kind === 'creature' ? card.attack + card.hp : 0);
     // 有進場效果、關鍵字、再生、持續效果或遺言的生物，數值本來就扣過，不拿來比。

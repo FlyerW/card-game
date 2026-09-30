@@ -87,7 +87,7 @@ const CARDS: DeckCardDef[] = [
   { kind: 'spell', id: 'divine-punishment', name: '天罰', rarity: 'SR', colors: ['white'], cost: 6, target: NONE, effects: [aoe(4), heal(4)] },
   {
     kind: 'creature', id: 'celestial-archangel', name: '天界大天使', rarity: 'UR', colors: ['white'], race: 'angel', trait: 4,
-    stage: 0, cost: 9, attack: 9, hp: 12, keywords: ['shield'],
+    stage: 0, cost: 9, attack: 8, hp: 12, keywords: ['shield'],
     entry: { name: '天界降臨', target: NONE, effects: [shieldAll, { type: 'buff', attack: 1, hp: 1, on: 'all' }] },
     skills: [hit('天界審判', 4, ANY, 6)],
   },
