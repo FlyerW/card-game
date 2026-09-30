@@ -31,7 +31,22 @@ export type ClientMessage =
   /** 排位賽排隊：用帳號的 session token 驗證身分，牌組只能放收藏裡有的卡。 */
   | { t: 'queue'; token: string; heroId: string; deck: string[]; back?: string }
   /** 取消排隊。 */
-  | { t: 'unqueue' };
+  | { t: 'unqueue' }
+  /** 在房間裡說一句話（最多 CHAT_LIMIT 個字），雙方都看得到。 */
+  | { t: 'chat'; text: string };
+
+/** 房間聊天室的一句話。 */
+export interface ChatLine {
+  seat: PlayerId;
+  name: string;
+  text: string;
+  /** 伺服器收到的時間（毫秒）。 */
+  at: number;
+}
+
+/** 一句話最多幾個字；房間最多留幾句（斷線回來時補給他）。 */
+export const CHAT_LIMIT = 100;
+export const CHAT_KEPT = 50;
 
 /** 一場排位賽之後，給一位玩家看的結果。 */
 export interface RankedReport {
@@ -53,6 +68,8 @@ export type ServerMessage =
   | { t: 'ranked'; report: RankedReport }
   /** 對局的最新局面：你的視角、你現在能做的動作、剛剛發生的事件（已經過濾掉你不該看到的）。 */
   | { t: 'state'; view: PlayerView; legal: Action[]; events: GameEvent[] }
+  /** 聊天室：新的幾句話；replace 是斷線回來時整份換掉。 */
+  | { t: 'chat'; lines: ChatLine[]; replace: boolean }
   /** 動作被拒絕，或房間不存在等等。fatal 表示這個連線回不去了，要回到開局畫面。 */
   | { t: 'error'; message: string; fatal?: boolean };
 

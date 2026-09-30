@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { DEFAULT_RULES, eventsFor, validateDeck, type Engine, type GameEvent, type GameState, type PlayerId } from '@card-game/engine';
 import { cleanBack, emptyTally, gameSummary, tallyEvents, type GameSummary, type GameTally } from '@card-game/economy';
 import { recordFromState, type GameLog } from './gamelog';
-import { CODE_ALPHABET, CODE_LENGTH, type ClientMessage, type RankedReport, type SeatInfo, type ServerMessage } from './protocol';
+import { CHAT_KEPT, CHAT_LIMIT, CODE_ALPHABET, CODE_LENGTH, type ChatLine, type ClientMessage, type RankedReport, type SeatInfo, type ServerMessage } from './protocol';
 
 // 房間與對局。不碰網路：一條連線就是一個能收訊息的 Client，方便測試。
 //
@@ -53,6 +53,8 @@ interface Room {
   /** 這局什麼時候開始、記進對局紀錄了沒。 */
   startedAt: number;
   logged: boolean;
+  /** 聊天室最近的幾句話（再來一局也留著）；舊存檔的房間沒有。 */
+  chat?: ChatLine[];
 }
 
 interface QueueEntry {
@@ -127,6 +129,8 @@ export class Lobby {
         return this.enqueue(client, message);
       case 'unqueue':
         return this.dequeue(client);
+      case 'chat':
+        return this.say(client, message.text);
       default:
         client.send({ t: 'error', message: '看不懂這個請求' });
     }
@@ -210,6 +214,22 @@ export class Lobby {
     this.where.set(client, { room, seat: seatNo });
     this.broadcastRoom(room);
     if (room.state) this.sendState(room, seatNo, []);
+    if (room.chat?.length) client.send({ t: 'chat', lines: room.chat, replace: true });
+  }
+
+  /** 聊天室：去掉控制字元、最多 CHAT_LIMIT 個字，傳給房間裡的兩個人。流量限制在 server.ts。 */
+  private say(client: Client, text: unknown): void {
+    const at = this.where.get(client);
+    if (!at) return client.send({ t: 'error', message: '不在房間裡，沒辦法聊天' });
+    const clean = String(text ?? '')
+      .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e]/g, '')
+      .trim()
+      .slice(0, CHAT_LIMIT);
+    if (!clean) return;
+    const seat = at.room.seats[at.seat];
+    const line: ChatLine = { seat: at.seat, name: seat?.name ?? '玩家', text: clean, at: this.now() };
+    at.room.chat = [...(at.room.chat ?? []), line].slice(-CHAT_KEPT);
+    for (const each of at.room.seats) each?.client?.send({ t: 'chat', lines: [line], replace: false });
   }
 
   private act(client: Client, action: unknown): void {

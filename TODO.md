@@ -13,8 +13,10 @@ Google 登入、Play 商店的 App、綠界的付款通知都要固定的 https 
 
 - [ ] 👤 買網域（一年約 US$10–15，例如 Cloudflare、Namecheap、Gandi）
 - [ ] 👤 租雲端主機（每月約幾美元起的小型 VPS 就夠，或繼續用這台機器，但要改成固定的 Cloudflare Tunnel）
-- [ ] 🤖 部署到新主機：https、開機自動啟動、當掉自動重開（systemd 或 pm2）、log
-- [ ] 🤖 **每天自動備份 `data/accounts.json`**（玩家的帳號、金幣、儲值紀錄全在這個檔案裡，壞了就全沒了）
+- [ ] 🤖 部署到新主機：https、開機自動啟動、當掉自動重開、log（步驟與 systemd 服務檔已經準備好：[docs/deploy.md](docs/deploy.md)、`deploy/card-game.service`）
+- [x] 🤖 這台機器上當掉自動重開（`scripts/serve.sh`）；伺服器只接受本機連線；登入、註冊、API、連線對戰加流量限制；密碼改在背景執行緒算
+- [x] 🤖 **每天自動備份帳號資料**（帳號改存 SQLite `data/accounts.sqlite`，每天備份到 `data/backups/`，留 14 天）
+- [ ] 🤖 備份再複製一份到別台機器或雲端（現在備份跟資料在同一顆硬碟）
 - [ ] 🤖 `deploy.sh` 改成部署到新主機
 
 ## 1. Google 帳號登入
@@ -73,7 +75,7 @@ Google 登入、Play 商店的 App、綠界的付款通知都要固定的 https 
 
 ## 4. 管理工具（客服用）
 
-帳號資料在 `data/accounts.json`，用法見 README 的「管理帳號」。
+帳號資料在 `data/accounts.sqlite`，用法見 README 的「管理帳號」。
 
 - [x] `npm run admin -- list`：列出所有帳號（名字、金幣、粉塵、收藏數、儲值總額）
 - [x] `npm run admin -- unlimited <名字>`：超級帳號（金幣用不完、全卡），Flyer 已經設好

@@ -362,6 +362,21 @@ button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
 .power small { margin-left: 4px; color: var(--ink-faint); font-size: 11px; }
 .log-wrap { background: var(--mat); border: 1px solid var(--mat-edge); border-radius: 12px; padding: 10px 12px 10px 14px; display: grid; grid-template-rows: auto 1fr; min-height: 0; }
 .log-title { margin: 0 0 6px; font-size: 12px; color: var(--ink-faint); letter-spacing: .08em; }
+/* 連線對戰的聊天室（對戰紀錄下面）：可以收起來，收起來時標出沒看到的幾句 */
+.chat { background: var(--mat); border: 1px solid var(--mat-edge); border-radius: 12px; padding: 6px 10px 8px; display: grid; gap: 6px; }
+.chat-head { display: flex; align-items: center; gap: 6px; padding: 2px 0; border: 0; background: none; color: var(--ink-faint); font-size: 12px; letter-spacing: .08em; cursor: pointer; text-align: left; }
+.chat-fold { margin-left: auto; color: var(--ink-soft); letter-spacing: 0; }
+.chat-badge { min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--damage); color: #1b0d0b; font: 700 11px/18px var(--num); text-align: center; letter-spacing: 0; }
+.chat-lines { list-style: none; margin: 0; padding: 0; max-height: 140px; overflow-y: auto; display: grid; gap: 3px; align-content: start; font-size: 13px; }
+.chat-lines li { overflow-wrap: anywhere; }
+.chat-lines b { margin-right: 6px; font-weight: 700; }
+.chat-lines .mine b { color: var(--energy); }
+.chat-lines .theirs b { color: var(--pick); }
+.chat-empty { color: var(--ink-faint); font-size: 12px; }
+.chat-quick { display: flex; flex-wrap: wrap; gap: 4px; }
+.chat-form { display: flex; gap: 6px; }
+.chat-form input { flex: 1; min-width: 0; font: inherit; font-size: 13px; color: var(--ink); background: var(--page); border: 1px solid var(--mat-edge); border-radius: 6px; padding: 5px 8px; }
+.chat-mute { justify-self: end; }
 .log { list-style: none; margin: 0; padding: 0; overflow-y: auto; font-size: 12.5px; display: grid; gap: 2px; align-content: start; }
 .log .t-turn { color: var(--ink-faint); }
 .log .t-you { color: #bfe7f1; }

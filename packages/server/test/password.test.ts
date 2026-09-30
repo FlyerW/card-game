@@ -26,8 +26,10 @@ describe('名字＋密碼帳號', () => {
     try {
       const store = await AccountStore.open(dir, db);
       await store.loginWithPassword('小安', 'my-secret-pw', true);
-      const text = await readFile(join(dir, 'accounts.json'), 'utf8');
-      expect(text).not.toContain('my-secret-pw');
+      store.close();
+      // 資料庫檔（連同還沒併回去的 WAL 檔）裡都找不到明文密碼
+      const bytes = [await readFile(join(dir, 'accounts.sqlite')), await readFile(join(dir, 'accounts.sqlite-wal')).catch(() => Buffer.alloc(0))];
+      for (const each of bytes) expect(each.includes('my-secret-pw')).toBe(false);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

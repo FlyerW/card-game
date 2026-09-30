@@ -87,7 +87,8 @@ tmux kill-session -t card-game   # 停掉
 
 - 用的是 Cloudflare 的免費通道（quick tunnel）：不用帳號、自動有 https，但**每次重開網址會變**。
   只重開伺服器、不動通道的話網址不變：`tmux respawn-window -k -t card-game:server`。
-- 帳號資料在 `data/accounts.json`，重開也還在。伺服器與通道的紀錄在 `logs/`，網址在 `logs/url.txt`。
+- 帳號資料在 `data/accounts.sqlite`，重開也還在，每天自動備份到 `data/backups/`。伺服器與通道的紀錄在 `logs/`，網址在 `logs/url.txt`。
+- 伺服器用 `scripts/serve.sh` 開，當掉會自動重開；只接受本機連線，外面的人都從通道進來。承載量、流量限制、搬到固定主機的步驟見 [docs/deploy.md](docs/deploy.md)。
 - 這台機器重開機之後要再跑一次 `scripts/deploy.sh`。
 - 要固定網址（Google 登入需要），得用自己的網域或 Cloudflare 帳號建「具名通道」，網址固定後把它加進 Google 的「已授權的 JavaScript 來源」。
 
@@ -108,7 +109,7 @@ PUBLIC_URL=https://你的固定網址   # 綠界付款完成後要通知這個�
 
 - 綠界付款完成後會從他們的伺服器通知 `PUBLIC_URL/api/ecpay/notify`，所以一定要用固定、對外的網址；臨時通道重開網址就變了。
 - 測試環境付款可以用綠界文件上的測試信用卡號（例如 4311-9522-2222-2222，安全碼 222，有效期限填未來的日期）。
-- 儲值紀錄（訂單）存在 `data/accounts.json`。細節見 [docs/design.md 的「儲值」](docs/design.md#儲值綠界)。
+- 儲值紀錄（訂單）存在 `data/accounts.sqlite`。細節見 [docs/design.md 的「儲值」](docs/design.md#儲值綠界)。
 
 ## Google 登入
 
@@ -125,13 +126,14 @@ PUBLIC_URL=https://你的固定網址   # 綠界付款完成後要通知這個�
 GOOGLE_CLIENT_ID=123456-xxxx.apps.googleusercontent.com npm run server
 ```
 
-- 帳號資料存在專案的 `data/accounts.json`（已經加進 .gitignore），`DATA_DIR=/some/path` 可以換地方。要備份就備份這個檔案。
+- 帳號資料存在專案的 `data/accounts.sqlite`（SQLite，已經加進 .gitignore），`DATA_DIR=/some/path` 可以換地方。
+  每天自動備份到 `data/backups/`（留 14 天）；以前的 `data/accounts.json` 第一次開伺服器時自動搬進去。
 - 伺服器只信任自己驗證過的 Google ID token：檢查簽章、發給誰、誰發的、有沒有過期。瀏覽器拿到的是 30 天的 session token，檔案裡只存它的雜湊。
 - 跟電腦打的勝負是瀏覽器回報的，還防不了作弊，見 docs/design.md 的「經濟系統」。
 
 ## 管理帳號
 
-帳號資料在 `data/accounts.json`（伺服器帳號才有；測試帳號存在各自的瀏覽器裡，看不到）。
+帳號資料在 `data/accounts.sqlite`（伺服器帳號才有；測試帳號存在各自的瀏覽器裡，看不到）。改之前會自動備份到 `data/backups/`。
 
 ```bash
 npm run admin -- list                  # 列出所有帳號：金幣、粉塵、收藏、儲值總額（伺服器開著也可以看）

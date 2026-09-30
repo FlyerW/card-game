@@ -70,7 +70,7 @@ import {
   type RankState,
   type SavedDeck,
 } from '@card-game/economy';
-import type { RankedReport } from '@card-game/server/protocol';
+import { CHAT_KEPT, CHAT_LIMIT, type ChatLine, type RankedReport } from '@card-game/server/protocol';
 import { chooseAction, chooseActionSmart, STYLES } from '@card-game/sim/bot';
 import { describeEvents, ZONE, type LogLine } from './log';
 import {
@@ -206,6 +206,8 @@ interface App extends Saved {
   queue: { since: number; waiting: number } | null;
   /** 現在這個房間是排位賽（結果由伺服器記，不用瀏覽器回報）。 */
   rankedRoom: boolean;
+  /** 連線對戰的聊天室：哪個房間的、說過的話、沒看到的幾句、有沒有展開、打到一半的字、要不要隱藏對手的話。 */
+  chat: { room: string | null; lines: ChatLine[]; unread: number; open: boolean; draft: string; muted: boolean };
   /** 這場排位賽的結果。 */
   rankedReport: RankedReport | null;
   leaderboard: LeaderboardRow[] | null;
@@ -294,6 +296,7 @@ const app: App = {
   rank: null,
   queue: null,
   rankedRoom: false,
+  chat: { room: null, lines: [], unread: 0, open: window.innerWidth > 700, draft: '', muted: false },
   rankedReport: null,
   leaderboard: null,
   guestName: loadName(),
@@ -553,6 +556,8 @@ online.onMessage = (message) => {
     app.mode = 'online';
     YOU = message.seat;
     app.rankedRoom = message.ranked;
+    // 換了房間：聊天室從頭開始。
+    if (app.chat.room !== message.code) app.chat = { ...app.chat, room: message.code, lines: [], unread: 0, draft: '' };
     // 排位賽配對成功：等局面送來就開打，不經過等候畫面。
     if (message.ranked) {
       app.queue = null;
@@ -561,6 +566,12 @@ online.onMessage = (message) => {
       // 還沒開局（等朋友加入）就留在等候畫面；已經在打就只是更新對手的連線狀態。
       app.screen = 'lobby';
     }
+    render();
+  } else if (message.t === 'chat') {
+    const lines = message.replace ? message.lines : [...app.chat.lines, ...message.lines];
+    // 收起來的時候，對手說的話算未讀（隱藏對手的話時不算）。
+    const unseen = message.replace || app.chat.open || app.chat.muted ? 0 : message.lines.filter((line) => line.seat !== YOU).length;
+    app.chat = { ...app.chat, lines: lines.slice(-CHAT_KEPT), unread: app.chat.unread + unseen };
     render();
   } else if (message.t === 'queued') {
     app.queue = { since: message.since, waiting: message.waiting };
@@ -614,6 +625,36 @@ function joinRoom(): void {
   const deck = myDeck();
   resetGameRecord(deck);
   online.send({ t: 'join', code, name: roomName(), heroId: app.heroId, deck, back: myBack() });
+}
+
+/** 聊天室的快捷句子（手機上不用打字）。 */
+const QUICK_CHAT = ['你好！', '好牌！', '謝謝', '再來一局？'];
+
+/** 連線對戰的聊天室：對戰紀錄下面，可以收起來；收起來時標出沒看到的幾句。 */
+function chatPanel(): string {
+  const chat = app.chat;
+  const head = `<button class="chat-head" data-do="chat-toggle" aria-expanded="${chat.open}">聊天${chat.unread ? `<b class="chat-badge">${chat.unread}</b>` : ''}<span class="chat-fold">${chat.open ? '收起' : '展開'}</span></button>`;
+  if (!chat.open) return `<div class="chat">${head}</div>`;
+  const lines = chat.lines
+    .filter((line) => !(chat.muted && line.seat !== YOU))
+    .map((line) => `<li class="${line.seat === YOU ? 'mine' : 'theirs'}"><b>${esc(line.seat === YOU ? '你' : line.name)}</b>${esc(line.text)}</li>`)
+    .join('');
+  const quick = QUICK_CHAT.map((text) => `<button class="ghost small" data-chat-quick="${esc(text)}">${esc(text)}</button>`).join('');
+  return `<div class="chat open">${head}
+    <ol class="chat-lines" aria-live="polite">${lines || `<li class="chat-empty">${chat.muted ? '對手的話已經隱藏' : '還沒有人說話'}</li>`}</ol>
+    <div class="chat-quick">${quick}</div>
+    <div class="chat-form"><input id="chat-in" maxlength="${CHAT_LIMIT}" placeholder="說點什麼…（Enter 送出）" value="${esc(chat.draft)}" autocomplete="off" aria-label="聊天訊息"><button class="primary small" data-do="chat-send">送出</button></div>
+    <button class="ghost small chat-mute" data-do="chat-mute" aria-pressed="${chat.muted}">${chat.muted ? '顯示對手的話' : '隱藏對手的話'}</button>
+  </div>`;
+}
+
+/** 送出一句話；伺服器會傳回給雙方（包括自己），收到才顯示。fromInput：清掉輸入框。 */
+function sendChat(text: string, fromInput = false): void {
+  const clean = text.trim().slice(0, CHAT_LIMIT);
+  if (!clean || app.mode !== 'online') return;
+  online.send({ t: 'chat', text: clean });
+  if (fromInput) app.chat = { ...app.chat, draft: '' };
+  render();
 }
 
 function leaveRoom(): void {
@@ -1539,6 +1580,7 @@ function playScreen(): string {
     <aside class="panel">
       <div class="detail${app.selection || app.toast ? ' floating' : ''}">${detail(view)}</div>
       <div class="log-wrap"><p class="log-title">對戰紀錄</p><ol class="log">${log}</ol></div>
+      ${app.mode === 'online' ? chatPanel() : ''}
       <div class="panel-tools">
         <button class="ghost small" data-do="concede" ${view.phase === 'main' ? '' : 'disabled'}>投降</button>
         <button class="ghost small" data-do="density" aria-pressed="${compact()}">${compact() ? '放大卡牌' : '縮小卡牌'}</button>
@@ -1872,6 +1914,9 @@ function lobbyScreen(): string {
 function render(): void {
   hideKeywordTip();
   const handScroll = root.querySelector('.hand')?.scrollLeft ?? 0;
+  // 正在打字的輸入框（例如聊天）：重畫後放回去，打到一半收到訊息也不會被打斷。
+  const typing = document.activeElement instanceof HTMLInputElement && document.activeElement.id ? document.activeElement : null;
+  const caret = typing ? { id: typing.id, start: typing.selectionStart, end: typing.selectionEnd } : null;
   const editing = app.book.decks.find((deck) => deck.id === app.builder.deckId);
   if (app.screen === 'deck' && !editing) app.screen = 'setup';
   // 開著頁面跨過午夜：換成今天的任務（Google 帳號由伺服器在下一次存取時換）。
@@ -1910,6 +1955,16 @@ function render(): void {
   });
   const handEl = root.querySelector('.hand');
   if (handEl) handEl.scrollLeft = handScroll;
+  if (caret) {
+    const input = document.getElementById(caret.id);
+    if (input instanceof HTMLInputElement) {
+      input.focus();
+      input.setSelectionRange(caret.start, caret.end);
+    }
+  }
+  // 聊天室停在最新的一句。
+  const chatLines = root.querySelector('.chat-lines');
+  if (chatLines) chatLines.scrollTop = chatLines.scrollHeight;
   const log = root.querySelector('.log');
   if (log) log.scrollTop = log.scrollHeight;
   for (const f of floats) {
@@ -2136,18 +2191,28 @@ function builderClick(el: HTMLElement, command: string | undefined): boolean {
 
 root.addEventListener('click', (event) => {
   const el = (event.target as HTMLElement).closest<HTMLElement>(
-    '[data-do],[data-key],[data-hand],[data-skill],[data-hero],[data-mull],[data-pick],[data-add],[data-remove],[data-focus],[data-filter],[data-rarity],[data-color],[data-cost],[data-kind],[data-pack],[data-stage],[data-series],[data-deck-set],[data-back],[data-deck-pick],[data-deck-edit],[data-missing],[data-craft],[data-topup],[data-difficulty]',
+    '[data-do],[data-key],[data-hand],[data-skill],[data-hero],[data-mull],[data-pick],[data-add],[data-remove],[data-focus],[data-filter],[data-rarity],[data-color],[data-cost],[data-kind],[data-pack],[data-stage],[data-series],[data-deck-set],[data-back],[data-deck-pick],[data-deck-edit],[data-missing],[data-craft],[data-topup],[data-difficulty],[data-chat-quick]',
   );
   if (!el) {
     // 點在說明欄裡（正在看卡片資訊、點關鍵字看意思）不取消選取；點其他地方才回到對戰紀錄。
-    if ((event.target as HTMLElement).closest('.detail, .dialog')) return;
+    if ((event.target as HTMLElement).closest('.detail, .dialog, .chat')) return;
     if (app.selection) {
       app.selection = null;
       render();
     }
     return;
   }
-  const { do: command, key, hand: handUid, skill, hero: heroId, mull, pick, difficulty, deckPick, deckEdit, stage, stageLevel } = el.dataset;
+  const { do: command, key, hand: handUid, skill, hero: heroId, mull, pick, difficulty, deckPick, deckEdit, stage, stageLevel, chatQuick } = el.dataset;
+  if (chatQuick !== undefined) return sendChat(chatQuick);
+  if (command === 'chat-send') return sendChat(app.chat.draft, true);
+  if (command === 'chat-toggle') {
+    app.chat = { ...app.chat, open: !app.chat.open, unread: 0 };
+    return render();
+  }
+  if (command === 'chat-mute') {
+    app.chat = { ...app.chat, muted: !app.chat.muted };
+    return render();
+  }
   if (app.screen === 'deck' && builderClick(el, command)) return;
   if (app.screen === 'shop' && app.backend && shopClick(db, app, app.backend, el, command, render)) {
     render();
@@ -2371,6 +2436,8 @@ root.addEventListener('input', (event) => {
     app.roomCode = input.value.toUpperCase();
   } else if (input.id === 'deck-code-in') {
     app.importText = input.value;
+  } else if (input.id === 'chat-in') {
+    app.chat.draft = input.value;
   } else if (input.id === 'deck-name') {
     // 改牌組名字：不重畫（游標才不會跳掉），停手才存。
     const id = app.builder.deckId;
@@ -2398,6 +2465,12 @@ window.addEventListener('pageshow', (event) => {
 });
 
 document.addEventListener('keydown', (event) => {
+  // 聊天：Enter 送出（輸入法選字時的 Enter 不算）。
+  if (event.key === 'Enter' && !event.isComposing && (event.target as HTMLElement).id === 'chat-in') {
+    event.preventDefault();
+    sendChat(app.chat.draft, true);
+    return;
+  }
   if (event.key === 'Escape' && app.selection) {
     app.selection = null;
     render();

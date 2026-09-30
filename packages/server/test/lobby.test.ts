@@ -40,6 +40,36 @@ describe('卡背', () => {
   });
 });
 
+describe('聊天室', () => {
+  it('房間裡說的話雙方都收到；去掉控制字元、太長截斷、空白的不送', () => {
+    const lobby = new Lobby(engine);
+    const { host, guest } = openRoom(lobby);
+    lobby.handle(host.client, { t: 'chat', text: '  你好\u0007！ ' });
+    expect(guest.last('chat')).toMatchObject({ replace: false, lines: [{ seat: 0, name: '小明', text: '你好！' }] });
+    expect(host.last('chat')!.lines[0]!.text).toBe('你好！');
+    lobby.handle(guest.client, { t: 'chat', text: '好'.repeat(500) });
+    expect(host.last('chat')!.lines[0]!.text).toHaveLength(100);
+    const before = host.inbox.length;
+    lobby.handle(guest.client, { t: 'chat', text: '   ' });
+    expect(host.inbox.length).toBe(before);
+  });
+
+  it('不在房間裡不能說話；斷線回來補給他之前的對話', () => {
+    const lobby = new Lobby(engine);
+    const stranger = fakeClient();
+    lobby.handle(stranger.client, { t: 'chat', text: 'hi' });
+    expect(stranger.last('error')!.message).toContain('不在房間裡');
+    const { host, guest, code } = openRoom(lobby);
+    lobby.handle(host.client, { t: 'chat', text: '一' });
+    lobby.handle(guest.client, { t: 'chat', text: '二' });
+    const token = guest.last('room')!.token;
+    lobby.disconnect(guest.client);
+    const back = fakeClient();
+    lobby.handle(back.client, { t: 'rejoin', code, token });
+    expect(back.last('chat')).toMatchObject({ replace: true, lines: [{ text: '一' }, { text: '二' }] });
+  });
+});
+
 describe('房間', () => {
   it('開房間拿到房號；朋友用房號加入，兩個人都到了就開局', () => {
     const lobby = new Lobby(engine);

@@ -6,6 +6,7 @@ import { AccountError, accountInfo, serverDay, type Account, type AccountStore }
 import { checkoutFields, checkoutUrl, newTradeNo, readNotice, type EcpayConfig } from './ecpay';
 import { parseBotRecord, type GameLog } from './gamelog';
 import { TokenError, type GoogleIdentity } from './google';
+import { clientIp, type RateLimiter } from './limits';
 
 // 帳號與經濟的 HTTP API，全部在 /api/ 底下，收發 JSON。登入後的請求帶 Authorization: Bearer <token>。
 // 開卡包的亂數在伺服器上抽，瀏覽器改不了；跟電腦打的勝負目前是瀏覽器回報的（電腦對手跑在瀏覽器裡），
@@ -27,7 +28,11 @@ export interface ApiOptions {
   ecpay?: EcpayConfig | null;
   /** 對外的網址（綠界付款完成後通知與返回用）；沒設定就用瀏覽器頁面的來源。 */
   publicUrl?: string | null;
+  /** 流量限制（見 limits.ts）；沒給就不限（測試用）。 */
+  limits?: { api: RateLimiter; login: RateLimiter; register: RateLimiter; failedLogin: RateLimiter } | null;
 }
+
+const TOO_MANY = '太頻繁了，請等一下再試';
 
 class HttpError extends Error {
   constructor(
@@ -82,7 +87,11 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
   /** 超級帳號看得到還沒發布的卡包；其他帳號只有已發布的。 */
   const dbFor = (account: Account): CardDb => (account.unlimited && options.previewDb ? options.previewDb : db);
   const route = `${request.method} ${path}`;
+  const ip = clientIp(request);
+  const limits = options.limits ?? null;
   try {
+    // 綠界的付款通知從綠界的伺服器來，不限。
+    if (limits && route !== 'POST /api/ecpay/notify' && !limits.api.take(ip)) throw new HttpError(429, TOO_MANY);
     const authed = (): { account: Account; token: string } => {
       const token = bearer(request);
       const account = token ? store.byToken(token) : null;
@@ -140,6 +149,7 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
 
       case 'POST /api/login/google': {
         if (!options.verify) throw new HttpError(503, '這台伺服器還沒設定 Google 登入');
+        if (limits && !limits.login.take(ip)) throw new HttpError(429, TOO_MANY);
         const { credential } = await readJson(request);
         if (typeof credential !== 'string' || credential.length > 8192) throw new HttpError(400, '缺少 Google 的登入資料');
         let identity: GoogleIdentity;
@@ -163,11 +173,19 @@ export async function handleApi(request: IncomingMessage, response: ServerRespon
       case 'POST /api/login/password': {
         const { name, password, create } = await readJson(request);
         if (typeof name !== 'string' || typeof password !== 'string' || password.length > 200) throw new HttpError(400, '名字或密碼格式不對');
+        // 算密碼很吃 CPU：同一個 IP 每分鐘有上限；開新帳號另外有每小時的上限；同一個名字錯太多次先鎖一陣子（防猜密碼）。
+        const nameKey = name.trim().toLowerCase();
+        if (limits && !limits.login.take(ip)) throw new HttpError(429, TOO_MANY);
+        if (limits && create === true && !limits.register.take(ip)) throw new HttpError(429, '這個網路開太多新帳號了，過一陣子再試');
+        if (limits && !limits.failedLogin.allows(nameKey)) throw new HttpError(429, '密碼錯太多次了，過 15 分鐘再試');
         try {
           const { token, account } = await store.loginWithPassword(name, password, create === true);
           return send(response, 200, { token, account: accountInfo(account), profile: account.profile, rank: store.rankOf(account), deckBook: account.deckBook ?? emptyBook() }), true;
         } catch (error) {
-          if (error instanceof AccountError) throw new HttpError(error.status, error.message);
+          if (error instanceof AccountError) {
+            if (error.status === 401) limits?.failedLogin.take(nameKey);
+            throw new HttpError(error.status, error.message);
+          }
           throw error;
         }
       }

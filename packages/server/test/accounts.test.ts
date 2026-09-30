@@ -82,11 +82,10 @@ describe('帳號資料', () => {
       const store = await AccountStore.open(dir, db);
       const { token, account } = await store.login({ sub: '9', email: null, name: '管理員', picture: null });
       await store.update(account, { ...account.profile, gold: 0 });
-      // 管理指令只改帳號檔：模擬它把旗標寫進去
-      const file = join(dir, 'accounts.json');
-      const data = JSON.parse(await readFile(file, 'utf8'));
-      data.accounts['google:9'].unlimited = true;
-      await writeFile(file, JSON.stringify(data));
+      // 管理指令（npm run admin -- unlimited）在伺服器關著時打開旗標
+      await store.setUnlimited(account, true);
+      await store.update(account, { ...account.profile, gold: 0 });
+      store.close();
 
       const reopened = await AccountStore.open(dir, db);
       const hero = reopened.byToken(token)!;
@@ -108,10 +107,8 @@ describe('帳號資料', () => {
       const store = await AccountStore.open(dir, sampleDb());
       const admin = await store.login({ sub: 'admin', email: null, name: '管理員', picture: null });
       const normal = await store.login({ sub: 'normal', email: null, name: '路人', picture: null });
-      const file = join(dir, 'accounts.json');
-      const data = JSON.parse(await readFile(file, 'utf8'));
-      data.accounts['google:admin'].unlimited = true;
-      await writeFile(file, JSON.stringify(data));
+      await store.setUnlimited(admin.account, true);
+      store.close();
 
       const running = await startServer({ port: 0, host: '127.0.0.1', dataDir: dir });
       try {

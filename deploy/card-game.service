@@ -1,0 +1,23 @@
+# systemd 服務檔：搬到固定的主機（VPS）時用，開機自動啟動、當掉自動重開。怎麼用見 docs/deploy.md。
+# 把 /srv/card-game 換成專案的位置、card-game 換成跑伺服器的使用者。
+[Unit]
+Description=幻彩英雄 遊戲伺服器
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=card-game
+WorkingDirectory=/srv/card-game
+# 正式的綠界金鑰、Google client id 等寫在 data/secrets.env（一行一個 KEY=value，不會進 git）
+EnvironmentFile=-/srv/card-game/data/secrets.env
+Environment=PORT=8787
+Environment=HOST=127.0.0.1
+Environment=DATA_DIR=/srv/card-game/data
+ExecStart=/usr/bin/npx tsx packages/server/src/main.ts
+Restart=always
+RestartSec=3
+# 記憶體用超過 1 GB 就重開（正常大約 150 MB）
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target
