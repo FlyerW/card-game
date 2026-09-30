@@ -711,13 +711,14 @@ button.deck-item { border: 1px solid var(--mat-edge); }
 .play-howto { margin-top: 12px; }
 .play-howto summary { cursor: pointer; font: 700 15px/1.4 var(--display); }
 .play-howto ul { margin: 10px 0 0; }
-/* 關鍵字：滑鼠移上去或點一下（手機）才跳出完整說明 */
-.kw { position: relative; cursor: help; text-decoration: underline dotted #fff6; text-underline-offset: 3px; outline: none; }
-.kw:hover::after, .kw:focus::after {
-  content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 4px); z-index: 60; width: max-content; max-width: min(280px, 80vw);
+/* 關鍵字：滑鼠移上去或點一下（手機）才跳出完整說明（keyword-tip.ts：固定在畫面上，位置夾在畫面裡） */
+.kw { cursor: help; text-decoration: underline dotted #fff6; text-underline-offset: 3px; outline: none; }
+.kw-tip {
+  position: fixed; z-index: 100; width: max-content; max-width: min(280px, calc(100vw - 16px));
   padding: 7px 10px; border-radius: 8px; background: #0b1319; border: 1px solid var(--mat-edge); box-shadow: 0 6px 20px #000a;
-  font: 400 12.5px/1.5 var(--body, inherit); color: var(--ink); white-space: normal; text-decoration: none; pointer-events: none;
+  font: 400 12.5px/1.5 var(--body); color: var(--ink); white-space: normal; pointer-events: none;
 }
+.kw-tip[hidden] { display: none; }
 .d-kw { margin: 6px 0 0; padding: 6px 0 0; list-style: none; border-top: 1px solid var(--mat-edge); font-size: 12px; line-height: 1.5; opacity: .8; }
 .d-kw li { margin: 2px 0; }
 .d-line b, .d-kw b, .tags b, .hero-info b, .hp-text b, .skill-text b { font-weight: 700; color: var(--ink); }

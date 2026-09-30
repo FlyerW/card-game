@@ -88,6 +88,7 @@ import {
   type KindFilter,
 } from './deck-builder';
 import { CARD_BACKS, cardBack, COLOR_BACKS, DEFAULT_BACK } from './card-backs';
+import { hideKeywordTip, installKeywordTips } from './keyword-tip';
 import {
   backendFor,
   fetchLeaderboard,
@@ -1868,6 +1869,7 @@ function lobbyScreen(): string {
 // ─── 繪製與事件 ──────────────────────────────────────────────────────────────
 
 function render(): void {
+  hideKeywordTip();
   const handScroll = root.querySelector('.hand')?.scrollLeft ?? 0;
   const editing = app.book.decks.find((deck) => deck.id === app.builder.deckId);
   if (app.screen === 'deck' && !editing) app.screen = 'setup';
@@ -2450,6 +2452,8 @@ function start(data: Partial<Saved>): void {
   render();
   void advance();
 }
+
+installKeywordTips();
 
 // 排隊時每秒更新等待時間。
 setInterval(() => {
